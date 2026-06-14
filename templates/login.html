@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>FCCI Login</title>
+</head>
+
+<body>
+
+<h1>FCCI Login</h1>
+
+<form method="POST">
+
+<input
+type="text"
+name="username"
+placeholder="Username"
+required>
+
+<br><br>
+
+<input
+type="password"
+name="password"
+placeholder="Password"
+required>
+
+<br><br>
+
+<button type="submit">
+Login
+</button>
+
+<div class="text-center mt-3">
+
+<a href="/member_registration">
+
+New Member Registration
+
+</a>
+
+</div>
+
+</form>
+
+{% if error %}
+<p>{{ error }}</p>
+{% endif %}
+
+</body>
+</html>

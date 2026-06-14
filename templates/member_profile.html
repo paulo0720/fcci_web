@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Member Profile</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+rel="stylesheet">
+
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-4">
+
+<div class="card shadow">
+
+<div class="card-header bg-primary text-white">
+
+<h3>FCCI MEMBER PROFILE</h3>
+
+</div>
+
+<div class="card-body">
+
+<div class="row">
+
+<div class="col-md-3 text-center">
+
+{% if member[11] %}
+
+<img
+src="/static/uploads/{{ member[11] }}"
+class="img-fluid rounded border"
+style="
+width:220px;
+height:220px;
+object-fit:cover;
+">
+
+{% else %}
+
+<img
+src="/static/default_avatar.png"
+class="img-fluid rounded border"
+style="
+width:220px;
+height:220px;
+object-fit:cover;
+">
+
+{% endif %}
+
+</div>
+
+{% if member[10] %}
+
+<img
+src="/static/uploads/{{ member[10] }}"
+class="img-fluid rounded border">
+
+{% endif %}
+
+</div>
+
+<div class="col-md-9">
+
+<h4>{{ member[2] }}</h4>
+
+<hr>
+
+<b>Member ID:</b>
+{{ member[1] }}
+
+<br>
+
+<b>Contact:</b>
+{{ member[3] }}
+
+<br>
+
+<b>Email:</b>
+{{ member[7] }}
+
+<br>
+
+<b>Birthday:</b>
+{{ member[8] }}
+
+<br>
+
+<b>Address:</b>
+{{ member[4] }}
+
+<br>
+
+<b>Status:</b>
+{{ member[10] }}
+
+<br>
+
+<b>Last Attendance:</b>
+
+{% if attendance %}
+
+{{ attendance[0] }}
+
+{% else %}
+
+No Record
+
+{% endif %}
+
+</div>
+
+<hr>
+
+<div class="alert alert-success">
+
+<h4>
+💰 Total Payment
+</h4>
+
+<h2>
+
+₩{{ "{:,}".format(total_payment) }}
+
+</h2>
+
+</div>
+
+</div>
+
+<hr>
+
+<h4>Payment History</h4>
+
+<table class="table table-bordered">
+
+<tr>
+
+<th>Date</th>
+<th>Type</th>
+<th>Amount</th>
+
+</tr>
+
+{% for p in payments %}
+
+<tr>
+
+<td>{{ p[0] }}</td>
+<td>{{ p[1] }}</td>
+<td>₩{{ "{:,}".format(p[2]) }}</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+<div
+class="alert alert-primary mt-3">
+
+<h4 class="text-center">
+
+TOTAL PAYMENT :
+₩{{ "{:,}".format(total_payment) }}
+
+</h4>
+
+</div>
+
+<a
+href="/member_profile_pdf/{{ member[1] }}"
+class="btn btn-success btn-lg">
+
+📄 Generate Profile PDF
+
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

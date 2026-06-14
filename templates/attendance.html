@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>FCCI Attendance Center</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+rel="stylesheet">
+
+</head>
+
+<body class="bg-light">
+
+<div class="container-fluid">
+
+<div class="row">
+
+<div class="col-md-2 bg-primary text-white min-vh-100 p-3">
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<h3 class="text-center">
+FCCI
+</h3>
+
+<hr>
+
+<a class="btn btn-light w-100 mb-2"
+href="/dashboard">
+Dashboard </a>
+
+<a class="btn btn-success w-100 mb-2"
+href="/members">
+Members </a>
+
+<a class="btn btn-warning w-100 mb-2"
+href="/payments">
+Payments </a>
+
+<a class="btn btn-danger w-100 mb-2"
+href="/expenses">
+Expenses </a>
+
+<a class="btn btn-info w-100 mb-2"
+href="/donations">
+Donations </a>
+
+<a class="btn btn-secondary w-100 mb-2"
+href="/attendance">
+Attendance </a>
+
+<a class="btn btn-dark w-100"
+href="/logout">
+Logout </a>
+
+</div>
+
+<div class="col-md-10 p-4">
+
+<h2>
+📋 Attendance Center
+</h2>
+
+{% if message %}
+
+<div class="alert alert-info">
+
+{{ message }}
+
+</div>
+
+{% endif %}
+
+<div class="card shadow mb-4">
+
+<div class="card-header">
+
+Attendance Scanner
+
+</div>
+
+<div class="card-body">
+
+<form method="POST">
+
+<div class="row">
+
+<div class="col-md-8">
+
+<input
+type="text"
+name="member_id"
+class="form-control"
+placeholder="Scan or Enter Member ID"
+required>
+
+</div>
+
+<div class="col-md-4">
+
+<button
+class="btn btn-success w-100">
+
+Time In / Time Out
+
+</button>
+
+</div>
+
+<hr>
+
+<h5>QR Attendance Scanner</h5>
+
+<div id="reader" style="width:500px;"></div>
+
+<div id="scan_result"></div>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+<div class="row mb-4">
+
+<div class="col-md-4">
+
+<form action="/export_attendance" method="GET">
+
+<input
+type="date"
+name="export_date"
+class="form-control mb-2"
+required>
+
+<button
+type="submit"
+class="btn btn-primary w-100">
+
+📊 Export Attendance Excel
+
+</button>
+
+</form>
+
+</div>
+
+<br><br>
+
+
+
+</div>
+
+<div class="card shadow">
+
+<div class="card-header">
+
+Today's Attendance
+
+</div>
+
+<div class="card-body">
+
+<table class="table table-striped table-bordered">
+
+<thead>
+
+<tr>
+
+<th>Member ID</th>
+<th>Name</th>
+<th>Date</th>
+<th>Time In</th>
+<th>Time Out</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for a in attendance_history %}
+
+<tr>
+
+<td>{{ a[0] }}</td>
+
+<td>{{ a[1] }}</td>
+
+<td>{{ a[2] }}</td>
+
+<td>{{ a[3] }}</td>
+
+<td>{{ a[4] }}</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+<script>
+
+function onScanSuccess(decodedText)
+{
+
+    fetch(
+        "/qr_attendance_scan",
+        {
+            method:"POST",
+
+            headers:{
+                "Content-Type":
+                "application/x-www-form-urlencoded"
+            },
+
+            body:
+            "member_id=" +
+            encodeURIComponent(
+                decodedText
+            )
+        }
+    )
+
+    .then(
+        response => response.json()
+    )
+
+    .then(
+        data =>
+        {
+            document
+            .getElementById(
+                "scan_result"
+            )
+            .innerHTML =
+            "<div class='alert alert-success'>"
+            +
+            data.message +
+            "</div>";
+
+            setTimeout(
+                () =>
+                {
+                    location.reload();
+                },
+                5000
+            );
+        }
+    );
+}
+
+let scanner =
+new Html5QrcodeScanner(
+    "reader",
+    {
+        fps:10,
+        qrbox:250
+    }
+);
+
+scanner.render(
+    onScanSuccess
+);
+
+</script>
+
+</body>
+
+</html>
