@@ -1,0 +1,7 @@
+Flask
+gunicorn
+Werkzeug
+qrcode
+Pillow
+reportlab
+openpyxl
