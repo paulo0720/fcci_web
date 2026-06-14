@@ -138,7 +138,7 @@ def member_registration():
             birthday,
             date_registered,
             status,
-            photo_path
+
         )
         VALUES
         (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -152,7 +152,7 @@ def member_registration():
             email,
             birthday,
             datetime.now().strftime("%Y-%m-%d"),
-            "Applicant",
+            "Applicant"
             ""
         ))
 
