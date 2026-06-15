@@ -441,7 +441,7 @@ def members():
             full_name,
             contact,
             email,
-            status
+            member_since
         FROM members
         WHERE
             member_id LIKE ?
@@ -460,12 +460,115 @@ def members():
             full_name,
             contact,
             email,
-            status
+            member_since
         FROM members
         ORDER BY full_name
         """)
 
     members = cursor.fetchall()
+
+    updated_members = []
+
+    month_map = {
+        "January":1,
+        "February":2,
+        "March":3,
+        "April":4,
+        "May":5,
+        "June":6,
+        "July":7,
+        "August":8,
+        "September":9,
+        "October":10,
+        "November":11,
+        "December":12
+    }
+
+    current_date = datetime.now()
+
+    for member in members:
+
+        member_id = member[0]
+        full_name = member[1]
+        contact = member[2]
+        email = member[3]
+        member_since = member[4]
+
+        status = "Applicant"
+
+        if member_since:
+
+            try:
+
+                month_name, year = member_since.split()
+
+                year = int(year)
+
+                month = month_map[month_name]
+
+                missing_count = 0
+
+                temp_year = year
+                temp_month = month
+
+                while (
+                    temp_year < current_date.year
+                    or
+                    (
+                        temp_year == current_date.year
+                        and temp_month <= current_date.month
+                    )
+                ):
+
+                    current_month = datetime(
+                        temp_year,
+                        temp_month,
+                        1
+                   ).strftime("%B")
+
+                    cursor.execute("""
+                    SELECT COUNT(*)
+                    FROM payments
+                    WHERE member_id=?
+                    AND payment_type='Monthly Contribution'
+                    AND payment_month=?
+                    AND payment_year=?
+                    """,(
+                       member_id,
+                       current_month,
+                       str(temp_year)
+                    ))
+
+                    paid = cursor.fetchone()[0]
+
+                    if paid == 0:
+                        missing_count += 1
+
+                    temp_month += 1
+
+                    if temp_month > 12:
+                        temp_month = 1
+                        temp_year += 1
+
+                if missing_count >= 5:
+                    status = "Inactive"
+                else:
+                    status = "Active"
+
+            except:
+                status = "Active"
+
+        updated_members.append(
+            (
+                member_id,
+                full_name,
+                contact,
+                email,
+                status
+            )
+        )
+
+    members = updated_members
 
     conn.close()
 
