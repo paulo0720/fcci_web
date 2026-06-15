@@ -125,6 +125,28 @@ def member_registration():
         email = request.form["email"]
         address = request.form["address"]
 
+        photo = request.files.get("photo")
+
+        photo_filename = ""
+
+        if photo and photo.filename:
+
+            os.makedirs(
+                app.config["UPLOAD_FOLDER"],
+                exist_ok=True
+            )
+
+            photo_filename = secure_filename(
+                photo.filename
+            )
+
+            photo.save(
+                os.path.join(
+                    app.config["UPLOAD_FOLDER"],
+                    photo_filename
+                )
+            )
+
         cursor.execute("""
         INSERT INTO members
         (
@@ -139,11 +161,10 @@ def member_registration():
             date_registered,
             status,
             photo_path
-
         )
         VALUES
         (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, 
+        """,
         (
             member_id,
             full_name,
@@ -155,7 +176,7 @@ def member_registration():
             birthday,
             datetime.now().strftime("%Y-%m-%d"),
             "Applicant",
-            ""
+            photo_filename
         ))
 
         conn.commit()
@@ -824,6 +845,8 @@ def payments():
                 f"{payment_month} {payment_year}"
             )
 
+            old_member_id = member_id
+
             cursor.execute("""
             UPDATE members
             SET
@@ -835,7 +858,16 @@ def payments():
             """, (
                 new_member_id,
                 member_since,
-                member_id
+                old_member_id
+            ))
+
+            cursor.execute("""
+            UPDATE payments
+            SET member_id = ?
+            WHERE member_id = ?
+            """, (
+                new_member_id,
+                old_member_id
             ))
 
         conn.commit()
@@ -1273,7 +1305,7 @@ def export_donations():
     )
 
 @app.route(
-"/donation_certificate/[int:donation_id](int:donation_id)"
+"/donation_certificate/<int:donation_id>"
 )
 def donation_certificate(donation_id):
 
@@ -1803,6 +1835,7 @@ def attendance():
                     ""
                 ))
 
+
                 conn.commit()
 
                 message = (
@@ -2225,6 +2258,8 @@ def withdrawals():
                 - refund_amount
             )
 
+            
+
             if action == "finalize":
 
                 cursor.execute("""
@@ -2264,6 +2299,7 @@ def withdrawals():
                 DELETE FROM members
                 WHERE member_id = ?
                 """, (member_id,))
+                
 
                 conn.commit()
 
@@ -2411,42 +2447,24 @@ def withdrawal_certificate(member_id):
         Spacer(1,20)
     )
 
-    photo = request.files["photo"]
 
-    photo_filename = ""
-
-    if photo and photo.filename:
-
-        photo_filename = secure_filename(
-            photo.filename
-        )
-
-        photo.save(
-            os.path.join(
-                app.config["UPLOAD_FOLDER"],
-                photo_filename
-            )
-        )
+    photo_path = ""
 
     if len(member) > 11 and member[11]:
 
         photo_path = (
-            "static/uploads/"
-            + member[11]
+            "static/uploads/" +
+            member[11]
         )
 
-    if os.path.exists(
-        photo_path
-    ):
-
-        member_photo = Image(
-            photo_path,
-            width=120,
-            height=120
-        )
+    if photo_path and os.path.exists(photo_path):
 
         story.append(
-            member_photo
+            Image(
+                photo_path,
+                width=120,
+                height=120
+            )
         )
 
         story.append(

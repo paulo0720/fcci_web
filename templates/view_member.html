@@ -34,7 +34,7 @@ class="btn btn-secondary mb-3">
 {% if member[11] %}
 
 <img
-src="/static/uploads/{{ member[11] }}"
+src="{{ url_for('static', filename='uploads/' + member[11]) }}"
 class="img-thumbnail"
 style="width:250px;height:250px;object-fit:cover;">
 
@@ -108,7 +108,7 @@ No Photo
 </td>
 </tr>
 
-{% if member[9] == "Active" %}
+{% if member[10] == "Active" %}
 
 <span class="badge bg-success">
 Active

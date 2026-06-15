@@ -31,36 +31,21 @@ rel="stylesheet">
 {% if member[11] %}
 
 <img
-src="/static/uploads/{{ member[11] }}"
+src="{{ url_for('static', filename='uploads/' + member[11]) }}"
 class="img-fluid rounded border"
-style="
-width:220px;
-height:220px;
-object-fit:cover;
-">
+style="width:220px;height:220px;object-fit:cover;">
 
 {% else %}
 
 <img
 src="/static/default_avatar.png"
 class="img-fluid rounded border"
-style="
-width:220px;
-height:220px;
-object-fit:cover;
-">
+style="width:220px;height:220px;object-fit:cover;">
 
 {% endif %}
 
 </div>
 
-{% if member[10] %}
-
-<img
-src="/static/uploads/{{ member[10] }}"
-class="img-fluid rounded border">
-
-{% endif %}
 
 </div>
 
