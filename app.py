@@ -808,6 +808,18 @@ def payments():
 
         if payment_type == "Registration Fee":
 
+            cursor.execute("""
+            SELECT COUNT(*)
+            FROM members
+            WHERE member_id LIKE 'FCCI-%'
+            """)
+
+            count = cursor.fetchone()[0] + 1
+
+            new_member_id = (
+                f"FCCI-{datetime.now().year}-{count:06d}"
+            )
+
             member_since = (
                 f"{payment_month} {payment_year}"
             )
@@ -815,11 +827,13 @@ def payments():
             cursor.execute("""
             UPDATE members
             SET
+                member_id = ?,
                 registration_fee = 20000,
                 member_since = ?,
                 status = 'Active'
             WHERE member_id = ?
             """, (
+                new_member_id,
                 member_since,
                 member_id
             ))
