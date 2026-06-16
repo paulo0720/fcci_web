@@ -1,223 +1,268 @@
 <!DOCTYPE html>
-
-<html>
-
+<html lang="en">
 <head>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FCCI Payments</title>
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode"></script>
 
+<style>
+  body { background:#f0f4f8; }
+
+  .sidebar {
+    width:240px; min-height:100vh;
+    background:linear-gradient(180deg,#00562a 0%,#003d1e 100%);
+    padding:20px 12px;
+  }
+
+  .sidebar h3 { color:#fff; font-weight:700; letter-spacing:2px; }
+
+  .sidebar a {
+    display:block; padding:10px 14px; border-radius:10px;
+    color:rgba(255,255,255,0.8); text-decoration:none;
+    font-size:14px; font-weight:500; margin-bottom:4px;
+  }
+
+  .sidebar a:hover { background:rgba(255,255,255,0.12); color:#fff; }
+
+  .scan-card {
+    background:#fff; border-radius:16px; padding:24px;
+    box-shadow:0 2px 12px rgba(0,0,0,0.06); margin-bottom:20px;
+  }
+
+  .member-found {
+    background:#e6f4ea; border:1px solid #b7e0c4; border-radius:12px;
+    padding:14px 18px; display:flex; align-items:center; gap:14px;
+    margin-top:14px;
+  }
+
+  .member-found .avatar {
+    width:42px; height:42px; border-radius:50%;
+    background:linear-gradient(135deg,#00562a,#009a4e);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    font-weight:700; flex-shrink:0;
+  }
+
+  .member-not-found {
+    background:#fce8e6; border:1px solid #f5b8b2; border-radius:12px;
+    padding:14px 18px; margin-top:14px; color:#a02b1e; font-weight:600;
+  }
+
+  #reader { width:100%; max-width:420px; margin-top:14px; }
+
+  .card { border-radius:16px; }
+</style>
 </head>
 
-<body class="bg-light">
+<body>
+<div class="d-flex">
 
-<div class="container-fluid">
+  <div class="sidebar">
+    <img
+      src="{{ url_for('static', filename='fcci_logo.jpeg') }}"
+      alt="FCCI Logo"
+      style="width:56px;height:56px;object-fit:contain;border-radius:12px;display:block;margin:0 auto 8px;">
+    <h3 class="text-center mb-3">FCCI</h3>
+    <hr style="border-color:rgba(255,255,255,0.2)">
+    <a href="/dashboard">🏠 Dashboard</a>
+    <a href="/members">👥 Members</a>
+    <a href="/payments">💰 Payments</a>
+    <a href="/settings">⚙️ Settings</a>
+    <a href="/logout">🚪 Logout</a>
+  </div>
 
-<div class="row">
+  <div class="flex-grow-1 p-4">
 
-<div class="col-md-2 bg-primary text-white min-vh-100 p-3">
+    <h2 class="mb-4">💰 Payment Management</h2>
 
-<h3 class="text-center">
-FCCI
-</h3>
+    <!-- ── QR SCANNER CARD ── -->
+    <div class="scan-card">
+      <h5 class="mb-2">📷 Scan Member ID Card</h5>
+      <p class="text-muted mb-2">I-scan ang QR code sa likod ng ID card para auto-fill ang Member ID at makita ang pangalan.</p>
 
-<hr>
+      <button type="button" class="btn btn-primary" id="toggleScanBtn" onclick="toggleScanner()">
+        Start Scanner
+      </button>
 
-<a class="btn btn-light w-100 mb-2"
-href="/dashboard">
-Dashboard </a>
+      <div id="reader"></div>
 
-<a class="btn btn-success w-100 mb-2"
-href="/members">
-Members </a>
+      <div id="memberResult"></div>
+    </div>
 
-<a class="btn btn-warning w-100 mb-2"
-href="/payments">
-Payments </a>
+    <!-- ── PAYMENT FORM ── -->
+    <div class="card shadow mb-4">
+      <div class="card-body">
+        <form method="POST" id="paymentForm">
 
-<a class="btn btn-danger w-100"
-href="/logout">
-Logout </a>
+          <div class="row">
+            <div class="col-md-4">
+              <label>Member ID</label>
+              <input
+                type="text"
+                name="member_id"
+                id="member_id"
+                class="form-control"
+                placeholder="FCCI-2026-000001 (o i-scan QR sa taas)"
+                required>
+            </div>
 
+            <div class="col-md-4">
+              <label>Payment Type</label>
+              <select name="payment_type" class="form-select" required>
+                <option value="Registration Fee">Registration Fee</option>
+                <option value="Monthly Contribution">Monthly Contribution</option>
+              </select>
+            </div>
+          </div>
+
+          <br>
+
+          <div class="row">
+            <div class="col-md-4">
+              <label>Month</label>
+              <select name="payment_month" class="form-select">
+                <option>January</option>
+                <option>February</option>
+                <option>March</option>
+                <option>April</option>
+                <option>May</option>
+                <option>June</option>
+                <option>July</option>
+                <option>August</option>
+                <option>September</option>
+                <option>October</option>
+                <option>November</option>
+                <option>December</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label>Year</label>
+              <select name="payment_year" class="form-select">
+                <option>2025</option>
+                <option>2026</option>
+                <option>2027</option>
+                <option>2028</option>
+                <option>2029</option>
+                <option>2030</option>
+              </select>
+            </div>
+          </div>
+
+          <br>
+
+          <button class="btn btn-success">Save Payment</button>
+
+        </form>
+      </div>
+    </div>
+
+    <!-- ── PAYMENT HISTORY ── -->
+    <div class="card shadow">
+      <div class="card-body">
+        <h4>Payment History</h4>
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Receipt No</th>
+              <th>Member ID</th>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payment_history %}
+            <tr>
+              <td>{{ p[0] }}</td>
+              <td>{{ p[1] }}</td>
+              <td>{{ p[2] }}</td>
+              <td>₩{{ p[3] }}</td>
+              <td>{{ p[4] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 </div>
 
-<div class="col-md-10 p-4">
+<script>
+let scannerActive = false;
+let html5QrcodeScanner = null;
 
-<h2>
-💰 Payment Management
-</h2>
+function toggleScanner() {
+  const btn = document.getElementById('toggleScanBtn');
 
-<div class="card shadow mb-4">
+  if (!scannerActive) {
+    document.getElementById('reader').style.display = 'block';
 
-<div class="card-body">
+    html5QrcodeScanner = new Html5Qrcode("reader");
 
-<form method="POST">
+    html5QrcodeScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      onScanSuccess
+    );
 
-<div class="row">
+    btn.textContent = "Stop Scanner";
+    scannerActive = true;
 
-<div class="col-md-4">
+  } else {
+    html5QrcodeScanner.stop().then(() => {
+      document.getElementById('reader').style.display = 'none';
+    });
 
-<label>
-Member ID
-</label>
+    btn.textContent = "Start Scanner";
+    scannerActive = false;
+  }
+}
 
-<input
-type="text"
-name="member_id"
-class="form-control"
-placeholder="FCCI-2026-000001"
-required>
-</div>
+function onScanSuccess(decodedText) {
 
-<div class="col-md-4">
+  // Lagay sa Member ID field
+  document.getElementById('member_id').value = decodedText;
 
-<label>
-Payment Type
-</label>
+  // I-fetch ang member info para makita ang pangalan
+  fetch(`/get_member_info/${encodeURIComponent(decodedText)}`)
+    .then(res => res.json())
+    .then(data => {
 
-<select
-name="payment_type"
-class="form-select"
-required>
+      const resultBox = document.getElementById('memberResult');
 
-<option value="Registration Fee">
-Registration Fee
-</option>
+      if (data.found) {
+        resultBox.innerHTML = `
+          <div class="member-found">
+            <div class="avatar">${data.full_name.charAt(0).toUpperCase()}</div>
+            <div>
+              <div style="font-weight:600;">${data.full_name}</div>
+              <div style="font-size:13px;color:#5a7a5a;">${data.member_id} · ${data.status}</div>
+            </div>
+          </div>
+        `;
+      } else {
+        resultBox.innerHTML = `
+          <div class="member-not-found">
+            ⚠️ Member ID "${decodedText}" not found. Paki-check ang QR code.
+          </div>
+        `;
+      }
+    });
 
-<option value="Monthly Contribution">
-Monthly Contribution
-</option>
-
-</select>
-
-</div>
-
-
-</div>
-
-<br>
-
-<div class="row">
-
-<div class="col-md-4">
-
-<label>
-Month
-</label>
-
-<select
-name="payment_month"
-class="form-select">
-
-<option>January</option>
-<option>February</option>
-<option>March</option>
-<option>April</option>
-<option>May</option>
-<option>June</option>
-<option>July</option>
-<option>August</option>
-<option>September</option>
-<option>October</option>
-<option>November</option>
-<option>December</option>
-
-</select>
-
-</div>
-
-<div class="col-md-4">
-
-<label>
-Year
-</label>
-
-<select
-name="payment_year"
-class="form-select">
-
-<option>2025</option>
-<option>2026</option>
-<option>2027</option>
-<option>2028</option>
-<option>2029</option>
-<option>2030</option>
-
-</select>
-
-</div>
-
-
-</div>
-
-<br>
-
-<button
-class="btn btn-success">
-Save Payment </button>
-
-</form>
-
-</div>
-
-</div>
-
-<div class="card shadow">
-
-<div class="card-body">
-
-<h4>
-Payment History
-</h4>
-
-<table class="table table-striped">
-
-<thead>
-
-<tr>
-
-<th>Receipt No</th>
-<th>Member ID</th>
-<th>Type</th>
-<th>Amount</th>
-<th>Date</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-{% for p in payment_history %}
-
-<tr>
-
-<td>{{ p[0] }}</td>
-<td>{{ p[1] }}</td>
-<td>{{ p[2] }}</td>
-<td>₩{{ p[3] }}</td>
-<td>{{ p[4] }}</td>
-
-</tr>
-
-{% endfor %}
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
+  // Stop scanner pagkatapos mag-scan ng successful
+  if (html5QrcodeScanner && scannerActive) {
+    html5QrcodeScanner.stop().then(() => {
+      document.getElementById('reader').style.display = 'none';
+    });
+    document.getElementById('toggleScanBtn').textContent = "Start Scanner";
+    scannerActive = false;
+  }
+}
+</script>
 
 </body>
-
 </html>

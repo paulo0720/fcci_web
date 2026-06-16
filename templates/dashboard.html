@@ -1,279 +1,592 @@
 <!DOCTYPE html>
-
-<html>
-
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FCCI Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
 
-<title>FCCI Dashboard</title>
+    body { background: #f0f4f8; margin: 0; }
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 240px;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #00562a 0%, #003d1e 100%);
+      position: fixed;
+      top: 0; left: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      z-index: 100;
+      box-shadow: 3px 0 15px rgba(0,0,0,0.15);
+    }
 
-<style>
+    .sidebar-brand {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      text-align: center;
+    }
 
-.card-link{
-    text-decoration:none;
-    color:black;
-}
+    .sidebar-brand .brand-name {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 2px;
+    }
 
-.card-link:hover{
-    color:black;
-}
+    .sidebar-brand .brand-sub {
+      font-size: 10px;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
 
-</style>
+    .sidebar-brand .brand-logo {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      margin-bottom: 8px;
+      border-radius: 12px;
+    }
 
+    .sidebar-nav {
+      flex: 1;
+      padding: 16px 12px;
+      overflow-y: auto;
+    }
+
+    .nav-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      padding: 8px 10px 4px;
+      margin-top: 8px;
+    }
+
+    .sidebar-nav a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      color: rgba(255,255,255,0.75);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 2px;
+      transition: all 0.2s;
+    }
+
+    .sidebar-nav a:hover,
+    .sidebar-nav a.active {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+    }
+
+    .sidebar-nav a .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-footer {
+      padding: 16px 12px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .sidebar-footer a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      color: rgba(255,200,200,0.8);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .sidebar-footer a:hover {
+      background: rgba(255,80,80,0.15);
+      color: #ff8080;
+    }
+
+    /* ── MAIN CONTENT ── */
+    .main-content {
+      margin-left: 240px;
+      padding: 28px 32px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+
+    .topbar h4 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a2e1a;
+      margin: 0;
+    }
+
+    .topbar .date-badge {
+      background: #fff;
+      border: 1px solid #e0e7e0;
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: #5a7a5a;
+      font-weight: 500;
+    }
+
+    /* ── STAT CARDS ── */
+    .stat-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: 1px solid rgba(0,0,0,0.04);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+      color: inherit;
+    }
+
+    .stat-card .stat-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      margin-bottom: 14px;
+    }
+
+    .stat-card .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #8a9e8a;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 4px;
+    }
+
+    .stat-card .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: #1a2e1a;
+      line-height: 1;
+    }
+
+    .stat-card .stat-value.money {
+      font-size: 20px;
+    }
+
+    /* icon bg colors */
+    .icon-blue   { background: #e8f0fe; }
+    .icon-green  { background: #e6f4ea; }
+    .icon-red    { background: #fce8e6; }
+    .icon-orange { background: #fff3e0; }
+    .icon-purple { background: #f3e8fd; }
+    .icon-teal   { background: #e0f7f4; }
+
+    /* ── BALANCE CARD ── */
+    .balance-card {
+      background: linear-gradient(135deg, #00562a 0%, #007a3d 60%, #009a4e 100%);
+      border-radius: 20px;
+      padding: 28px 32px;
+      color: #fff;
+      box-shadow: 0 8px 32px rgba(0,86,42,0.3);
+    }
+
+    .balance-card .label {
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0.75;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .balance-card .amount {
+      font-size: 42px;
+      font-weight: 700;
+      margin: 8px 0 4px;
+    }
+
+    .balance-card .sub {
+      font-size: 13px;
+      opacity: 0.6;
+    }
+
+    /* ── BIRTHDAY CARD ── */
+    .birthday-section {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      border: 1px solid rgba(0,0,0,0.04);
+    }
+
+    .birthday-section h6 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #8a9e8a;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+    }
+
+    .birthday-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f4f0;
+    }
+
+    .birthday-item:last-child { border-bottom: none; }
+
+    .birthday-avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00562a, #009a4e);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .birthday-avatar img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+
+    .birthday-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a2e1a;
+    }
+
+    .birthday-date {
+      font-size: 12px;
+      color: #8a9e8a;
+      margin-top: 1px;
+    }
+
+    .birthday-tag {
+      margin-left: auto;
+      background: #fff3e0;
+      color: #e65100;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .birthday-tag.today {
+      background: #e6f4ea;
+      color: #1b5e20;
+    }
+
+    .no-birthdays {
+      text-align: center;
+      color: #b0c4b0;
+      font-size: 14px;
+      padding: 20px 0;
+    }
+
+    /* ── RECENT PAYMENTS ── */
+    .section-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      border: 1px solid rgba(0,0,0,0.04);
+    }
+
+    .section-card h6 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #8a9e8a;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+    }
+
+    .section-card table {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .section-card th {
+      font-size: 11px;
+      font-weight: 600;
+      color: #8a9e8a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: none;
+      padding-bottom: 8px;
+    }
+
+    .section-card td {
+      border: none;
+      border-top: 1px solid #f0f4f0;
+      vertical-align: middle;
+      color: #2d4a2d;
+      padding: 10px 8px;
+    }
+
+    .amount-pill {
+      background: #e6f4ea;
+      color: #1b5e20;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+  </style>
 </head>
+<body>
 
-<body class="bg-light">
+<!-- ── SIDEBAR ── -->
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <img
+      src="{{ url_for('static', filename='fcci_logo.jpeg') }}"
+      alt="FCCI Logo"
+      class="brand-logo">
+    <div class="brand-name">FCCI</div>
+    <div class="brand-sub">Filipino Community Center Int'l</div>
+  </div>
 
-<div class="container-fluid">
+  <nav class="sidebar-nav">
+    <div class="nav-label">Main</div>
+    <a href="/dashboard" class="active">
+      <span class="nav-icon">🏠</span> Dashboard
+    </a>
 
-<div class="row">
+    <div class="nav-label">Members</div>
+    <a href="/members">
+      <span class="nav-icon">👥</span> Members
+    </a>
+    <a href="/registration_approval">
+      <span class="nav-icon">📝</span> Reg. Approval
+    </a>
 
-<div class="col-md-2 bg-primary text-white min-vh-100 p-3">
+    <div class="nav-label">Finance</div>
+    <a href="/payments">
+      <span class="nav-icon">💰</span> Payments
+    </a>
+    <a href="/expenses">
+      <span class="nav-icon">💸</span> Expenses
+    </a>
+    <a href="/donations">
+      <span class="nav-icon">🎁</span> Donations
+    </a>
+    <a href="/withdrawals">
+      <span class="nav-icon">📄</span> Withdrawals
+    </a>
 
-<h3 class="text-center">FCCI</h3>
+    <div class="nav-label">Tools</div>
+    <a href="/attendance">
+      <span class="nav-icon">📋</span> Attendance
+    </a>
+    <a href="/exports">
+      <span class="nav-icon">📊</span> Export Center
+    </a>
+  </nav>
 
-<hr>
+  <div class="sidebar-footer">
+    <a href="/settings">
+      <span class="nav-icon">⚙️</span> Settings
+    </a>
+    <a href="/logout">
+      <span class="nav-icon">🚪</span> Logout
+    </a>
+  </div>
+</div>
 
-<ul class="nav flex-column">
+<!-- ── MAIN CONTENT ── -->
+<div class="main-content">
 
-<li class="nav-item">
-<a class="nav-link text-white" href="/members">👥 Members</a>
-</li>
+  <!-- Topbar -->
+  <div class="topbar">
+    <h4>Welcome back, {{ username }} 👋</h4>
+    <div class="date-badge" id="currentDate"></div>
+  </div>
 
-<li class="nav-item">
-<a class="nav-link text-white"
-href="/registration_approval">
+  <!-- Row 1: Stats -->
+  <div class="row g-3 mb-3">
 
-📝 Registration Approval
+    <div class="col-md-3 col-6">
+      <div class="stat-card">
+        <div class="stat-icon icon-blue">👥</div>
+        <div class="stat-label">Total Members</div>
+        <div class="stat-value">{{ total_members }}</div>
+      </div>
+    </div>
 
-</a>
-</li>
+    <div class="col-md-3 col-6">
+      <a href="/dashboard_active" class="stat-card">
+        <div class="stat-icon icon-green">🟢</div>
+        <div class="stat-label">Active</div>
+        <div class="stat-value">{{ active_members }}</div>
+      </a>
+    </div>
 
-<li class="nav-item">
-<a class="nav-link text-white" href="/payments">💰 Payments</a>
-</li>
+    <div class="col-md-3 col-6">
+      <a href="/dashboard_inactive" class="stat-card">
+        <div class="stat-icon icon-red">🔴</div>
+        <div class="stat-label">Inactive</div>
+        <div class="stat-value">{{ inactive_members }}</div>
+      </a>
+    </div>
 
-<li class="nav-item">
-<a class="nav-link text-white" href="/expenses">💸 Expenses</a>
-</li>
+    <div class="col-md-3 col-6">
+      <a href="/dashboard_applicants" class="stat-card">
+        <div class="stat-icon icon-orange">📝</div>
+        <div class="stat-label">Applicants</div>
+        <div class="stat-value">{{ applicants }}</div>
+      </a>
+    </div>
 
-<li class="nav-item">
-<a class="nav-link text-white" href="/donations">🎁 Donations</a>
-</li>
+  </div>
 
-<li class="nav-item">
-<a class="nav-link text-white" href="/attendance">📋 Attendance</a>
-</li>
+  <!-- Row 2: Finance Stats -->
+  <div class="row g-3 mb-3">
 
-<li class="nav-item">
-<a class="nav-link text-white" href="/exports">📊 Export Center</a>
-</li>
+    <div class="col-md-3 col-6">
+      <div class="stat-card">
+        <div class="stat-icon icon-green">💰</div>
+        <div class="stat-label">Collections</div>
+        <div class="stat-value money">₩{{ "{:,}".format(collections) }}</div>
+      </div>
+    </div>
 
-<li class="nav-item">
-<a class="nav-link text-white" href="/withdrawals">📄 Withdrawals</a>
-</li>
+    <div class="col-md-3 col-6">
+      <a href="/donations" class="stat-card">
+        <div class="stat-icon icon-purple">🎁</div>
+        <div class="stat-label">Donations</div>
+        <div class="stat-value money">₩{{ "{:,}".format(donations) }}</div>
+      </a>
+    </div>
 
-<li class="nav-item mt-4">
-<a class="btn btn-danger w-100" href="/logout">Logout</a>
-</li>
+    <div class="col-md-3 col-6">
+      <div class="stat-card">
+        <div class="stat-icon icon-red">💸</div>
+        <div class="stat-label">Expenses</div>
+        <div class="stat-value money">₩{{ "{:,}".format(expenses) }}</div>
+      </div>
+    </div>
 
-</ul>
+    <div class="col-md-3 col-6">
+      <a href="/dashboard_outstanding" class="stat-card">
+        <div class="stat-icon icon-orange">⚠️</div>
+        <div class="stat-label">Outstanding</div>
+        <div class="stat-value money">₩{{ "{:,}".format(total_outstanding) }}</div>
+      </a>
+    </div>
+
+  </div>
+
+  <!-- Balance -->
+  <div class="row g-3 mb-4">
+    <div class="col-12">
+      <div class="balance-card">
+        <div class="label">🏦 Current Balance</div>
+        <div class="amount">₩{{ "{:,}".format(balance) }}</div>
+        <div class="sub">Collections + Donations − Expenses</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Birthday + Recent Payments -->
+  <div class="row g-3">
+
+    <!-- 🎂 Birthday This Month -->
+    <div class="col-md-5">
+      <div class="birthday-section h-100">
+        <h6>🎂 Birthdays This Month</h6>
+
+        {% if birthday_list %}
+          {% for b in birthday_list %}
+          <div class="birthday-item">
+            <div class="birthday-avatar">
+              {% if b.photo %}
+                <img src="/static/uploads/{{ b.photo }}" alt="{{ b.full_name }}">
+              {% else %}
+                {{ b.full_name[0] | upper }}
+              {% endif %}
+            </div>
+            <div>
+              <div class="birthday-name">{{ b.full_name }}</div>
+              <div class="birthday-date">{{ b.birthday }}</div>
+            </div>
+            {% if b.is_today %}
+              <span class="birthday-tag today">🎉 Today!</span>
+            {% else %}
+              <span class="birthday-tag">🎂 This Month</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="no-birthdays">
+            🎈 No birthdays this month
+          </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- Recent Payments -->
+    <div class="col-md-7">
+      <div class="section-card h-100">
+        <h6>💳 Recent Payments</h6>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Member ID</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in recent_payments %}
+            <tr>
+              <td>{{ p[0] }}</td>
+              <td><span class="amount-pill">₩{{ "{:,}".format(p[1]) }}</span></td>
+            </tr>
+            {% endfor %}
+            {% if not recent_payments %}
+            <tr>
+              <td colspan="2" class="text-center text-muted py-3">No recent payments</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 
 </div>
 
-<div class="col-md-10 p-4">
-
-<h2>
-Welcome {{ username }}
-</h2>
-
-<div class="row g-3">
-
-<div class="col-md-3">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h5>👥 Members</h5>
-
-<h2>{{ total_members }}</h2>
-
-</div>
-
-</div>
-
-</div>
-
-<div class="col-md-3">
-
-<a href="/dashboard_active" class="card-link">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h5>🟢 Active</h5>
-
-<h2>{{ active_members }}</h2>
-
-</div>
-
-</div>
-
-</a>
-
-</div>
-
-<div class="col-md-3">
-
-<a href="/dashboard_inactive" class="card-link">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h5>🔴 Inactive</h5>
-
-<h2>{{ inactive_members }}</h2>
-
-</div>
-
-</div>
-
-</a>
-
-</div>
-
-<div class="col-md-3">
-
-<a href="/dashboard_outstanding" class="card-link">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h5>⚠️ Outstanding</h5>
-
-<h2>₩{{ "{:,}".format(total_outstanding) }}</h2>
-
-</div>
-
-</div>
-
-</a>
-
-</div>
-
-</div>
-
-<div class="row g-3 mt-2">
-
-<div class="col-md-3">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h5>💰 Collections</h5>
-
-<h2>₩{{ "{:,}".format(collections) }}</h2>
-
-</div>
-
-</div>
-
-</div>
-
-<div class="col-md-3">
-
-<a href="/donations" class="card-link">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h5>🎁 Donations</h5>
-
-<h2>₩{{ "{:,}".format(donations) }}</h2>
-
-</div>
-
-</div>
-
-</a>
-
-</div>
-
-<div class="col-md-3">
-
-<a href="/dashboard_applicants" class="card-link">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h5>📝 Applicants</h5>
-
-<h2>{{ applicants }}</h2>
-
-</div>
-
-</div>
-
-</a>
-
-</div>
-
-<div class="col-md-3">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h5>💸 Expenses</h5>
-
-<h2>₩{{ "{:,}".format(expenses) }}</h2>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<div class="row mt-4">
-
-<div class="col-md-12">
-
-<div class="card shadow">
-
-<div class="card-body text-center">
-
-<h4>🏦 Current Balance</h4>
-
-<h1 class="text-success">
-
-₩{{ "{:,}".format(balance) }}
-
-</h1>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
+<script>
+  // Show today's date in the topbar
+  const d = new Date();
+  const options = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+  document.getElementById('currentDate').textContent = d.toLocaleDateString('en-US', options);
+</script>
 
 </body>
-
 </html>

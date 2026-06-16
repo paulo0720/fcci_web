@@ -4,7 +4,8 @@ from flask import (
     request,
     redirect,
     session,
-    send_file
+    send_file,
+    jsonify
 )
 
 from werkzeug.utils import secure_filename
@@ -29,6 +30,7 @@ from reportlab.lib.styles import (
 )
 
 from flask import send_file
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 
@@ -70,29 +72,34 @@ def login():
         cursor = conn.cursor()
 
         cursor.execute("""
-        SELECT role
+        SELECT role, password
         FROM users
         WHERE username = ?
-        AND password = ?
-        """, (
-            username,
-            password
-        ))
+        """, (username,))
 
         user = cursor.fetchone()
-
         conn.close()
 
+        # Supports both hashed and plain passwords (para hindi masisira ang existing users)
         if user:
+            stored_password = user[1]
+            role = user[0]
 
-            session["username"] = username
-            session["role"] = user[0]
+            # Check if password is already hashed (starts with 'pbkdf2:' or 'scrypt:')
+            if stored_password.startswith("pbkdf2:") or stored_password.startswith("scrypt:"):
+                password_ok = check_password_hash(stored_password, password)
+            else:
+                # Plain text fallback (old accounts)
+                password_ok = (stored_password == password)
 
-            return redirect("/dashboard")
+            if password_ok:
+                session["username"] = username
+                session["role"] = role
+                return redirect("/dashboard")
 
         return render_template(
             "login.html",
-            error="Invalid Login"
+            error="Invalid username or password."
         )
 
     return render_template("login.html")
@@ -200,107 +207,64 @@ def dashboard():
     cursor = conn.cursor()
 
     # TOTAL MEMBERS
-
-    cursor.execute("""
-    SELECT COUNT(*)
-    FROM members
-    """)
-
+    cursor.execute("SELECT COUNT(*) FROM members")
     result = cursor.fetchone()
     total_members = result[0] if result else 0
 
     # COLLECTIONS
-
-    cursor.execute("""
-    SELECT COALESCE(
-        SUM(amount),
-        0
-    )
-    FROM payments
-    """)
-
+    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments")
     result = cursor.fetchone()
     collections = result[0] if result else 0
 
     # DONATIONS
-
-    cursor.execute("""
-    SELECT COALESCE(
-        SUM(amount),
-        0
-    )
-    FROM donations
-    """)
-
+    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM donations")
     result = cursor.fetchone()
     donations = result[0] if result else 0
 
     # EXPENSES
-
-    cursor.execute("""
-    SELECT COALESCE(
-        SUM(amount),
-        0
-    )
-    FROM expenses
-    """)
-
+    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM expenses")
     result = cursor.fetchone()
     expenses = result[0] if result else 0
 
-    # CURRENT BALANCE
-
-    balance = (
-        collections
-        + donations
-        - expenses
-    )
+    # BALANCE
+    balance = collections + donations - expenses
 
     # RECENT PAYMENTS
-
     cursor.execute("""
-    SELECT
-        member_id,
-        amount
+    SELECT member_id, amount
     FROM payments
     ORDER BY id DESC
     LIMIT 10
     """)
-
     recent_payments = cursor.fetchall()
 
-    # ACTIVE / INACTIVE / OUTSTANDING
+    # APPLICANTS COUNT
+    cursor.execute("SELECT COUNT(*) FROM members WHERE status='Applicant'")
+    result = cursor.fetchone()
+    applicants = result[0] if result else 0
 
+    # ACTIVE / INACTIVE / OUTSTANDING
     active_members = 0
     inactive_members = 0
     total_outstanding = 0
 
     cursor.execute("""
-        SELECT
-            member_id,
-            member_since
+        SELECT member_id, member_since
         FROM members
         WHERE status = 'Active'
-        """)
-
-    members = cursor.fetchall()
-
-    # APPLICANTS COUNT
-
-    cursor.execute("""
-    SELECT COUNT(*)
-    FROM members
-    WHERE status='Applicant'
     """)
-
-    result = cursor.fetchone()
-
-    applicants = result[0] if result else 0
+    members = cursor.fetchall()
 
     current_date = datetime.now()
 
-    for member in members:
+    month_map = {
+        "January":1, "February":2, "March":3,
+        "April":4, "May":5, "June":6,
+        "July":7, "August":8, "September":9,
+        "October":10, "November":11, "December":12
+    }
 
+    for member in members:
         member_id = member[0]
         member_since = member[1]
 
@@ -308,50 +272,20 @@ def dashboard():
             continue
 
         try:
-
             parts = member_since.split()
-
             month_name = parts[0]
             year = int(parts[1])
-
-            month_map = {
-                "January":1,
-                "February":2,
-                "March":3,
-                "April":4,
-                "May":5,
-                "June":6,
-                "July":7,
-                "August":8,
-                "September":9,
-                "October":10,
-                "November":11,
-                "December":12
-            }
-
             month = month_map[month_name]
-
         except:
             continue
 
         missing_count = 0
 
-
-
         while (
             year < current_date.year
-            or
-            (
-                year == current_date.year
-                and month <= current_date.month
-            )
+            or (year == current_date.year and month <= current_date.month)
         ):
-
-            month_name = datetime(
-                year,
-                month,
-                1
-            ).strftime("%B")
+            month_name_loop = datetime(year, month, 1).strftime("%B")
 
             cursor.execute("""
             SELECT COUNT(*)
@@ -360,24 +294,15 @@ def dashboard():
             AND payment_type = 'Monthly Contribution'
             AND payment_month = ?
             AND payment_year = ?
-            """, (
-                member_id,
-                month_name,
-                str(year)
-            ))
+            """, (member_id, month_name_loop, str(year)))
 
             result = cursor.fetchone()
-
-            paid = (
-                result[0]
-                if result else 0
-            )
+            paid = result[0] if result else 0
 
             if paid == 0:
                 missing_count += 1
 
             month += 1
-
             if month > 12:
                 month = 1
                 year += 1
@@ -387,36 +312,73 @@ def dashboard():
         else:
             inactive_members += 1
 
-        total_outstanding += (
-            missing_count * 10000
-        )
+        total_outstanding += (missing_count * 10000)
+
+    # ── BIRTHDAY THIS MONTH ──────────────────────────────────
+    # Kinukuha ang lahat ng Active members na may birthday ngayong buwan
+    current_month = current_date.month
+    current_day   = current_date.day
+
+    cursor.execute("""
+    SELECT full_name, birthday, photo_path
+    FROM members
+    WHERE status = 'Active'
+    AND birthday IS NOT NULL
+    AND birthday != ''
+    ORDER BY birthday
+    """)
+
+    all_members = cursor.fetchall()
+    birthday_list = []
+
+    for row in all_members:
+        full_name  = row[0]
+        birthday   = row[1]   # expected format: YYYY-MM-DD
+        photo_path = row[2]
+
+        if not birthday:
+            continue
+
+        try:
+            # Try YYYY-MM-DD format first
+            bday_obj = datetime.strptime(birthday, "%Y-%m-%d")
+        except ValueError:
+            try:
+                # Fallback: MM/DD/YYYY
+                bday_obj = datetime.strptime(birthday, "%m/%d/%Y")
+            except ValueError:
+                continue
+
+        if bday_obj.month == current_month:
+            is_today = (bday_obj.day == current_day)
+
+            birthday_list.append({
+                "full_name": full_name,
+                "birthday":  bday_obj.strftime("%B %d"),
+                "photo":     photo_path or "",
+                "is_today":  is_today,
+                "day":       bday_obj.day   # para ma-sort
+            })
+
+    # I-sort: today first, then by day of month
+    birthday_list.sort(key=lambda x: (not x["is_today"], x["day"]))
 
     conn.close()
 
     return render_template(
         "dashboard.html",
-
         username=session["username"],
-
         total_members=total_members,
-
         active_members=active_members,
         inactive_members=inactive_members,
-
         applicants=applicants,
-
         collections=collections,
         donations=donations,
         expenses=expenses,
-
         balance=balance,
-
         total_outstanding=total_outstanding,
-
-        birthday_list=[],
-
+        birthday_list=birthday_list,
         recent_payments=recent_payments
-        
     )
 
 @app.route("/members")
@@ -3803,7 +3765,253 @@ def registration_approval():
         "registration_approval.html",
         applicants=applicants
     )
-    
+
+@app.route("/get_member_info/<member_id>")
+def get_member_info(member_id):
+ 
+    if "username" not in session:
+        return jsonify({"found": False, "error": "Not logged in"}), 401
+ 
+    conn = get_db()
+    cursor = conn.cursor()
+ 
+    cursor.execute("""
+    SELECT member_id, full_name, status
+    FROM members
+    WHERE member_id = ?
+    """, (member_id,))
+ 
+    member = cursor.fetchone()
+    conn.close()
+ 
+    if not member:
+        return jsonify({"found": False})
+ 
+    return jsonify({
+        "found": True,
+        "member_id": member[0],
+        "full_name": member[1],
+        "status": member[2]
+    })
+
+@app.route("/settings")
+def settings():
+ 
+    if "username" not in session:
+        return redirect("/login")
+ 
+    conn = get_db()
+    cursor = conn.cursor()
+ 
+    cursor.execute("SELECT username, role FROM users ORDER BY username")
+    all_users = cursor.fetchall()
+ 
+    conn.close()
+ 
+    return render_template(
+        "settings.html",
+        username=session["username"],
+        all_users=all_users
+    )
+ 
+ 
+@app.route("/settings/change_username", methods=["POST"])
+def change_username():
+ 
+    if "username" not in session:
+        return redirect("/login")
+ 
+    new_username = request.form["new_username"].strip()
+    current_password = request.form["current_password"]
+ 
+    conn = get_db()
+    cursor = conn.cursor()
+ 
+    # Kunin ang current user's stored password
+    cursor.execute(
+        "SELECT password FROM users WHERE username = ?",
+        (session["username"],)
+    )
+    row = cursor.fetchone()
+ 
+    if not row:
+        conn.close()
+        return redirect("/login")
+ 
+    stored_password = row[0]
+ 
+    # Verify current password (supports hashed or plain)
+    if stored_password.startswith("pbkdf2:") or stored_password.startswith("scrypt:"):
+        password_ok = check_password_hash(stored_password, current_password)
+    else:
+        password_ok = (stored_password == current_password)
+ 
+    if not password_ok:
+        conn.close()
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=[],
+            error="Maling current password. Subukan ulit."
+        )
+ 
+    # Check kung taken na ang bagong username
+    cursor.execute(
+        "SELECT COUNT(*) FROM users WHERE username = ?",
+        (new_username,)
+    )
+    taken = cursor.fetchone()[0]
+ 
+    if taken > 0 and new_username != session["username"]:
+        conn.close()
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=[],
+            error=f'Ang username "{new_username}" ay ginagamit na.'
+        )
+ 
+    # I-update ang username
+    cursor.execute(
+        "UPDATE users SET username = ? WHERE username = ?",
+        (new_username, session["username"])
+    )
+    conn.commit()
+    conn.close()
+ 
+    session["username"] = new_username
+ 
+    cursor = get_db().cursor()
+ 
+    return redirect("/settings")
+ 
+ 
+@app.route("/settings/change_password", methods=["POST"])
+def change_password():
+ 
+    if "username" not in session:
+        return redirect("/login")
+ 
+    current_password = request.form["current_password"]
+    new_password = request.form["new_password"]
+    confirm_password = request.form["confirm_password"]
+ 
+    conn = get_db()
+    cursor = conn.cursor()
+ 
+    cursor.execute(
+        "SELECT password FROM users WHERE username = ?",
+        (session["username"],)
+    )
+    row = cursor.fetchone()
+ 
+    if not row:
+        conn.close()
+        return redirect("/login")
+ 
+    stored_password = row[0]
+ 
+    if stored_password.startswith("pbkdf2:") or stored_password.startswith("scrypt:"):
+        password_ok = check_password_hash(stored_password, current_password)
+    else:
+        password_ok = (stored_password == current_password)
+ 
+    if not password_ok:
+        conn.close()
+        cursor2 = get_db().cursor()
+        cursor2.execute("SELECT username, role FROM users ORDER BY username")
+        all_users = cursor2.fetchall()
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=all_users,
+            error="Maling current password."
+        )
+ 
+    if new_password != confirm_password:
+        conn.close()
+        cursor2 = get_db().cursor()
+        cursor2.execute("SELECT username, role FROM users ORDER BY username")
+        all_users = cursor2.fetchall()
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=all_users,
+            error="Hindi tugma ang New Password at Confirm Password."
+        )
+ 
+    hashed_password = generate_password_hash(new_password)
+ 
+    cursor.execute(
+        "UPDATE users SET password = ? WHERE username = ?",
+        (hashed_password, session["username"])
+    )
+    conn.commit()
+    conn.close()
+ 
+    cursor2 = get_db().cursor()
+    cursor2.execute("SELECT username, role FROM users ORDER BY username")
+    all_users = cursor2.fetchall()
+ 
+    return render_template(
+        "settings.html",
+        username=session["username"],
+        all_users=all_users,
+        message="Matagumpay na na-update ang password!"
+    )
+ 
+ 
+@app.route("/settings/add_user", methods=["POST"])
+def add_user():
+ 
+    if "username" not in session:
+        return redirect("/login")
+ 
+    new_username = request.form["username"].strip()
+    new_password = request.form["password"]
+    role = request.form["role"]
+ 
+    conn = get_db()
+    cursor = conn.cursor()
+ 
+    cursor.execute(
+        "SELECT COUNT(*) FROM users WHERE username = ?",
+        (new_username,)
+    )
+    taken = cursor.fetchone()[0]
+ 
+    if taken > 0:
+        conn.close()
+        cursor2 = get_db().cursor()
+        cursor2.execute("SELECT username, role FROM users ORDER BY username")
+        all_users = cursor2.fetchall()
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=all_users,
+            error=f'Ang username "{new_username}" ay ginagamit na.'
+        )
+ 
+    hashed_password = generate_password_hash(new_password)
+ 
+    cursor.execute(
+        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+        (new_username, hashed_password, role)
+    )
+    conn.commit()
+    conn.close()
+ 
+    cursor2 = get_db().cursor()
+    cursor2.execute("SELECT username, role FROM users ORDER BY username")
+    all_users = cursor2.fetchall()
+ 
+    return render_template(
+        "settings.html",
+        username=session["username"],
+        all_users=all_users,
+        message=f'Matagumpay na nagawa ang user "{new_username}"!'
+    )
+
 @app.route("/logout")
 def logout():
 
