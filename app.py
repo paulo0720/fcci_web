@@ -4012,6 +4012,25 @@ def add_user():
         message=f'Matagumpay na nagawa ang user "{new_username}"!'
     )
 
+@app.route("/delete_donation/<int:donation_id>")
+def delete_donation(donation_id):
+ 
+    if "username" not in session:
+        return redirect("/login")
+ 
+    conn = get_db()
+    cursor = conn.cursor()
+ 
+    cursor.execute(
+        "DELETE FROM donations WHERE id = ?",
+        (donation_id,)
+    )
+ 
+    conn.commit()
+    conn.close()
+ 
+    return redirect("/donations")
+
 @app.route("/logout")
 def logout():
 

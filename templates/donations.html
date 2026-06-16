@@ -157,6 +157,7 @@
           <th>Purpose</th>
           <th>Date</th>
           <th>Certificate</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
@@ -170,6 +171,9 @@
           <td>{{ d[5] }}</td>
           <td>
             <a href="/donation_certificate/{{ d[0] }}" class="btn btn-success btn-sm">Generate Certificate</a>
+          </td>
+          <td>
+            <a href="/delete_donation/{{ d[0] }}" class="btn btn-danger btn-sm" onclick="return confirm('Delete this donation record permanently?')">Delete</a>
           </td>
         </tr>
         {% endfor %}
