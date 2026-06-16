@@ -70,29 +70,34 @@ def login():
         cursor = conn.cursor()
 
         cursor.execute("""
-        SELECT role
+        SELECT role, password
         FROM users
         WHERE username = ?
-        AND password = ?
-        """, (
-            username,
-            password
-        ))
+        """, (username,))
 
         user = cursor.fetchone()
-
         conn.close()
 
+        # Supports both hashed and plain passwords (para hindi masisira ang existing users)
         if user:
+            stored_password = user[1]
+            role = user[0]
 
-            session["username"] = username
-            session["role"] = user[0]
+            # Check if password is already hashed (starts with 'pbkdf2:' or 'scrypt:')
+            if stored_password.startswith("pbkdf2:") or stored_password.startswith("scrypt:"):
+                password_ok = check_password_hash(stored_password, password)
+            else:
+                # Plain text fallback (old accounts)
+                password_ok = (stored_password == password)
 
-            return redirect("/dashboard")
+            if password_ok:
+                session["username"] = username
+                session["role"] = role
+                return redirect("/dashboard")
 
         return render_template(
             "login.html",
-            error="Invalid Login"
+            error="Invalid username or password."
         )
 
     return render_template("login.html")
