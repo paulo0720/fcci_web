@@ -205,107 +205,64 @@ def dashboard():
     cursor = conn.cursor()
 
     # TOTAL MEMBERS
-
-    cursor.execute("""
-    SELECT COUNT(*)
-    FROM members
-    """)
-
+    cursor.execute("SELECT COUNT(*) FROM members")
     result = cursor.fetchone()
     total_members = result[0] if result else 0
 
     # COLLECTIONS
-
-    cursor.execute("""
-    SELECT COALESCE(
-        SUM(amount),
-        0
-    )
-    FROM payments
-    """)
-
+    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments")
     result = cursor.fetchone()
     collections = result[0] if result else 0
 
     # DONATIONS
-
-    cursor.execute("""
-    SELECT COALESCE(
-        SUM(amount),
-        0
-    )
-    FROM donations
-    """)
-
+    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM donations")
     result = cursor.fetchone()
     donations = result[0] if result else 0
 
     # EXPENSES
-
-    cursor.execute("""
-    SELECT COALESCE(
-        SUM(amount),
-        0
-    )
-    FROM expenses
-    """)
-
+    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM expenses")
     result = cursor.fetchone()
     expenses = result[0] if result else 0
 
-    # CURRENT BALANCE
-
-    balance = (
-        collections
-        + donations
-        - expenses
-    )
+    # BALANCE
+    balance = collections + donations - expenses
 
     # RECENT PAYMENTS
-
     cursor.execute("""
-    SELECT
-        member_id,
-        amount
+    SELECT member_id, amount
     FROM payments
     ORDER BY id DESC
     LIMIT 10
     """)
-
     recent_payments = cursor.fetchall()
 
-    # ACTIVE / INACTIVE / OUTSTANDING
+    # APPLICANTS COUNT
+    cursor.execute("SELECT COUNT(*) FROM members WHERE status='Applicant'")
+    result = cursor.fetchone()
+    applicants = result[0] if result else 0
 
+    # ACTIVE / INACTIVE / OUTSTANDING
     active_members = 0
     inactive_members = 0
     total_outstanding = 0
 
     cursor.execute("""
-        SELECT
-            member_id,
-            member_since
+        SELECT member_id, member_since
         FROM members
         WHERE status = 'Active'
-        """)
-
-    members = cursor.fetchall()
-
-    # APPLICANTS COUNT
-
-    cursor.execute("""
-    SELECT COUNT(*)
-    FROM members
-    WHERE status='Applicant'
     """)
-
-    result = cursor.fetchone()
-
-    applicants = result[0] if result else 0
+    members = cursor.fetchall()
 
     current_date = datetime.now()
 
-    for member in members:
+    month_map = {
+        "January":1, "February":2, "March":3,
+        "April":4, "May":5, "June":6,
+        "July":7, "August":8, "September":9,
+        "October":10, "November":11, "December":12
+    }
 
+    for member in members:
         member_id = member[0]
         member_since = member[1]
 
@@ -313,50 +270,20 @@ def dashboard():
             continue
 
         try:
-
             parts = member_since.split()
-
             month_name = parts[0]
             year = int(parts[1])
-
-            month_map = {
-                "January":1,
-                "February":2,
-                "March":3,
-                "April":4,
-                "May":5,
-                "June":6,
-                "July":7,
-                "August":8,
-                "September":9,
-                "October":10,
-                "November":11,
-                "December":12
-            }
-
             month = month_map[month_name]
-
         except:
             continue
 
         missing_count = 0
 
-
-
         while (
             year < current_date.year
-            or
-            (
-                year == current_date.year
-                and month <= current_date.month
-            )
+            or (year == current_date.year and month <= current_date.month)
         ):
-
-            month_name = datetime(
-                year,
-                month,
-                1
-            ).strftime("%B")
+            month_name_loop = datetime(year, month, 1).strftime("%B")
 
             cursor.execute("""
             SELECT COUNT(*)
@@ -365,24 +292,15 @@ def dashboard():
             AND payment_type = 'Monthly Contribution'
             AND payment_month = ?
             AND payment_year = ?
-            """, (
-                member_id,
-                month_name,
-                str(year)
-            ))
+            """, (member_id, month_name_loop, str(year)))
 
             result = cursor.fetchone()
-
-            paid = (
-                result[0]
-                if result else 0
-            )
+            paid = result[0] if result else 0
 
             if paid == 0:
                 missing_count += 1
 
             month += 1
-
             if month > 12:
                 month = 1
                 year += 1
@@ -392,36 +310,73 @@ def dashboard():
         else:
             inactive_members += 1
 
-        total_outstanding += (
-            missing_count * 10000
-        )
+        total_outstanding += (missing_count * 10000)
+
+    # ── BIRTHDAY THIS MONTH ──────────────────────────────────
+    # Kinukuha ang lahat ng Active members na may birthday ngayong buwan
+    current_month = current_date.month
+    current_day   = current_date.day
+
+    cursor.execute("""
+    SELECT full_name, birthday, photo_path
+    FROM members
+    WHERE status = 'Active'
+    AND birthday IS NOT NULL
+    AND birthday != ''
+    ORDER BY birthday
+    """)
+
+    all_members = cursor.fetchall()
+    birthday_list = []
+
+    for row in all_members:
+        full_name  = row[0]
+        birthday   = row[1]   # expected format: YYYY-MM-DD
+        photo_path = row[2]
+
+        if not birthday:
+            continue
+
+        try:
+            # Try YYYY-MM-DD format first
+            bday_obj = datetime.strptime(birthday, "%Y-%m-%d")
+        except ValueError:
+            try:
+                # Fallback: MM/DD/YYYY
+                bday_obj = datetime.strptime(birthday, "%m/%d/%Y")
+            except ValueError:
+                continue
+
+        if bday_obj.month == current_month:
+            is_today = (bday_obj.day == current_day)
+
+            birthday_list.append({
+                "full_name": full_name,
+                "birthday":  bday_obj.strftime("%B %d"),
+                "photo":     photo_path or "",
+                "is_today":  is_today,
+                "day":       bday_obj.day   # para ma-sort
+            })
+
+    # I-sort: today first, then by day of month
+    birthday_list.sort(key=lambda x: (not x["is_today"], x["day"]))
 
     conn.close()
 
     return render_template(
         "dashboard.html",
-
         username=session["username"],
-
         total_members=total_members,
-
         active_members=active_members,
         inactive_members=inactive_members,
-
         applicants=applicants,
-
         collections=collections,
         donations=donations,
         expenses=expenses,
-
         balance=balance,
-
         total_outstanding=total_outstanding,
-
-        birthday_list=[],
-
+        birthday_list=birthday_list,
         recent_payments=recent_payments
-        
     )
 
 @app.route("/members")
