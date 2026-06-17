@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCCI Community Feed</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-base: #f4fbf7; --bg-mist: #e9f7ef;
+    --glass: rgba(255,255,255,0.7); --glass-border: rgba(0,150,90,0.18);
+    --emerald: #00a85c; --emerald-bright: #00c46a; --emerald-deep: #00562a;
+    --text-main: #0c2418; --text-dim: #5c8270;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Inter', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(0,196,106,0.16) 0%, transparent 40%),
+      radial-gradient(circle at 88% 18%, rgba(0,168,92,0.12) 0%, transparent 45%),
+      linear-gradient(160deg, #ffffff 0%, var(--bg-base) 45%, var(--bg-mist) 100%);
+    background-attachment:fixed;
+    color:var(--text-main);
+    min-height:100vh;
+  }
+
+  .topbar {
+    position:sticky; top:0; z-index:50;
+    background:rgba(255,255,255,0.75); backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--glass-border);
+    padding:14px 24px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .topbar-brand { display:flex; align-items:center; gap:10px; }
+  .topbar-brand img { width:36px; height:36px; border-radius:50%; object-fit:contain; }
+  .topbar-brand span {
+    font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:18px;
+    background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .topbar-nav { display:flex; gap:8px; align-items:center; }
+  .topbar-nav a {
+    text-decoration:none; color:var(--text-dim); font-size:13.5px; font-weight:600;
+    padding:8px 14px; border-radius:10px; transition:all 0.2s;
+  }
+  .topbar-nav a:hover, .topbar-nav a.active { background:rgba(0,196,106,0.1); color:var(--emerald-deep); }
+
+  .feed-wrap { max-width:640px; margin:0 auto; padding:24px 16px 60px; }
+
+  .composer {
+    background:var(--glass); backdrop-filter:blur(18px); border:1px solid var(--glass-border);
+    border-radius:18px; padding:18px 20px; margin-bottom:20px;
+    box-shadow:0 4px 20px rgba(0,100,60,0.06);
+  }
+  .composer-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .avatar-circle {
+    width:38px; height:38px; border-radius:50%; flex-shrink:0;
+    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald-bright));
+    color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px;
+  }
+  .composer textarea {
+    width:100%; border:1px solid var(--glass-border); border-radius:12px; padding:10px 14px;
+    font-size:14px; font-family:inherit; resize:none; background:rgba(255,255,255,0.8);
+    min-height:60px;
+  }
+  .composer textarea:focus { outline:none; border-color:var(--emerald); box-shadow:0 0 0 3px rgba(0,196,106,0.15); }
+  .composer-footer { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+  .photo-label {
+    font-size:13px; color:var(--emerald-deep); cursor:pointer; display:flex; align-items:center; gap:6px;
+    font-weight:600;
+  }
+  .photo-label input { display:none; }
+  .btn-post {
+    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none;
+    border-radius:10px; padding:8px 22px; font-weight:600; font-size:13.5px;
+  }
+  .preview-photo { margin-top:10px; max-width:100%; border-radius:10px; max-height:200px; object-fit:cover; display:none; }
+
+  .post-card {
+    background:var(--glass); backdrop-filter:blur(18px); border:1px solid var(--glass-border);
+    border-radius:18px; padding:18px 20px; margin-bottom:18px;
+    box-shadow:0 4px 20px rgba(0,100,60,0.06);
+  }
+  .post-card.pinned { border-color:rgba(255,170,0,0.4); background:rgba(255,236,200,0.35); }
+  .pinned-tag {
+    display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700;
+    color:#c97300; background:rgba(255,170,0,0.15); padding:3px 10px; border-radius:20px; margin-bottom:10px;
+  }
+  .post-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .post-head .name { font-weight:700; font-size:14.5px; color:var(--text-main); }
+  .post-head .meta { font-size:11.5px; color:var(--text-dim); }
+  .post-content { font-size:14.5px; line-height:1.5; margin-bottom:12px; white-space:pre-wrap; }
+  .post-photo { width:100%; border-radius:12px; margin-bottom:12px; max-height:420px; object-fit:cover; }
+
+  .post-actions { display:flex; gap:18px; border-top:1px solid rgba(0,100,60,0.08); padding-top:10px; }
+  .post-actions a, .post-actions button {
+    background:none; border:none; font-size:13px; font-weight:600; color:var(--text-dim);
+    display:flex; align-items:center; gap:6px; cursor:pointer; text-decoration:none; padding:0;
+  }
+  .post-actions a.liked { color:var(--emerald-deep); }
+  .post-actions a:hover, .post-actions button:hover { color:var(--emerald-deep); }
+
+  .comments-box { margin-top:14px; }
+  .comment-item {
+    display:flex; gap:8px; margin-bottom:10px; font-size:13px;
+  }
+  .comment-bubble {
+    background:rgba(0,100,60,0.05); border-radius:12px; padding:8px 12px; flex:1;
+  }
+  .comment-bubble .cname { font-weight:700; font-size:12.5px; color:var(--emerald-deep); }
+  .comment-bubble .ctext { font-size:13px; color:var(--text-main); }
+  .comment-bubble .ctime { font-size:10.5px; color:var(--text-dim); margin-top:2px; }
+
+  .comment-form { display:flex; gap:8px; margin-top:10px; }
+  .comment-form input {
+    flex:1; border:1px solid var(--glass-border); border-radius:20px; padding:8px 16px;
+    font-size:13px; background:rgba(255,255,255,0.8);
+  }
+  .comment-form input:focus { outline:none; border-color:var(--emerald); }
+  .comment-form button {
+    background:var(--emerald-deep); color:#fff; border:none; border-radius:20px; padding:8px 16px;
+    font-size:12.5px; font-weight:600;
+  }
+
+  .delete-link { font-size:11.5px !important; color:#c0392b !important; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI">
+    <span>FCCI Feed</span>
+  </div>
+  <div class="topbar-nav">
+    <a href="/feed" class="active">📰 Feed</a>
+    <a href="/member_portal_profile">👤 Profile</a>
+    <a href="/member_logout">⏻ Logout</a>
+  </div>
+</div>
+
+<div class="feed-wrap">
+
+  <!-- COMPOSER -->
+  <div class="composer">
+    <form method="POST" action="/feed" enctype="multipart/form-data" id="postForm">
+      <div class="composer-head">
+        <div class="avatar-circle">{{ member_name[0] | upper }}</div>
+        <div style="font-weight:600;font-size:14px;">{{ member_name }}</div>
+      </div>
+
+      <textarea name="content" placeholder="Ano ang balita mo, {{ member_name.split(' ')[0] }}?"></textarea>
+      <img id="previewImg" class="preview-photo">
+
+      <div class="composer-footer">
+        <label class="photo-label">
+          📷 Add Photo
+          <input type="file" name="photo" accept="image/*" id="photoInput" onchange="previewPhoto(event)">
+        </label>
+        <button type="submit" class="btn-post">Post</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- POSTS -->
+  {% for post in posts %}
+  <div class="post-card {{ 'pinned' if post.is_pinned else '' }}">
+
+    {% if post.is_pinned %}
+    <div class="pinned-tag">📌 Pinned Post</div>
+    {% endif %}
+
+    <div class="post-head">
+      <div class="avatar-circle">{{ post.full_name[0] | upper }}</div>
+      <div>
+        <div class="name">{{ post.full_name }}</div>
+        <div class="meta">{{ post.post_date }} · {{ post.post_time }}</div>
+      </div>
+    </div>
+
+    {% if post.content %}
+    <div class="post-content">{{ post.content }}</div>
+    {% endif %}
+
+    {% if post.photo_path %}
+    <img src="/static/feed_uploads/{{ post.photo_path }}" class="post-photo">
+    {% endif %}
+
+    <div class="post-actions">
+      <a href="/feed/like/{{ post.id }}" class="{{ 'liked' if post.liked_by_me else '' }}">
+        {{ '💚' if post.liked_by_me else '🤍' }} Like ({{ post.like_count }})
+      </a>
+      <button onclick="document.getElementById('comment-input-{{ post.id }}').focus()">💬 Comment ({{ post.comments|length }})</button>
+
+      {% if post.member_id == member_id %}
+      <a href="/feed/delete/{{ post.id }}" class="delete-link" onclick="return confirm('Delete this post?')">🗑 Delete</a>
+      {% endif %}
+    </div>
+
+    {% if post.comments %}
+    <div class="comments-box">
+      {% for c in post.comments %}
+      <div class="comment-item">
+        <div class="avatar-circle" style="width:28px;height:28px;font-size:12px;">{{ c[0][0] | upper }}</div>
+        <div class="comment-bubble">
+          <div class="cname">{{ c[0] }}</div>
+          <div class="ctext">{{ c[1] }}</div>
+          <div class="ctime">{{ c[2] }} · {{ c[3] }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/feed/comment/{{ post.id }}" class="comment-form">
+      <input type="text" name="comment_text" id="comment-input-{{ post.id }}" placeholder="Write a comment..." required>
+      <button type="submit">Send</button>
+    </form>
+
+  </div>
+  {% endfor %}
+
+  {% if not posts %}
+  <div class="post-card" style="text-align:center;color:var(--text-dim);">
+    Walang post pa. Maging una sa pagshare ng update sa komunidad! 🎉
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function previewPhoto(event) {
+  const file = event.target.files[0];
+  const img = document.getElementById('previewImg');
+  if (file) {
+    img.src = URL.createObjectURL(file);
+    img.style.display = 'block';
+  }
+}
+</script>
+
+</body>
+</html>

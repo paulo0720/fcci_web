@@ -1,523 +1,499 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FCCI Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { font-family: 'Inter', sans-serif; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCCI Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    body { background: #f0f4f8; margin: 0; }
+<style>
+  :root {
+    --bg-base: #f4fbf7;
+    --bg-mist: #e9f7ef;
+    --glass: rgba(255,255,255,0.65);
+    --glass-border: rgba(0,150,90,0.18);
+    --emerald: #00a85c;
+    --emerald-bright: #00c46a;
+    --emerald-deep: #00562a;
+    --text-main: #0c2418;
+    --text-dim: #5c8270;
+  }
 
-    /* ── SIDEBAR ── */
-    .sidebar {
-      width: 240px;
-      min-height: 100vh;
-      background: linear-gradient(180deg, #00562a 0%, #003d1e 100%);
-      position: fixed;
-      top: 0; left: 0;
-      display: flex;
-      flex-direction: column;
-      padding: 0;
-      z-index: 100;
-      box-shadow: 3px 0 15px rgba(0,0,0,0.15);
-    }
+  * { box-sizing:border-box; margin:0; padding:0; }
 
-    .sidebar-brand {
-      padding: 24px 20px 20px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      text-align: center;
-    }
+  body {
+    font-family:'Inter', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(0,196,106,0.16) 0%, transparent 40%),
+      radial-gradient(circle at 88% 18%, rgba(0,168,92,0.12) 0%, transparent 45%),
+      radial-gradient(circle at 50% 95%, rgba(57,255,176,0.10) 0%, transparent 50%),
+      linear-gradient(160deg, #ffffff 0%, var(--bg-base) 45%, var(--bg-mist) 100%);
+    background-attachment:fixed;
+    color:var(--text-main);
+    min-height:100vh;
+  }
 
-    .sidebar-brand .brand-name {
-      font-size: 26px;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: 2px;
-    }
+  body::before {
+    content:'';
+    position:fixed;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(0,150,90,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,150,90,0.05) 1px, transparent 1px);
+    background-size:48px 48px;
+    mask-image:radial-gradient(circle at 30% 15%, rgba(0,0,0,0.5) 0%, transparent 65%);
+    pointer-events:none;
+    z-index:0;
+  }
 
-    .sidebar-brand .brand-sub {
-      font-size: 10px;
-      color: rgba(255,255,255,0.55);
-      letter-spacing: 0.5px;
-      margin-top: 2px;
-    }
+  .sidebar {
+    width:250px;
+    height:100vh;
+    position:fixed;
+    top:0; left:0;
+    background:rgba(255,255,255,0.55);
+    backdrop-filter:blur(22px);
+    border-right:1px solid var(--glass-border);
+    display:flex;
+    flex-direction:column;
+    z-index:10;
+    box-shadow:4px 0 24px rgba(0,100,60,0.06);
+    overflow-y:auto;
+  }
 
-    .sidebar-brand .brand-logo {
-      width: 64px;
-      height: 64px;
-      object-fit: contain;
-      margin-bottom: 8px;
-      border-radius: 12px;
-    }
+  .sidebar-brand {
+    padding:28px 20px 22px;
+    border-bottom:1px solid var(--glass-border);
+    text-align:center;
+  }
 
-    .sidebar-nav {
-      flex: 1;
-      padding: 16px 12px;
-      overflow-y: auto;
-    }
+  .brand-logo-ring {
+    width:68px; height:68px;
+    border-radius:50%;
+    margin:0 auto 12px;
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle, rgba(0,196,106,0.18), transparent 70%);
+  }
 
-    .nav-label {
-      font-size: 10px;
-      font-weight: 600;
-      color: rgba(255,255,255,0.35);
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      padding: 8px 10px 4px;
-      margin-top: 8px;
-    }
+  .brand-logo-ring::before {
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:50%;
+    border:1px solid var(--emerald);
+    opacity:0.55;
+    animation:pulse-ring 2.8s ease-out infinite;
+  }
 
-    .sidebar-nav a {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      color: rgba(255,255,255,0.75);
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 2px;
-      transition: all 0.2s;
-    }
+  @keyframes pulse-ring {
+    0%   { transform:scale(0.85); opacity:0.7; }
+    70%  { transform:scale(1.25); opacity:0; }
+    100% { transform:scale(1.25); opacity:0; }
+  }
 
-    .sidebar-nav a:hover,
-    .sidebar-nav a.active {
-      background: rgba(255,255,255,0.12);
-      color: #fff;
-    }
+  .brand-logo-ring img {
+    width:48px; height:48px;
+    object-fit:contain;
+    border-radius:50%;
+    position:relative;
+    z-index:1;
+    box-shadow:0 2px 12px rgba(0,100,60,0.15);
+  }
 
-    .sidebar-nav a .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .brand-name {
+    font-family:'Space Grotesk', sans-serif;
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:3px;
+    background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright));
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+  }
 
-    .sidebar-footer {
-      padding: 16px 12px;
-      border-top: 1px solid rgba(255,255,255,0.1);
-    }
+  .brand-sub {
+    font-size:9px;
+    color:var(--text-dim);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    margin-top:4px;
+  }
 
-    .sidebar-footer a {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      color: rgba(255,200,200,0.8);
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
+  .sidebar-nav { padding:18px 12px; }
 
-    .sidebar-footer a:hover {
-      background: rgba(255,80,80,0.15);
-      color: #ff8080;
-    }
+  .nav-label {
+    font-size:10px; font-weight:600; color:rgba(92,130,112,0.6);
+    letter-spacing:1.5px; text-transform:uppercase;
+    padding:14px 12px 6px;
+  }
 
-    /* ── MAIN CONTENT ── */
-    .main-content {
-      margin-left: 240px;
-      padding: 28px 32px;
-    }
+  .sidebar-nav a, .sidebar-footer a {
+    display:flex; align-items:center; gap:11px;
+    padding:11px 14px; margin-bottom:3px;
+    border-radius:10px;
+    color:var(--text-dim);
+    text-decoration:none;
+    font-size:13.5px; font-weight:500;
+    border:1px solid transparent;
+    transition:all 0.25s ease;
+  }
 
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 28px;
-    }
+  .sidebar-nav a:hover {
+    background:rgba(0,196,106,0.08);
+    border-color:var(--glass-border);
+    color:var(--emerald-deep);
+  }
 
-    .topbar h4 {
-      font-size: 22px;
-      font-weight: 700;
-      color: #1a2e1a;
-      margin: 0;
-    }
+  .sidebar-nav a.active {
+    background:linear-gradient(90deg, rgba(0,196,106,0.16), rgba(0,196,106,0.02));
+    border-color:rgba(0,196,106,0.4);
+    color:var(--emerald-deep);
+    box-shadow:0 0 18px rgba(0,196,106,0.12) inset;
+    font-weight:600;
+  }
 
-    .topbar .date-badge {
-      background: #fff;
-      border: 1px solid #e0e7e0;
-      border-radius: 10px;
-      padding: 8px 16px;
-      font-size: 13px;
-      color: #5a7a5a;
-      font-weight: 500;
-    }
+  .nav-icon { font-size:15px; width:18px; text-align:center; }
 
-    /* ── STAT CARDS ── */
-    .stat-card {
-      background: #fff;
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      text-decoration: none;
-      color: inherit;
-      display: block;
-      transition: transform 0.2s, box-shadow 0.2s;
-      border: 1px solid rgba(0,0,0,0.04);
-    }
+  .sidebar-footer {
+    padding:16px 12px;
+    border-top:1px solid var(--glass-border);
+  }
 
-    .stat-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-      color: inherit;
-    }
+  .sidebar-footer a.logout:hover {
+    background:rgba(220,53,69,0.08);
+    border-color:rgba(220,53,69,0.25);
+    color:#c0392b;
+  }
 
-    .stat-card .stat-icon {
-      width: 44px; height: 44px;
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px;
-      margin-bottom: 14px;
-    }
+  .main-content {
+    margin-left:250px;
+    padding:32px 36px;
+    position:relative;
+    z-index:1;
+  }
 
-    .stat-card .stat-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #8a9e8a;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 4px;
-    }
+  .topbar {
+    display:flex; justify-content:space-between; align-items:flex-end;
+    margin-bottom:30px;
+  }
 
-    .stat-card .stat-value {
-      font-size: 26px;
-      font-weight: 700;
-      color: #1a2e1a;
-      line-height: 1;
-    }
+  .topbar h4 {
+    font-family:'Space Grotesk', sans-serif;
+    font-size:26px; font-weight:600;
+    color:var(--text-main);
+  }
 
-    .stat-card .stat-value.money {
-      font-size: 20px;
-    }
+  .topbar .greeting-tag {
+    font-size:11px; color:var(--emerald);
+    letter-spacing:1.5px; text-transform:uppercase;
+    margin-bottom:6px; display:block;
+    font-weight:600;
+  }
 
-    /* icon bg colors */
-    .icon-blue   { background: #e8f0fe; }
-    .icon-green  { background: #e6f4ea; }
-    .icon-red    { background: #fce8e6; }
-    .icon-orange { background: #fff3e0; }
-    .icon-purple { background: #f3e8fd; }
-    .icon-teal   { background: #e0f7f4; }
+  .date-chip {
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    border-radius:30px;
+    padding:8px 18px;
+    font-size:12.5px;
+    color:var(--text-dim);
+    backdrop-filter:blur(10px);
+    box-shadow:0 2px 12px rgba(0,100,60,0.06);
+  }
 
-    /* ── BALANCE CARD ── */
-    .balance-card {
-      background: linear-gradient(135deg, #00562a 0%, #007a3d 60%, #009a4e 100%);
-      border-radius: 20px;
-      padding: 28px 32px;
-      color: #fff;
-      box-shadow: 0 8px 32px rgba(0,86,42,0.3);
-    }
+  .glass-card {
+    background:var(--glass);
+    backdrop-filter:blur(18px);
+    border:1px solid var(--glass-border);
+    border-radius:18px;
+    padding:22px;
+    text-decoration:none;
+    color:inherit;
+    display:block;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 4px 20px rgba(0,100,60,0.06);
+    transition:transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
 
-    .balance-card .label {
-      font-size: 13px;
-      font-weight: 600;
-      opacity: 0.75;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
+  .glass-card:hover {
+    transform:translateY(-4px);
+    border-color:rgba(0,196,106,0.5);
+    box-shadow:0 14px 32px rgba(0,196,106,0.16);
+    color:inherit;
+  }
 
-    .balance-card .amount {
-      font-size: 42px;
-      font-weight: 700;
-      margin: 8px 0 4px;
-    }
+  .stat-icon-orb {
+    width:42px; height:42px;
+    border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:19px;
+    margin-bottom:14px;
+    background:rgba(0,196,106,0.12);
+    border:1px solid rgba(0,196,106,0.3);
+    color:var(--emerald-deep);
+  }
 
-    .balance-card .sub {
-      font-size: 13px;
-      opacity: 0.6;
-    }
+  .stat-label {
+    font-size:11px; font-weight:600; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;
+  }
 
-    /* ── BIRTHDAY CARD ── */
-    .birthday-section {
-      background: #fff;
-      border-radius: 16px;
-      padding: 20px 24px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      border: 1px solid rgba(0,0,0,0.04);
-    }
+  .stat-value {
+    font-family:'Space Grotesk', sans-serif;
+    font-size:28px; font-weight:600; color:var(--text-main);
+  }
 
-    .birthday-section h6 {
-      font-size: 13px;
-      font-weight: 700;
-      color: #8a9e8a;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 16px;
-    }
+  .stat-value.money { font-size:21px; }
 
-    .birthday-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 0;
-      border-bottom: 1px solid #f0f4f0;
-    }
+  .balance-hero {
+    background:linear-gradient(135deg, rgba(0,196,106,0.16) 0%, rgba(255,255,255,0.5) 100%);
+    backdrop-filter:blur(22px);
+    border:1px solid rgba(0,196,106,0.35);
+    border-radius:22px;
+    padding:34px 38px;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 8px 30px rgba(0,150,90,0.1);
+  }
 
-    .birthday-item:last-child { border-bottom: none; }
+  .balance-hero::after {
+    content:'';
+    position:absolute;
+    top:-30%; right:-10%;
+    width:340px; height:340px;
+    background:radial-gradient(circle, rgba(0,196,106,0.2) 0%, transparent 70%);
+    border-radius:50%;
+  }
 
-    .birthday-avatar {
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #00562a, #009a4e);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700;
-      font-size: 16px;
-      color: #fff;
-      flex-shrink: 0;
-      overflow: hidden;
-    }
+  .balance-hero .label {
+    font-size:12px; font-weight:700; color:var(--emerald-deep);
+    letter-spacing:1.5px; text-transform:uppercase;
+    position:relative; z-index:1;
+  }
 
-    .birthday-avatar img {
-      width: 100%; height: 100%; object-fit: cover;
-    }
+  .balance-hero .amount {
+    font-family:'Space Grotesk', sans-serif;
+    font-size:48px; font-weight:700;
+    margin:10px 0 4px;
+    position:relative; z-index:1;
+    color:var(--emerald-deep);
+  }
 
-    .birthday-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: #1a2e1a;
-    }
+  .balance-hero .sub {
+    font-size:13px; color:var(--text-dim);
+    position:relative; z-index:1;
+  }
 
-    .birthday-date {
-      font-size: 12px;
-      color: #8a9e8a;
-      margin-top: 1px;
-    }
+  .birthday-item {
+    display:flex; align-items:center; gap:12px;
+    padding:11px 0;
+    border-bottom:1px solid rgba(0,100,60,0.08);
+  }
+  .birthday-item:last-child { border-bottom:none; }
 
-    .birthday-tag {
-      margin-left: auto;
-      background: #fff3e0;
-      color: #e65100;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 20px;
-      white-space: nowrap;
-    }
+  .birthday-avatar {
+    width:38px; height:38px; border-radius:50%;
+    background:linear-gradient(135deg, var(--emerald), var(--emerald-bright));
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:14px; color:#fff;
+    flex-shrink:0; overflow:hidden;
+  }
 
-    .birthday-tag.today {
-      background: #e6f4ea;
-      color: #1b5e20;
-    }
+  .birthday-avatar img { width:100%; height:100%; object-fit:cover; }
 
-    .no-birthdays {
-      text-align: center;
-      color: #b0c4b0;
-      font-size: 14px;
-      padding: 20px 0;
-    }
+  .birthday-name { font-size:13.5px; font-weight:600; color:var(--text-main); }
+  .birthday-date { font-size:11.5px; color:var(--text-dim); }
 
-    /* ── RECENT PAYMENTS ── */
-    .section-card {
-      background: #fff;
-      border-radius: 16px;
-      padding: 20px 24px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      border: 1px solid rgba(0,0,0,0.04);
-    }
+  .birthday-tag {
+    margin-left:auto;
+    font-size:10.5px; font-weight:600;
+    padding:3px 10px; border-radius:20px;
+    background:rgba(0,196,106,0.14);
+    color:var(--emerald-deep);
+    border:1px solid rgba(0,196,106,0.3);
+    white-space:nowrap;
+  }
 
-    .section-card h6 {
-      font-size: 13px;
-      font-weight: 700;
-      color: #8a9e8a;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 16px;
-    }
+  .birthday-tag.today {
+    background:rgba(255,160,0,0.14);
+    color:#c97300;
+    border-color:rgba(255,160,0,0.35);
+  }
 
-    .section-card table {
-      margin: 0;
-      font-size: 14px;
-    }
+  .no-birthdays { text-align:center; color:var(--text-dim); font-size:13.5px; padding:24px 0; }
 
-    .section-card th {
-      font-size: 11px;
-      font-weight: 600;
-      color: #8a9e8a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border: none;
-      padding-bottom: 8px;
-    }
+  .section-title {
+    font-family:'Space Grotesk', sans-serif;
+    font-size:13px; font-weight:600; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:1.2px;
+    margin-bottom:16px;
+    display:flex; align-items:center; gap:8px;
+  }
 
-    .section-card td {
-      border: none;
-      border-top: 1px solid #f0f4f0;
-      vertical-align: middle;
-      color: #2d4a2d;
-      padding: 10px 8px;
-    }
+  .section-title::before {
+    content:'';
+    width:6px; height:6px;
+    border-radius:50%;
+    background:var(--emerald);
+    box-shadow:0 0 8px rgba(0,196,106,0.6);
+  }
 
-    .amount-pill {
-      background: #e6f4ea;
-      color: #1b5e20;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 13px;
-    }
-  </style>
+  table { width:100%; border-collapse:collapse; }
+
+  th {
+    font-size:10.5px; font-weight:600; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:0.6px;
+    text-align:left; padding-bottom:10px;
+    border-bottom:1px solid var(--glass-border);
+  }
+
+  td {
+    font-size:13.5px; color:var(--text-main);
+    padding:11px 0;
+    border-bottom:1px solid rgba(0,100,60,0.06);
+  }
+
+  .amount-pill {
+    background:rgba(0,196,106,0.12);
+    color:var(--emerald-deep);
+    font-weight:600; font-size:12.5px;
+    padding:4px 12px; border-radius:20px;
+    border:1px solid rgba(0,196,106,0.3);
+  }
+</style>
 </head>
 <body>
 
-<!-- ── SIDEBAR ── -->
 <div class="sidebar">
   <div class="sidebar-brand">
-    <img
-      src="{{ url_for('static', filename='fcci_logo.jpeg') }}"
-      alt="FCCI Logo"
-      class="brand-logo">
+    <div class="brand-logo-ring">
+      <img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI">
+    </div>
     <div class="brand-name">FCCI</div>
-    <div class="brand-sub">Filipino Community Center Int'l</div>
+    <div class="brand-sub">United in Faith</div>
   </div>
 
   <nav class="sidebar-nav">
     <div class="nav-label">Main</div>
-    <a href="/dashboard" class="active">
-      <span class="nav-icon">🏠</span> Dashboard
-    </a>
+    <a href="/dashboard" class="active"><span class="nav-icon">⬡</span> Dashboard</a>
 
     <div class="nav-label">Members</div>
-    <a href="/members">
-      <span class="nav-icon">👥</span> Members
-    </a>
-    <a href="/registration_approval">
-      <span class="nav-icon">📝</span> Reg. Approval
-    </a>
+    <a href="/members"><span class="nav-icon">◈</span> Members</a>
+    <a href="/registration_approval"><span class="nav-icon">◉</span> Reg. Approval</a>
 
     <div class="nav-label">Finance</div>
-    <a href="/payments">
-      <span class="nav-icon">💰</span> Payments
-    </a>
-    <a href="/expenses">
-      <span class="nav-icon">💸</span> Expenses
-    </a>
-    <a href="/donations">
-      <span class="nav-icon">🎁</span> Donations
-    </a>
-    <a href="/withdrawals">
-      <span class="nav-icon">📄</span> Withdrawals
-    </a>
+    <a href="/payments"><span class="nav-icon">◎</span> Payments</a>
+    <a href="/expenses"><span class="nav-icon">◐</span> Expenses</a>
+    <a href="/donations"><span class="nav-icon">◭</span> Donations</a>
+    <a href="/withdrawals"><span class="nav-icon">▣</span> Withdrawals</a>
 
     <div class="nav-label">Tools</div>
-    <a href="/attendance">
-      <span class="nav-icon">📋</span> Attendance
-    </a>
-    <a href="/exports">
-      <span class="nav-icon">📊</span> Export Center
-    </a>
+    <a href="/attendance"><span class="nav-icon">▤</span> Attendance</a>
+    <a href="/exports"><span class="nav-icon">▥</span> Export Center</a>
   </nav>
 
   <div class="sidebar-footer">
-    <a href="/settings">
-      <span class="nav-icon">⚙️</span> Settings
-    </a>
-    <a href="/logout">
-      <span class="nav-icon">🚪</span> Logout
-    </a>
+    <a href="/settings"><span class="nav-icon">⚙</span> Settings</a>
+    <a href="/logout" class="logout"><span class="nav-icon">⏻</span> Logout</a>
   </div>
 </div>
 
-<!-- ── MAIN CONTENT ── -->
 <div class="main-content">
 
-  <!-- Topbar -->
   <div class="topbar">
-    <h4>Welcome back, {{ username }} 👋</h4>
-    <div class="date-badge" id="currentDate"></div>
+    <div>
+      <span class="greeting-tag">Welcome back</span>
+      <h4>{{ username }}</h4>
+    </div>
+    <div class="date-chip" id="currentDate"></div>
   </div>
 
-  <!-- Row 1: Stats -->
   <div class="row g-3 mb-3">
-
     <div class="col-md-3 col-6">
-      <div class="stat-card">
-        <div class="stat-icon icon-blue">👥</div>
+      <div class="glass-card">
+        <div class="stat-icon-orb">◈</div>
         <div class="stat-label">Total Members</div>
         <div class="stat-value">{{ total_members }}</div>
       </div>
     </div>
 
     <div class="col-md-3 col-6">
-      <a href="/dashboard_active" class="stat-card">
-        <div class="stat-icon icon-green">🟢</div>
+      <a href="/dashboard_active" class="glass-card">
+        <div class="stat-icon-orb">◉</div>
         <div class="stat-label">Active</div>
         <div class="stat-value">{{ active_members }}</div>
       </a>
     </div>
 
     <div class="col-md-3 col-6">
-      <a href="/dashboard_inactive" class="stat-card">
-        <div class="stat-icon icon-red">🔴</div>
+      <a href="/dashboard_inactive" class="glass-card">
+        <div class="stat-icon-orb">◌</div>
         <div class="stat-label">Inactive</div>
         <div class="stat-value">{{ inactive_members }}</div>
       </a>
     </div>
 
     <div class="col-md-3 col-6">
-      <a href="/dashboard_applicants" class="stat-card">
-        <div class="stat-icon icon-orange">📝</div>
+      <a href="/dashboard_applicants" class="glass-card">
+        <div class="stat-icon-orb">◎</div>
         <div class="stat-label">Applicants</div>
         <div class="stat-value">{{ applicants }}</div>
       </a>
     </div>
-
   </div>
 
-  <!-- Row 2: Finance Stats -->
   <div class="row g-3 mb-3">
-
     <div class="col-md-3 col-6">
-      <div class="stat-card">
-        <div class="stat-icon icon-green">💰</div>
+      <div class="glass-card">
+        <div class="stat-icon-orb">◎</div>
         <div class="stat-label">Collections</div>
         <div class="stat-value money">₩{{ "{:,}".format(collections) }}</div>
       </div>
     </div>
 
     <div class="col-md-3 col-6">
-      <a href="/donations" class="stat-card">
-        <div class="stat-icon icon-purple">🎁</div>
+      <a href="/donations" class="glass-card">
+        <div class="stat-icon-orb">◭</div>
         <div class="stat-label">Donations</div>
         <div class="stat-value money">₩{{ "{:,}".format(donations) }}</div>
       </a>
     </div>
 
     <div class="col-md-3 col-6">
-      <div class="stat-card">
-        <div class="stat-icon icon-red">💸</div>
+      <div class="glass-card">
+        <div class="stat-icon-orb">◐</div>
         <div class="stat-label">Expenses</div>
         <div class="stat-value money">₩{{ "{:,}".format(expenses) }}</div>
       </div>
     </div>
 
     <div class="col-md-3 col-6">
-      <a href="/dashboard_outstanding" class="stat-card">
-        <div class="stat-icon icon-orange">⚠️</div>
+      <a href="/dashboard_outstanding" class="glass-card">
+        <div class="stat-icon-orb">▲</div>
         <div class="stat-label">Outstanding</div>
         <div class="stat-value money">₩{{ "{:,}".format(total_outstanding) }}</div>
       </a>
     </div>
-
   </div>
 
-  <!-- Balance -->
   <div class="row g-3 mb-4">
     <div class="col-12">
-      <div class="balance-card">
-        <div class="label">🏦 Current Balance</div>
+      <div class="balance-hero">
+        <div class="label">◉ Current Balance</div>
         <div class="amount">₩{{ "{:,}".format(balance) }}</div>
         <div class="sub">Collections + Donations − Expenses</div>
       </div>
     </div>
   </div>
 
-  <!-- Row 3: Birthday + Recent Payments -->
   <div class="row g-3">
 
-    <!-- 🎂 Birthday This Month -->
     <div class="col-md-5">
-      <div class="birthday-section h-100">
-        <h6>🎂 Birthdays This Month</h6>
+      <div class="glass-card h-100" style="cursor:default;">
+        <div class="section-title">Birthdays This Month</div>
 
         {% if birthday_list %}
           {% for b in birthday_list %}
@@ -534,31 +510,24 @@
               <div class="birthday-date">{{ b.birthday }}</div>
             </div>
             {% if b.is_today %}
-              <span class="birthday-tag today">🎉 Today!</span>
+              <span class="birthday-tag today">Today!</span>
             {% else %}
-              <span class="birthday-tag">🎂 This Month</span>
+              <span class="birthday-tag">This Month</span>
             {% endif %}
           </div>
           {% endfor %}
         {% else %}
-          <div class="no-birthdays">
-            🎈 No birthdays this month
-          </div>
+          <div class="no-birthdays">No birthdays this month</div>
         {% endif %}
-
       </div>
     </div>
 
-    <!-- Recent Payments -->
     <div class="col-md-7">
-      <div class="section-card h-100">
-        <h6>💳 Recent Payments</h6>
-        <table class="table">
+      <div class="glass-card h-100" style="cursor:default;">
+        <div class="section-title">Recent Payments</div>
+        <table>
           <thead>
-            <tr>
-              <th>Member ID</th>
-              <th>Amount</th>
-            </tr>
+            <tr><th>Member ID</th><th>Amount</th></tr>
           </thead>
           <tbody>
             {% for p in recent_payments %}
@@ -568,9 +537,7 @@
             </tr>
             {% endfor %}
             {% if not recent_payments %}
-            <tr>
-              <td colspan="2" class="text-center text-muted py-3">No recent payments</td>
-            </tr>
+            <tr><td colspan="2" style="text-align:center;color:var(--text-dim);padding:20px 0;">No recent payments</td></tr>
             {% endif %}
           </tbody>
         </table>
@@ -582,11 +549,11 @@
 </div>
 
 <script>
-  // Show today's date in the topbar
   const d = new Date();
-  const options = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
-  document.getElementById('currentDate').textContent = d.toLocaleDateString('en-US', options);
+  document.getElementById('currentDate').textContent =
+    d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 </script>
 
 </body>
 </html>
+

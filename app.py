@@ -7,7 +7,7 @@ from flask import (
     send_file,
     jsonify
 )
-
+import shutil
 from werkzeug.utils import secure_filename
 import os
 from openpyxl import Workbook
@@ -4030,6 +4030,716 @@ def delete_donation(donation_id):
     conn.close()
  
     return redirect("/donations")
+
+@app.route("/settings/backup_database")
+def backup_database():
+
+    if "username" not in session:
+        return redirect("/login")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    download_name = f"fcci_backup_{timestamp}.db"
+
+    return send_file(
+        DB_PATH,
+        as_attachment=True,
+        download_name=download_name
+    )
+
+@app.route("/settings/restore_database", methods=["POST"])
+def restore_database():
+
+    if "username" not in session:
+        return redirect("/login")
+
+    file = request.files.get("backup_file")
+
+    if not file or file.filename == "":
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=get_all_users(),
+            error="Walang pinili na backup file."
+        )
+
+    if not file.filename.endswith(".db"):
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=get_all_users(),
+            error="Invalid file type. Dapat .db file ang i-upload."
+        )
+
+    # Safety copy muna ng current database bago i-overwrite
+    os.makedirs("backups", exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safety_copy_path = os.path.join("backups", f"before_restore_{timestamp}.db")
+    shutil.copy(DB_PATH, safety_copy_path)
+
+    # I-save ang na-upload na file papalit sa kasalukuyang database
+    file.save(DB_PATH)
+
+    return render_template(
+        "settings.html",
+        username=session["username"],
+        all_users=get_all_users(),
+        message="Matagumpay na na-restore ang database! (Ang lumang database ay na-save sa backups/ folder bago na-overwrite.)"
+    )
+
+@app.route("/settings/merge_database", methods=["POST"])
+def merge_database():
+
+    if "username" not in session:
+        return redirect("/login")
+
+    file = request.files.get("merge_file")
+
+    if not file or file.filename == "":
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=get_all_users(),
+            error="Walang pinili na file para i-merge."
+        )
+
+    if not file.filename.endswith(".db"):
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=get_all_users(),
+            error="Invalid file type. Dapat .db file ang i-upload."
+        )
+
+    # I-save muna temporarily ang na-upload na lumang database
+    os.makedirs("backups", exist_ok=True)
+    temp_path = os.path.join("backups", "temp_merge_upload.db")
+    file.save(temp_path)
+
+    # Safety copy ng current database bago tayo mag-merge
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safety_copy_path = os.path.join("backups", f"before_merge_{timestamp}.db")
+    shutil.copy(DB_PATH, safety_copy_path)
+
+    try:
+        merge_summary = merge_old_database(temp_path)
+    except Exception as e:
+        return render_template(
+            "settings.html",
+            username=session["username"],
+            all_users=get_all_users(),
+            error=f"Error habang nag-me-merge: {str(e)}"
+        )
+    finally:
+        # Linisin ang temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return render_template(
+        "settings.html",
+        username=session["username"],
+        all_users=get_all_users(),
+        message=merge_summary
+    )
+
+def merge_old_database(old_db_path):
+    """
+    Kinukuha ang lahat ng members, payments, donations, at expenses
+    mula sa lumang offline .db file at idinadagdag (INSERT) sila sa
+    kasalukuyang database, hindi pinapalitan ang existing records.
+
+    SAFETY: Gumagamit lang ng mga column na PARESHAS sa dalawang
+    database (matching column names). Kung may column sa luma na
+    wala sa bago (o vice versa), hindi ito sasama sa insert at
+    hindi magiging error — para hindi masira ang merge kung may
+    konting pagkaiba sa schema.
+
+    Member duplicates ay kinakheck gamit ang member_id (skip kung
+    existing na). Payments/donations/expenses ay direktang idinadagdag
+    dahil walang natural duplicate key dito.
+    """
+
+    old_conn = sqlite3.connect(old_db_path)
+    old_cursor = old_conn.cursor()
+
+    new_conn = get_db()
+    new_cursor = new_conn.cursor()
+
+    summary_parts = []
+
+    def get_columns(cursor, table_name):
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        return [col[1] for col in cursor.fetchall()]
+
+    def table_exists(cursor, table_name):
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,)
+        )
+        return cursor.fetchone() is not None
+
+    # ── MEMBERS (may duplicate check gamit ang member_id) ──
+    if table_exists(old_cursor, "members") and table_exists(new_cursor, "members"):
+
+        old_columns = get_columns(old_cursor, "members")
+        new_columns = get_columns(new_cursor, "members")
+
+        # Gamitin lang ang columns na PARESHAS sa dalawa, laktawan ang 'id'
+        common_columns = [c for c in old_columns if c in new_columns and c != "id"]
+
+        if "member_id" not in common_columns:
+            summary_parts.append("Members: hindi na-merge — walang 'member_id' column na pareho sa dalawang database")
+        else:
+            old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM members")
+            old_members = old_cursor.fetchall()
+
+            member_id_index = common_columns.index("member_id")
+
+            added_members = 0
+            skipped_members = 0
+
+            for row in old_members:
+                member_id = row[member_id_index]
+
+                new_cursor.execute(
+                    "SELECT COUNT(*) FROM members WHERE member_id = ?",
+                    (member_id,)
+                )
+                exists = new_cursor.fetchone()[0]
+
+                if exists:
+                    skipped_members += 1
+                    continue
+
+                placeholders = ", ".join(["?"] * len(common_columns))
+                columns_str = ", ".join(common_columns)
+
+                new_cursor.execute(
+                    f"INSERT INTO members ({columns_str}) VALUES ({placeholders})",
+                    row
+                )
+
+                added_members += 1
+
+            summary_parts.append(f"Members: {added_members} idinagdag, {skipped_members} na-skip (duplicate)")
+    else:
+        summary_parts.append("Members: walang nahanap na table")
+
+    # ── MEMBER_PHOTOS (hiwalay na table, gamit ng offline version) ──
+    if table_exists(old_cursor, "member_photos") and table_exists(new_cursor, "member_photos"):
+
+        old_columns = get_columns(old_cursor, "member_photos")
+        new_columns = get_columns(new_cursor, "member_photos")
+        common_columns = [c for c in old_columns if c in new_columns and c != "id"]
+
+        if common_columns and "member_id" in common_columns:
+            old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM member_photos")
+            old_photos = old_cursor.fetchall()
+
+            member_id_index = common_columns.index("member_id")
+
+            placeholders = ", ".join(["?"] * len(common_columns))
+            columns_str = ", ".join(common_columns)
+
+            added_photos = 0
+
+            for row in old_photos:
+                member_id = row[member_id_index]
+
+                # Skip kung may existing na photo record na ang member na ito
+                new_cursor.execute(
+                    "SELECT COUNT(*) FROM member_photos WHERE member_id = ?",
+                    (member_id,)
+                )
+                exists = new_cursor.fetchone()[0]
+
+                if exists:
+                    continue
+
+                new_cursor.execute(
+                    f"INSERT INTO member_photos ({columns_str}) VALUES ({placeholders})",
+                    row
+                )
+                added_photos += 1
+
+            summary_parts.append(f"Member Photos: {added_photos} idinagdag")
+        else:
+            summary_parts.append("Member Photos: walang pareho na columns")
+    else:
+        summary_parts.append("Member Photos: walang nahanap na table (okay lang, optional)")
+
+    # ── PAYMENTS (walang duplicate check, direktang idagdag) ──
+    if table_exists(old_cursor, "payments") and table_exists(new_cursor, "payments"):
+
+        old_columns = get_columns(old_cursor, "payments")
+        new_columns = get_columns(new_cursor, "payments")
+        common_columns = [c for c in old_columns if c in new_columns and c != "id"]
+
+        if common_columns:
+            old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM payments")
+            old_payments = old_cursor.fetchall()
+
+            placeholders = ", ".join(["?"] * len(common_columns))
+            columns_str = ", ".join(common_columns)
+
+            for row in old_payments:
+                new_cursor.execute(
+                    f"INSERT INTO payments ({columns_str}) VALUES ({placeholders})",
+                    row
+                )
+
+            summary_parts.append(f"Payments: {len(old_payments)} idinagdag")
+        else:
+            summary_parts.append("Payments: walang pareho na columns")
+    else:
+        summary_parts.append("Payments: walang nahanap na table")
+
+    # ── DONATIONS (walang duplicate check, direktang idagdag) ──
+    if table_exists(old_cursor, "donations") and table_exists(new_cursor, "donations"):
+
+        old_columns = get_columns(old_cursor, "donations")
+        new_columns = get_columns(new_cursor, "donations")
+        common_columns = [c for c in old_columns if c in new_columns and c != "id"]
+
+        if common_columns:
+            old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM donations")
+            old_donations = old_cursor.fetchall()
+
+            placeholders = ", ".join(["?"] * len(common_columns))
+            columns_str = ", ".join(common_columns)
+
+            for row in old_donations:
+                new_cursor.execute(
+                    f"INSERT INTO donations ({columns_str}) VALUES ({placeholders})",
+                    row
+                )
+
+            summary_parts.append(f"Donations: {len(old_donations)} idinagdag")
+        else:
+            summary_parts.append("Donations: walang pareho na columns")
+    else:
+        summary_parts.append("Donations: walang nahanap na table")
+
+    # ── EXPENSES (walang duplicate check, direktang idagdag) ──
+    if table_exists(old_cursor, "expenses") and table_exists(new_cursor, "expenses"):
+
+        old_columns = get_columns(old_cursor, "expenses")
+        new_columns = get_columns(new_cursor, "expenses")
+        common_columns = [c for c in old_columns if c in new_columns and c != "id"]
+
+        if common_columns:
+            old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM expenses")
+            old_expenses = old_cursor.fetchall()
+
+            placeholders = ", ".join(["?"] * len(common_columns))
+            columns_str = ", ".join(common_columns)
+
+            for row in old_expenses:
+                new_cursor.execute(
+                    f"INSERT INTO expenses ({columns_str}) VALUES ({placeholders})",
+                    row
+                )
+
+            summary_parts.append(f"Expenses: {len(old_expenses)} idinagdag")
+        else:
+            summary_parts.append("Expenses: walang pareho na columns")
+    else:
+        summary_parts.append("Expenses: walang nahanap na table")
+
+    # ── ATTENDANCE (walang duplicate check, direktang idagdag) ──
+    if table_exists(old_cursor, "attendance") and table_exists(new_cursor, "attendance"):
+
+        old_columns = get_columns(old_cursor, "attendance")
+        new_columns = get_columns(new_cursor, "attendance")
+        common_columns = [c for c in old_columns if c in new_columns and c != "id"]
+
+        if common_columns:
+            old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM attendance")
+            old_attendance = old_cursor.fetchall()
+
+            placeholders = ", ".join(["?"] * len(common_columns))
+            columns_str = ", ".join(common_columns)
+
+            for row in old_attendance:
+                new_cursor.execute(
+                    f"INSERT INTO attendance ({columns_str}) VALUES ({placeholders})",
+                    row
+                )
+
+            summary_parts.append(f"Attendance: {len(old_attendance)} idinagdag")
+    else:
+        summary_parts.append("Attendance: walang nahanap na table (okay lang, optional)")
+
+    new_conn.commit()
+    new_conn.close()
+    old_conn.close()
+
+    return "Matagumpay na na-merge ang backup! " + " | ".join(summary_parts)
+
+
+def get_all_users():
+    """Helper function para makuha ang listahan ng users (ginagamit sa settings page)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, role FROM users ORDER BY username")
+    users = cursor.fetchall()
+    conn.close()
+    return users
+
+@app.route("/member_login", methods=["GET", "POST"])
+def member_login():
+
+    if request.method == "POST":
+
+        member_id = request.form["member_id"].strip()
+        birthday_input = request.form["birthday"]  # format: YYYY-MM-DD mula sa <input type="date">
+
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        SELECT member_id, full_name, birthday, status
+        FROM members
+        WHERE member_id = ?
+        """, (member_id,))
+
+        member = cursor.fetchone()
+        conn.close()
+
+        if not member:
+            return render_template(
+                "member_login.html",
+                error="Member ID na hindi natagpuan. Pakitiyak na tama ang inilagay mo."
+            )
+
+        stored_birthday = member[2]
+        status = member[3]
+
+        # I-normalize ang dalawang birthday format papuntang YYYY-MM-DD bago icompare
+        normalized_stored = normalize_birthday(stored_birthday)
+
+        if normalized_stored != birthday_input:
+            return render_template(
+                "member_login.html",
+                error="Maling Member ID o Birthday. Subukan ulit."
+            )
+
+        if status != "Active":
+            return render_template(
+                "member_login.html",
+                error=f"Hindi mo pa magagamit ang portal na ito. Ang status mo ay '{status}'. Pakibayaran muna ang Registration Fee sa FCCI office para ma-activate ang account mo."
+            )
+
+        # Successful login
+        session["member_logged_in"] = True
+        session["member_id"] = member[0]
+        session["member_name"] = member[1]
+
+        return redirect("/feed")
+
+    return render_template("member_login.html")
+
+
+def normalize_birthday(raw_value):
+    """
+    Sinusubukan i-convert ang anumang stored birthday format papunta sa
+    'YYYY-MM-DD' para ma-compare sa value mula sa HTML date input.
+    """
+    if not raw_value:
+        return ""
+
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%B %d, %Y", "%b %d, %Y"):
+        try:
+            parsed = datetime.strptime(raw_value, fmt)
+            return parsed.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    return raw_value  # fallback: ibalik na lang as-is
+
+
+# ── MEMBER LOGOUT ──────────────────────────────────────────
+@app.route("/member_logout")
+def member_logout():
+    session.pop("member_logged_in", None)
+    session.pop("member_id", None)
+    session.pop("member_name", None)
+    return redirect("/member_login")
+
+
+# ── DECORATOR/HELPER: I-CHECK KUNG NAKA-LOGIN ANG MEMBER ───
+def require_member_login():
+    """Tawagin ito sa simula ng bawat member-portal route."""
+    if not session.get("member_logged_in"):
+        return False
+    return True
+
+@app.route("/feed", methods=["GET", "POST"])
+def feed():
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+
+        content = request.form.get("content", "").strip()
+        photo_file = request.files.get("photo")
+
+        photo_filename = None
+
+        if photo_file and photo_file.filename != "":
+            photo_filename = secure_filename(
+                f"feed_{session['member_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo_file.filename}"
+            )
+            os.makedirs("static/feed_uploads", exist_ok=True)
+            photo_file.save(os.path.join("static/feed_uploads", photo_filename))
+
+        if content or photo_filename:
+            now = datetime.now()
+
+            cursor.execute("""
+            INSERT INTO feed_posts
+            (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
+            VALUES (?, ?, ?, ?, 0, ?, ?)
+            """, (
+                session["member_id"],
+                session["member_name"],
+                content,
+                photo_filename,
+                now.strftime("%B %d, %Y"),
+                now.strftime("%I:%M %p")
+            ))
+
+            conn.commit()
+
+        conn.close()
+        return redirect("/feed")
+
+    # GET request: kunin lahat ng posts, pinned muna, tapos pinaka-bago
+    cursor.execute("""
+    SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time
+    FROM feed_posts
+    ORDER BY is_pinned DESC, id DESC
+    """)
+    posts = cursor.fetchall()
+
+    # Bilangin ang likes at comments bawat post
+    posts_with_meta = []
+
+    for post in posts:
+        post_id = post[0]
+
+        cursor.execute("SELECT COUNT(*) FROM feed_likes WHERE post_id = ?", (post_id,))
+        like_count = cursor.fetchone()[0]
+
+        cursor.execute("""
+        SELECT COUNT(*) FROM feed_likes WHERE post_id = ? AND member_id = ?
+        """, (post_id, session["member_id"]))
+        liked_by_me = cursor.fetchone()[0] > 0
+
+        cursor.execute("""
+        SELECT full_name, comment_text, comment_date, comment_time
+        FROM feed_comments WHERE post_id = ? ORDER BY id ASC
+        """, (post_id,))
+        comments = cursor.fetchall()
+
+        posts_with_meta.append({
+            "id": post[0],
+            "member_id": post[1],
+            "full_name": post[2],
+            "content": post[3],
+            "photo_path": post[4],
+            "is_pinned": post[5],
+            "post_date": post[6],
+            "post_time": post[7],
+            "like_count": like_count,
+            "liked_by_me": liked_by_me,
+            "comments": comments
+        })
+
+    conn.close()
+
+    return render_template(
+        "feed.html",
+        posts=posts_with_meta,
+        member_name=session["member_name"],
+        member_id=session["member_id"]
+    )
+
+
+# ── DELETE POST (sariling post lang) ───────────────────────
+@app.route("/feed/delete/<int:post_id>")
+def feed_delete_post(post_id):
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Siguraduhing sariling post lang ng member ang puwedeng i-delete
+    cursor.execute(
+        "DELETE FROM feed_posts WHERE id = ? AND member_id = ?",
+        (post_id, session["member_id"])
+    )
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/feed")
+
+
+# ── LIKE / UNLIKE POST ──────────────────────────────────────
+@app.route("/feed/like/<int:post_id>")
+def feed_like_post(post_id):
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id FROM feed_likes WHERE post_id = ? AND member_id = ?",
+        (post_id, session["member_id"])
+    )
+    existing = cursor.fetchone()
+
+    if existing:
+        cursor.execute("DELETE FROM feed_likes WHERE id = ?", (existing[0],))
+    else:
+        cursor.execute(
+            "INSERT INTO feed_likes (post_id, member_id) VALUES (?, ?)",
+            (post_id, session["member_id"])
+        )
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/feed")
+
+
+# ── ADD COMMENT ──────────────────────────────────────────────
+@app.route("/feed/comment/<int:post_id>", methods=["POST"])
+def feed_add_comment(post_id):
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    comment_text = request.form.get("comment_text", "").strip()
+
+    if comment_text:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        now = datetime.now()
+
+        cursor.execute("""
+        INSERT INTO feed_comments (post_id, member_id, full_name, comment_text, comment_date, comment_time)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            post_id,
+            session["member_id"],
+            session["member_name"],
+            comment_text,
+            now.strftime("%B %d, %Y"),
+            now.strftime("%I:%M %p")
+        ))
+
+        conn.commit()
+        conn.close()
+
+    return redirect("/feed")
+
+
+# ── PIN / UNPIN POST (ADMIN/STAFF LANG, gamit ang main session) ──
+@app.route("/feed/pin/<int:post_id>")
+def feed_pin_post(post_id):
+
+    # Gamit ang ADMIN session (yung "username" sa session, hindi member portal session)
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT is_pinned FROM feed_posts WHERE id = ?", (post_id,))
+    row = cursor.fetchone()
+
+    if row:
+        new_value = 0 if row[0] == 1 else 1
+        cursor.execute("UPDATE feed_posts SET is_pinned = ? WHERE id = ?", (new_value, post_id))
+        conn.commit()
+
+    conn.close()
+
+    # Ibalik sa pinanggalingang page (admin feed view o member feed)
+    return redirect(request.referrer or "/feed")
+
+
+# ── MEMBER'S OWN PROFILE VIEW (sa loob ng portal) ──────────
+@app.route("/member_portal_profile")
+def member_portal_profile():
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM members WHERE member_id = ?", (session["member_id"],))
+    member = cursor.fetchone()
+
+    cursor.execute("""
+    SELECT payment_date, payment_type, amount
+    FROM payments WHERE member_id = ? ORDER BY id DESC
+    """, (session["member_id"],))
+    payments = cursor.fetchall()
+
+    cursor.execute("""
+    SELECT COALESCE(SUM(amount), 0) FROM payments WHERE member_id = ?
+    """, (session["member_id"],))
+    total_payment = cursor.fetchone()[0]
+
+    cursor.execute("""
+    SELECT photo_path FROM member_photos WHERE member_id = ? ORDER BY id DESC LIMIT 1
+    """, (session["member_id"],))
+    photo_row = cursor.fetchone()
+    photo_path = photo_row[0] if photo_row else None
+
+    conn.close()
+
+    return render_template(
+        "member_portal_profile.html",
+        member=member,
+        payments=payments,
+        total_payment=total_payment,
+        photo_path=photo_path
+    )
+
+@app.route("/admin_feed")
+def admin_feed():
+
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time
+    FROM feed_posts
+    ORDER BY is_pinned DESC, id DESC
+    """)
+    posts = cursor.fetchall()
+
+    conn.close()
+
+    return render_template("admin_feed.html", posts=posts, username=session["username"])
+
+
 
 @app.route("/logout")
 def logout():
