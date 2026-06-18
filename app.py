@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 import cv2
 import qrcode
 from datetime import datetime
+from cloudinary_helper import upload_photo, upload_file
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -199,22 +200,7 @@ def member_registration():
         photo_filename = ""
 
         if photo and photo.filename:
-
-            os.makedirs(
-                app.config["UPLOAD_FOLDER"],
-                exist_ok=True
-            )
-
-            photo_filename = secure_filename(
-                photo.filename
-            )
-
-            photo.save(
-                os.path.join(
-                    app.config["UPLOAD_FOLDER"],
-                    photo_filename
-                )
-            )
+            photo_filename = upload_photo(photo, folder="fcci_member_photos") or ""
 
         cursor.execute("""
         INSERT INTO members
@@ -660,20 +646,8 @@ def add_member():
 
         photo_filename = ""
 
-        if photo:
-
-            photo_filename = secure_filename(
-                photo.filename
-            )
-
-            photo.save(
-                os.path.join(
-                    app.config["UPLOAD_FOLDER"],
-                    photo_filename
-                )
-            )
-
-        
+        if photo and photo.filename:
+            photo_filename = upload_photo(photo, folder="fcci_member_photos") or ""
 
         conn = get_db()
         cursor = conn.cursor()
@@ -737,24 +711,16 @@ def edit_member(member_id):
 
         if photo and photo.filename:
 
-            photo_filename = secure_filename(
-                photo.filename
-            )
+            photo_url = upload_photo(photo, folder="fcci_member_photos")
 
-            photo.save(
-                os.path.join(
-                    app.config["UPLOAD_FOLDER"],
-                    photo_filename
-                )
-            )
-
-            cursor.execute("""
-            INSERT INTO member_photos (member_id, photo_path)
-            VALUES (%s, %s)
-            """, (
-                member_id,
-                photo_filename
-            ))
+            if photo_url:
+                cursor.execute("""
+                INSERT INTO member_photos (member_id, photo_path)
+                VALUES (%s, %s)
+                """, (
+                    member_id,
+                    photo_url
+                ))
 
         cursor.execute("""
         UPDATE members
@@ -1088,16 +1054,7 @@ def expenses():
             receipt_file.filename
         ):
 
-            receipt_filename = secure_filename(
-                receipt_file.filename
-            )
-
-            receipt_file.save(
-                os.path.join(
-                    "static/receipts",
-                    receipt_filename
-                )
-            )
+            receipt_filename = upload_file(receipt_file, folder="fcci_receipts") or ""
 
         cursor.execute("""
         INSERT INTO expenses
@@ -3642,15 +3599,7 @@ def upload_proof_of_payment():
 
     if proof_file and proof_file.filename:
 
-        os.makedirs("static/proof_of_payment", exist_ok=True)
-
-        proof_filename = secure_filename(
-            f"{member_id}_{proof_file.filename}"
-        )
-
-        proof_file.save(
-            os.path.join("static/proof_of_payment", proof_filename)
-        )
+        proof_filename = upload_photo(proof_file, folder="fcci_proof_of_payment") or ""
 
         conn = get_db()
         cursor = conn.cursor()
@@ -4509,11 +4458,7 @@ def feed():
         photo_filename = None
 
         if photo_file and photo_file.filename != "":
-            photo_filename = secure_filename(
-                f"feed_{session['member_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo_file.filename}"
-            )
-            os.makedirs("static/feed_uploads", exist_ok=True)
-            photo_file.save(os.path.join("static/feed_uploads", photo_filename))
+            photo_filename = upload_photo(photo_file, folder="fcci_feed") or None
 
         if content or photo_filename:
             now = datetime.now()
