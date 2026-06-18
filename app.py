@@ -3720,10 +3720,38 @@ def applicant_slip(member_id):
         Spacer(1,20)
     )
 
-    # member[11] = proof_of_payment (not photo)
-    # Photo comes from member_photos table via fetch_member_with_photo
-    # For PDF, we skip photo since it's now a Cloudinary URL
-    # (ReportLab needs local file path or URL download)
+    # Kunin ang photo ng applicant mula sa member_photos table
+    cursor2 = conn2 = None
+    try:
+        conn2 = get_db()
+        cursor2 = conn2.cursor()
+        cursor2.execute("""
+        SELECT photo_path FROM member_photos
+        WHERE member_id = %s
+        ORDER BY id DESC LIMIT 1
+        """, (member_id,))
+        photo_row = cursor2.fetchone()
+        photo_url = photo_row[0] if photo_row else None
+        conn2.close()
+    except:
+        photo_url = None
+
+    # Kung may photo (Cloudinary URL), i-download muna bago gamitin
+    # sa PDF (ReportLab ay kailangan ng local file path)
+    if photo_url and photo_url.startswith("http"):
+        try:
+            import urllib.request
+            import tempfile
+            tmp_photo = tempfile.NamedTemporaryFile(
+                delete=False, suffix=".jpg"
+            )
+            urllib.request.urlretrieve(photo_url, tmp_photo.name)
+            content.append(
+                Image(tmp_photo.name, width=120, height=120)
+            )
+            content.append(Spacer(1, 10))
+        except Exception as photo_err:
+            print(f"[PDF] Photo download error: {photo_err}")
 
     content.append(
         Image(
