@@ -6,3 +6,4 @@ Pillow
 reportlab
 openpyxl
 opencv-python-headless
+psycopg2-binary

@@ -12,7 +12,8 @@ from werkzeug.utils import secure_filename
 import os
 from openpyxl import Workbook
 import sqlite3
-import os
+import psycopg2
+from dotenv import load_dotenv
 import cv2
 import qrcode
 from datetime import datetime
@@ -32,6 +33,8 @@ from reportlab.lib.styles import (
 from flask import send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 
+load_dotenv()
+
 app = Flask(__name__)
 
 app.secret_key = "FCCI_SECRET_KEY"
@@ -42,14 +45,73 @@ app.config[
     "UPLOAD_FOLDER"
 ] = UPLOAD_FOLDER
 
-DB_PATH = os.path.join(
-    "database",
-    "fcci.db"
-)
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 def get_db():
-    return sqlite3.connect(DB_PATH)
+    """
+    Kumokonekta sa Supabase PostgreSQL database gamit ang
+    connection string mula sa .env file (DATABASE_URL).
+    """
+    return psycopg2.connect(DATABASE_URL)
+
+
+def fetch_member_with_photo(cursor, member_id):
+    """
+    Kinukuha ang lahat ng columns ng isang member (SELECT *) PLUS
+    ang photo_path mula sa member_photos table, idinadagdag bilang
+    HULING ELEMENT ng tuple. Ginagawa itong list para magamit ang
+    .append(), tapos ibinabalik bilang tuple para gumana pa rin ang
+    member[index] access pattern sa templates.
+
+    Kung walang member na nahanap, nagbabalik ng None.
+    """
+    cursor.execute("SELECT * FROM members WHERE member_id = %s", (member_id,))
+    row = cursor.fetchone()
+
+    if row is None:
+        return None
+
+    cursor.execute("""
+    SELECT photo_path FROM member_photos
+    WHERE member_id = %s
+    ORDER BY id DESC LIMIT 1
+    """, (member_id,))
+
+    photo_row = cursor.fetchone()
+    photo_path = photo_row[0] if photo_row else None
+
+    return tuple(list(row) + [photo_path])
+
+
+def fetch_all_members_with_photo(cursor, where_clause="", params=()):
+    """
+    Kinukuha ang lahat ng members (o filtered gamit ang where_clause)
+    PLUS photo_path bilang huling column ng bawat row. Ginagamit ito
+    sa mga listahan tulad ng registration_approval at members list.
+    """
+    query = "SELECT * FROM members"
+    if where_clause:
+        query += f" WHERE {where_clause}"
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    results = []
+
+    for row in rows:
+        cursor.execute("""
+        SELECT photo_path FROM member_photos
+        WHERE member_id = %s
+        ORDER BY id DESC LIMIT 1
+        """, (row[1],))  # row[1] = member_id column
+
+        photo_row = cursor.fetchone()
+        photo_path = photo_row[0] if photo_row else None
+
+        results.append(tuple(list(row) + [photo_path]))
+
+    return results
 
 
 @app.route("/")
@@ -74,7 +136,7 @@ def login():
         cursor.execute("""
         SELECT role, password
         FROM users
-        WHERE username = ?
+        WHERE username = %s
         """, (username,))
 
         user = cursor.fetchone()
@@ -170,7 +232,7 @@ def member_registration():
             photo_path
         )
         VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             member_id,
@@ -190,7 +252,7 @@ def member_registration():
         conn.close()
 
         return redirect(
-            f"/applicant_slip/{member_id}"
+            f"/registration_confirmation/{member_id}"
         )
 
     return render_template(
@@ -290,10 +352,10 @@ def dashboard():
             cursor.execute("""
             SELECT COUNT(*)
             FROM payments
-            WHERE member_id = ?
+            WHERE member_id = %s
             AND payment_type = 'Monthly Contribution'
-            AND payment_month = ?
-            AND payment_year = ?
+            AND payment_month = %s
+            AND payment_year = %s
             """, (member_id, month_name_loop, str(year)))
 
             result = cursor.fetchone()
@@ -406,8 +468,8 @@ def members():
             member_since
         FROM members
         WHERE
-            member_id LIKE ?
-            OR full_name LIKE ?
+            member_id LIKE %s
+            OR full_name LIKE %s
         ORDER BY full_name
         """, (
             f"%{search}%",
@@ -491,10 +553,10 @@ def members():
                     cursor.execute("""
                     SELECT COUNT(*)
                     FROM payments
-                    WHERE member_id=?
+                    WHERE member_id=%s
                     AND payment_type='Monthly Contribution'
-                    AND payment_month=?
-                    AND payment_year=?
+                    AND payment_month=%s
+                    AND payment_year=%s
                     """,(
                        member_id,
                        current_month,
@@ -632,7 +694,7 @@ def add_member():
             photo_path
         )
         VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             member_id,
             full_name,
@@ -687,23 +749,22 @@ def edit_member(member_id):
             )
 
             cursor.execute("""
-            UPDATE members
-            SET photo_path = ?
-            WHERE member_id = ?
+            INSERT INTO member_photos (member_id, photo_path)
+            VALUES (%s, %s)
             """, (
-                photo_filename,
-                member_id
+                member_id,
+                photo_filename
             ))
 
         cursor.execute("""
         UPDATE members
         SET
-            full_name = ?,
-            contact = ?,
-            birthday = ?,
-            email = ?,
-            address = ?
-        WHERE member_id = ?
+            full_name = %s,
+            contact = %s,
+            birthday = %s,
+            email = %s,
+            address = %s
+        WHERE member_id = %s
         """, (
             request.form["full_name"],
             request.form["contact"],
@@ -720,13 +781,7 @@ def edit_member(member_id):
             f"/view_member/{member_id}"
         )
 
-    cursor.execute("""
-    SELECT *
-    FROM members
-    WHERE member_id = ?
-    """, (member_id,))
-
-    member = cursor.fetchone()
+    member = fetch_member_with_photo(cursor, member_id)
 
     conn.close()
 
@@ -749,37 +804,37 @@ def delete_member(member_id):
     # Payments
     cursor.execute("""
     DELETE FROM payments
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     # Attendance
     cursor.execute("""
     DELETE FROM attendance
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     # Photos
     cursor.execute("""
     DELETE FROM member_photos
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     # Withdrawals
     cursor.execute("""
     DELETE FROM withdrawals
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     # ID Cards
     cursor.execute("""
     DELETE FROM id_cards
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     # Main Member Record
     cursor.execute("""
     DELETE FROM members
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     conn.commit()
@@ -797,13 +852,7 @@ def view_member(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("""
-    SELECT *
-    FROM members
-    WHERE member_id = ?
-    """, (member_id,))
-
-    member = cursor.fetchone()
+    member = fetch_member_with_photo(cursor, member_id)
 
     conn.close()
 
@@ -856,7 +905,7 @@ def payments():
         cursor.execute("""
         SELECT COUNT(*)
         FROM members
-        WHERE member_id = ?
+        WHERE member_id = %s
         """, (member_id,))
 
         exists = cursor.fetchone()[0]
@@ -880,7 +929,7 @@ def payments():
             
         )
         VALUES
-        (?, ?, ?, ?, ?, ?, ?)
+        (%s, %s, %s, %s, %s, %s, %s)
         """, (
             receipt_no,
             member_id,
@@ -915,11 +964,11 @@ def payments():
             cursor.execute("""
             UPDATE members
             SET
-                member_id = ?,
+                member_id = %s,
                 registration_fee = 20000,
-                member_since = ?,
+                member_since = %s,
                 status = 'Active'
-            WHERE member_id = ?
+            WHERE member_id = %s
             """, (
                 new_member_id,
                 member_since,
@@ -928,8 +977,8 @@ def payments():
 
             cursor.execute("""
             UPDATE payments
-            SET member_id = ?
-            WHERE member_id = ?
+            SET member_id = %s
+            WHERE member_id = %s
             """, (
                 new_member_id,
                 old_member_id
@@ -982,13 +1031,7 @@ def member_id_card(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("""
-    SELECT *
-    FROM members
-    WHERE member_id = ?
-    """, (member_id,))
-
-    member = cursor.fetchone()
+    member = fetch_member_with_photo(cursor, member_id)
 
     conn.close()
 
@@ -1066,7 +1109,7 @@ def expenses():
             expense_date
         )
         VALUES
-        (?, ?, ?, ?, ?)
+        (%s, %s, %s, %s, %s)
         """, (
             expense_type,
             description,
@@ -1131,7 +1174,7 @@ def donations():
             donation_date
         )
         VALUES
-        (?, ?, ?, ?, ?)
+        (%s, %s, %s, %s, %s)
         """, (
             donor_name,
             contact,
@@ -1389,7 +1432,7 @@ def donation_certificate(donation_id):
         purpose,
         donation_date
     FROM donations
-    WHERE id = ?
+    WHERE id = %s
     """, (
         donation_id,
     ))
@@ -1620,7 +1663,7 @@ def export_attendance():
     FROM attendance a
     LEFT JOIN members m
     ON a.member_id = m.member_id
-    WHERE a.attendance_date = ?
+    WHERE a.attendance_date = %s
     ORDER BY a.id DESC
     """, (
         export_date,
@@ -1747,7 +1790,7 @@ def export_monitoring():
         cursor.execute("""
         SELECT payment_month
         FROM payments
-        WHERE member_id = ?
+        WHERE member_id = %s
         """, (member_id,))
 
         payments = cursor.fetchall()
@@ -1824,7 +1867,7 @@ def attendance():
         cursor.execute("""
         SELECT full_name
         FROM members
-        WHERE member_id = ?
+        WHERE member_id = %s
         """, (
             member_id,
         ))
@@ -1846,8 +1889,8 @@ def attendance():
                 id,
                 time_out
             FROM attendance
-            WHERE member_id = ?
-            AND attendance_date = ?
+            WHERE member_id = %s
+            AND attendance_date = %s
             """, (
                 member_id,
                 today
@@ -1861,8 +1904,8 @@ def attendance():
 
                     cursor.execute("""
                     UPDATE attendance
-                    SET time_out = ?
-                    WHERE id = ?
+                    SET time_out = %s
+                    WHERE id = %s
                     """, (
                         current_time,
                         record[0]
@@ -1892,7 +1935,7 @@ def attendance():
                     attendance_time,
                     time_out
                 )
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
                 """, (
                     member_id,
                     today,
@@ -1927,7 +1970,7 @@ def attendance():
     FROM attendance a
     LEFT JOIN members m
     ON a.member_id = m.member_id
-    WHERE attendance_date = ?
+    WHERE attendance_date = %s
     ORDER BY a.id DESC
     """, (
         today,
@@ -1978,7 +2021,7 @@ def qr_attendance():
             cursor.execute("""
             SELECT full_name
             FROM members
-            WHERE member_id = ?
+            WHERE member_id = %s
             """, (
                 member_id,
             ))
@@ -2000,8 +2043,8 @@ def qr_attendance():
                     id,
                     time_out
                 FROM attendance
-                WHERE member_id = ?
-                AND attendance_date = ?
+                WHERE member_id = %s
+                AND attendance_date = %s
                 """, (
                     member_id,
                     today
@@ -2015,8 +2058,8 @@ def qr_attendance():
 
                         cursor.execute("""
                         UPDATE attendance
-                        SET time_out = ?
-                        WHERE id = ?
+                        SET time_out = %s
+                        WHERE id = %s
                         """, (
                             current_time,
                             record[0]
@@ -2034,7 +2077,7 @@ def qr_attendance():
                         attendance_time,
                         time_out
                     )
-                    VALUES (?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s)
                     """, (
                         member_id,
                         today,
@@ -2103,7 +2146,7 @@ def qr_attendance_scan():
     cursor.execute("""
     SELECT full_name
     FROM members
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     member = cursor.fetchone()
@@ -2128,8 +2171,8 @@ def qr_attendance_scan():
     cursor.execute("""
     SELECT id,time_out
     FROM attendance
-    WHERE member_id = ?
-    AND attendance_date = ?
+    WHERE member_id = %s
+    AND attendance_date = %s
     """, (
         member_id,
         today
@@ -2143,8 +2186,8 @@ def qr_attendance_scan():
 
             cursor.execute("""
             UPDATE attendance
-            SET time_out = ?
-            WHERE id = ?
+            SET time_out = %s
+            WHERE id = %s
             """, (
                 current_time,
                 record[0]
@@ -2172,7 +2215,7 @@ def qr_attendance_scan():
             attendance_time,
             time_out
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
         """, (
             member_id,
             today,
@@ -2188,8 +2231,8 @@ def qr_attendance_scan():
     cursor.execute("""
     SELECT COUNT(*)
     FROM attendance
-    WHERE member_id = ?
-    AND attendance_date = ?
+    WHERE member_id = %s
+    AND attendance_date = %s
     """, (
         member_id,
         today
@@ -2215,13 +2258,7 @@ def member_profile(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("""
-    SELECT *
-    FROM members
-    WHERE member_id = ?
-    """, (member_id,))
-
-    member = cursor.fetchone()
+    member = fetch_member_with_photo(cursor, member_id)
 
     if not member:
 
@@ -2234,7 +2271,7 @@ def member_profile(member_id):
         payment_type,
         amount
     FROM payments
-    WHERE member_id = ?
+    WHERE member_id = %s
     ORDER BY id DESC
     """, (member_id,))
 
@@ -2244,7 +2281,7 @@ def member_profile(member_id):
     SELECT
         IFNULL(SUM(amount),0)
     FROM payments
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     total_payment = cursor.fetchone()[0]
@@ -2252,7 +2289,7 @@ def member_profile(member_id):
     cursor.execute("""
     SELECT attendance_date
     FROM attendance
-    WHERE member_id = ?
+    WHERE member_id = %s
     ORDER BY id DESC
     LIMIT 1
     """, (member_id,))
@@ -2292,13 +2329,7 @@ def withdrawals():
 
         member_id = request.form["member_id"]
 
-        cursor.execute("""
-        SELECT *
-        FROM members
-        WHERE member_id = ?
-        """, (member_id,))
-
-        member = cursor.fetchone()
+        member = fetch_member_with_photo(cursor, member_id)
 
         if member:
 
@@ -2306,7 +2337,7 @@ def withdrawals():
             SELECT
                 IFNULL(SUM(amount),0)
             FROM payments
-            WHERE member_id = ?
+            WHERE member_id = %s
             AND payment_type = 'Monthly Contribution'
             """, (member_id,))
 
@@ -2338,7 +2369,7 @@ def withdrawals():
                     withdrawal_date
                 )
                 VALUES
-                (?, ?, ?, ?, ?, ?)
+                (%s, %s, %s, %s, %s, %s)
                 """, (
                     member[1],
                     member[2],
@@ -2352,17 +2383,17 @@ def withdrawals():
 
                 cursor.execute("""
                 DELETE FROM payments
-                WHERE member_id = ?
+                WHERE member_id = %s
                 """, (member_id,))
 
                 cursor.execute("""
                 DELETE FROM attendance
-                WHERE member_id = ?
+                WHERE member_id = %s
                 """, (member_id,))
 
                 cursor.execute("""
                 DELETE FROM members
-                WHERE member_id = ?
+                WHERE member_id = %s
                 """, (member_id,))
                 
 
@@ -2429,7 +2460,7 @@ def withdrawal_certificate(member_id):
     cursor.execute("""
     SELECT *
     FROM members
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     member = cursor.fetchone()
@@ -2442,7 +2473,7 @@ def withdrawal_certificate(member_id):
     SELECT
         IFNULL(SUM(amount),0)
     FROM payments
-    WHERE member_id = ?
+    WHERE member_id = %s
     AND payment_type =
     'Monthly Contribution'
     """, (member_id,))
@@ -2688,7 +2719,7 @@ def member_profile_pdf(member_id):
     cursor.execute("""
     SELECT *
     FROM members
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     member = cursor.fetchone()
@@ -2703,7 +2734,7 @@ def member_profile_pdf(member_id):
     SELECT
         IFNULL(SUM(amount),0)
     FROM payments
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
 
     total_payment = cursor.fetchone()[0]
@@ -2711,7 +2742,7 @@ def member_profile_pdf(member_id):
     cursor.execute("""
     SELECT attendance_date
     FROM attendance
-    WHERE member_id = ?
+    WHERE member_id = %s
     ORDER BY id DESC
     LIMIT 1
     """, (member_id,))
@@ -2724,7 +2755,7 @@ def member_profile_pdf(member_id):
         payment_type,
         amount
     FROM payments
-    WHERE member_id = ?
+    WHERE member_id = %s
     ORDER BY id DESC
     """, (member_id,))
 
@@ -2981,10 +3012,10 @@ def dashboard_outstanding():
             cursor.execute("""
             SELECT COUNT(*)
             FROM payments
-            WHERE member_id=?
+            WHERE member_id=%s
             AND payment_type='Monthly Contribution'
-            AND payment_month=?
-            AND payment_year=?
+            AND payment_month=%s
+            AND payment_year=%s
             """, (
                 member_id,
                 current_month,
@@ -3108,10 +3139,10 @@ def dashboard_active():
             cursor.execute("""
             SELECT COUNT(*)
             FROM payments
-            WHERE member_id = ?
+            WHERE member_id = %s
             AND payment_type='Monthly Contribution'
-            AND payment_month = ?
-            AND payment_year = ?
+            AND payment_month = %s
+            AND payment_year = %s
             """, (
                 member_id,
                 current_month,
@@ -3232,10 +3263,10 @@ def dashboard_inactive():
             cursor.execute("""
             SELECT COUNT(*)
             FROM payments
-            WHERE member_id = ?
+            WHERE member_id = %s
             AND payment_type='Monthly Contribution'
-            AND payment_month = ?
-            AND payment_year = ?
+            AND payment_month = %s
+            AND payment_year = %s
             """, (
                 member_id,
                 current_month,
@@ -3314,7 +3345,7 @@ def dashboard_applicants():
                 cursor.execute("""
                 SELECT COUNT(*)
                 FROM payments
-                WHERE member_id = ?
+                WHERE member_id = %s
                 AND payment_type='Registration Fee'
                 """, (
                     applicant[0],
@@ -3326,7 +3357,7 @@ def dashboard_applicants():
 
                     cursor.execute("""
                     DELETE FROM members
-                    WHERE member_id = ?
+                    WHERE member_id = %s
                     """, (
                         applicant[0],
                     ))
@@ -3535,7 +3566,7 @@ def approve_applicant(member_id):
     cursor.execute("""
     UPDATE members
     SET status='Active'
-    WHERE member_id=?
+    WHERE member_id=%s
     """, (
         member_id,
     ))
@@ -3561,7 +3592,7 @@ def reject_applicant(member_id):
 
     cursor.execute("""
     DELETE FROM members
-    WHERE member_id=?
+    WHERE member_id=%s
     """, (
         member_id,
     ))
@@ -3573,6 +3604,69 @@ def reject_applicant(member_id):
         "/registration_approval"
     )
 
+@app.route("/registration_confirmation/<member_id>")
+def registration_confirmation(member_id):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT member_id, full_name, proof_of_payment
+    FROM members
+    WHERE member_id = %s
+    """, (member_id,))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return "Applicant Not Found"
+
+    member = {
+        "member_id": row[0],
+        "full_name": row[1],
+        "proof_uploaded": bool(row[2])
+    }
+
+    return render_template(
+        "registration_confirmation.html",
+        member=member
+    )
+
+
+@app.route("/upload_proof_of_payment", methods=["POST"])
+def upload_proof_of_payment():
+
+    member_id = request.form["member_id"]
+    proof_file = request.files.get("proof_of_payment")
+
+    if proof_file and proof_file.filename:
+
+        os.makedirs("static/proof_of_payment", exist_ok=True)
+
+        proof_filename = secure_filename(
+            f"{member_id}_{proof_file.filename}"
+        )
+
+        proof_file.save(
+            os.path.join("static/proof_of_payment", proof_filename)
+        )
+
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        UPDATE members
+        SET proof_of_payment = %s
+        WHERE member_id = %s
+        """, (proof_filename, member_id))
+
+        conn.commit()
+        conn.close()
+
+    return redirect(f"/registration_confirmation/{member_id}")
+
+
 @app.route("/applicant_slip/<member_id>")
 def applicant_slip(member_id):
 
@@ -3582,7 +3676,7 @@ def applicant_slip(member_id):
     cursor.execute("""
     SELECT *
     FROM members
-    WHERE member_id=?
+    WHERE member_id=%s
     """, (
         member_id,
     ))
@@ -3750,14 +3844,10 @@ def registration_approval():
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("""
-    SELECT *
-    FROM members
-    WHERE status='Applicant'
-    ORDER BY id DESC
-    """)
-
-    applicants = cursor.fetchall()
+    applicants = fetch_all_members_with_photo(
+        cursor,
+        where_clause="status='Applicant'"
+    )
 
     conn.close()
 
@@ -3778,7 +3868,7 @@ def get_member_info(member_id):
     cursor.execute("""
     SELECT member_id, full_name, status
     FROM members
-    WHERE member_id = ?
+    WHERE member_id = %s
     """, (member_id,))
  
     member = cursor.fetchone()
@@ -3829,7 +3919,7 @@ def change_username():
  
     # Kunin ang current user's stored password
     cursor.execute(
-        "SELECT password FROM users WHERE username = ?",
+        "SELECT password FROM users WHERE username = %s",
         (session["username"],)
     )
     row = cursor.fetchone()
@@ -3857,7 +3947,7 @@ def change_username():
  
     # Check kung taken na ang bagong username
     cursor.execute(
-        "SELECT COUNT(*) FROM users WHERE username = ?",
+        "SELECT COUNT(*) FROM users WHERE username = %s",
         (new_username,)
     )
     taken = cursor.fetchone()[0]
@@ -3873,7 +3963,7 @@ def change_username():
  
     # I-update ang username
     cursor.execute(
-        "UPDATE users SET username = ? WHERE username = ?",
+        "UPDATE users SET username = %s WHERE username = %s",
         (new_username, session["username"])
     )
     conn.commit()
@@ -3900,7 +3990,7 @@ def change_password():
     cursor = conn.cursor()
  
     cursor.execute(
-        "SELECT password FROM users WHERE username = ?",
+        "SELECT password FROM users WHERE username = %s",
         (session["username"],)
     )
     row = cursor.fetchone()
@@ -3943,7 +4033,7 @@ def change_password():
     hashed_password = generate_password_hash(new_password)
  
     cursor.execute(
-        "UPDATE users SET password = ? WHERE username = ?",
+        "UPDATE users SET password = %s WHERE username = %s",
         (hashed_password, session["username"])
     )
     conn.commit()
@@ -3975,7 +4065,7 @@ def add_user():
     cursor = conn.cursor()
  
     cursor.execute(
-        "SELECT COUNT(*) FROM users WHERE username = ?",
+        "SELECT COUNT(*) FROM users WHERE username = %s",
         (new_username,)
     )
     taken = cursor.fetchone()[0]
@@ -3995,7 +4085,7 @@ def add_user():
     hashed_password = generate_password_hash(new_password)
  
     cursor.execute(
-        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+        "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
         (new_username, hashed_password, role)
     )
     conn.commit()
@@ -4022,7 +4112,7 @@ def delete_donation(donation_id):
     cursor = conn.cursor()
  
     cursor.execute(
-        "DELETE FROM donations WHERE id = ?",
+        "DELETE FROM donations WHERE id = %s",
         (donation_id,)
     )
  
@@ -4037,13 +4127,11 @@ def backup_database():
     if "username" not in session:
         return redirect("/login")
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    download_name = f"fcci_backup_{timestamp}.db"
-
-    return send_file(
-        DB_PATH,
-        as_attachment=True,
-        download_name=download_name
+    return render_template(
+        "settings.html",
+        username=session["username"],
+        all_users=get_all_users(),
+        message="Ang database ay naka-Supabase na (cloud). Para mag-backup, pumunta sa iyong Supabase dashboard → Project → Backups."
     )
 
 @app.route("/settings/restore_database", methods=["POST"])
@@ -4052,38 +4140,11 @@ def restore_database():
     if "username" not in session:
         return redirect("/login")
 
-    file = request.files.get("backup_file")
-
-    if not file or file.filename == "":
-        return render_template(
-            "settings.html",
-            username=session["username"],
-            all_users=get_all_users(),
-            error="Walang pinili na backup file."
-        )
-
-    if not file.filename.endswith(".db"):
-        return render_template(
-            "settings.html",
-            username=session["username"],
-            all_users=get_all_users(),
-            error="Invalid file type. Dapat .db file ang i-upload."
-        )
-
-    # Safety copy muna ng current database bago i-overwrite
-    os.makedirs("backups", exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safety_copy_path = os.path.join("backups", f"before_restore_{timestamp}.db")
-    shutil.copy(DB_PATH, safety_copy_path)
-
-    # I-save ang na-upload na file papalit sa kasalukuyang database
-    file.save(DB_PATH)
-
     return render_template(
         "settings.html",
         username=session["username"],
         all_users=get_all_users(),
-        message="Matagumpay na na-restore ang database! (Ang lumang database ay na-save sa backups/ folder bago na-overwrite.)"
+        message="Ang database ay naka-Supabase na (cloud). Ang Restore from .db file ay hindi na available. Para mag-restore, gamitin ang Supabase dashboard → Project → Backups."
     )
 
 @app.route("/settings/merge_database", methods=["POST"])
@@ -4092,53 +4153,11 @@ def merge_database():
     if "username" not in session:
         return redirect("/login")
 
-    file = request.files.get("merge_file")
-
-    if not file or file.filename == "":
-        return render_template(
-            "settings.html",
-            username=session["username"],
-            all_users=get_all_users(),
-            error="Walang pinili na file para i-merge."
-        )
-
-    if not file.filename.endswith(".db"):
-        return render_template(
-            "settings.html",
-            username=session["username"],
-            all_users=get_all_users(),
-            error="Invalid file type. Dapat .db file ang i-upload."
-        )
-
-    # I-save muna temporarily ang na-upload na lumang database
-    os.makedirs("backups", exist_ok=True)
-    temp_path = os.path.join("backups", "temp_merge_upload.db")
-    file.save(temp_path)
-
-    # Safety copy ng current database bago tayo mag-merge
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safety_copy_path = os.path.join("backups", f"before_merge_{timestamp}.db")
-    shutil.copy(DB_PATH, safety_copy_path)
-
-    try:
-        merge_summary = merge_old_database(temp_path)
-    except Exception as e:
-        return render_template(
-            "settings.html",
-            username=session["username"],
-            all_users=get_all_users(),
-            error=f"Error habang nag-me-merge: {str(e)}"
-        )
-    finally:
-        # Linisin ang temp file
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
     return render_template(
         "settings.html",
         username=session["username"],
         all_users=get_all_users(),
-        message=merge_summary
+        message="Ang database ay naka-Supabase na (cloud). Ang Merge from .db file ay hindi na available."
     )
 
 def merge_old_database(old_db_path):
@@ -4172,7 +4191,7 @@ def merge_old_database(old_db_path):
 
     def table_exists(cursor, table_name):
         cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=%s",
             (table_name,)
         )
         return cursor.fetchone() is not None
@@ -4201,7 +4220,7 @@ def merge_old_database(old_db_path):
                 member_id = row[member_id_index]
 
                 new_cursor.execute(
-                    "SELECT COUNT(*) FROM members WHERE member_id = ?",
+                    "SELECT COUNT(*) FROM members WHERE member_id = %s",
                     (member_id,)
                 )
                 exists = new_cursor.fetchone()[0]
@@ -4210,7 +4229,7 @@ def merge_old_database(old_db_path):
                     skipped_members += 1
                     continue
 
-                placeholders = ", ".join(["?"] * len(common_columns))
+                placeholders = ", ".join(["%s"] * len(common_columns))
                 columns_str = ", ".join(common_columns)
 
                 new_cursor.execute(
@@ -4237,7 +4256,7 @@ def merge_old_database(old_db_path):
 
             member_id_index = common_columns.index("member_id")
 
-            placeholders = ", ".join(["?"] * len(common_columns))
+            placeholders = ", ".join(["%s"] * len(common_columns))
             columns_str = ", ".join(common_columns)
 
             added_photos = 0
@@ -4247,7 +4266,7 @@ def merge_old_database(old_db_path):
 
                 # Skip kung may existing na photo record na ang member na ito
                 new_cursor.execute(
-                    "SELECT COUNT(*) FROM member_photos WHERE member_id = ?",
+                    "SELECT COUNT(*) FROM member_photos WHERE member_id = %s",
                     (member_id,)
                 )
                 exists = new_cursor.fetchone()[0]
@@ -4278,7 +4297,7 @@ def merge_old_database(old_db_path):
             old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM payments")
             old_payments = old_cursor.fetchall()
 
-            placeholders = ", ".join(["?"] * len(common_columns))
+            placeholders = ", ".join(["%s"] * len(common_columns))
             columns_str = ", ".join(common_columns)
 
             for row in old_payments:
@@ -4304,7 +4323,7 @@ def merge_old_database(old_db_path):
             old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM donations")
             old_donations = old_cursor.fetchall()
 
-            placeholders = ", ".join(["?"] * len(common_columns))
+            placeholders = ", ".join(["%s"] * len(common_columns))
             columns_str = ", ".join(common_columns)
 
             for row in old_donations:
@@ -4330,7 +4349,7 @@ def merge_old_database(old_db_path):
             old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM expenses")
             old_expenses = old_cursor.fetchall()
 
-            placeholders = ", ".join(["?"] * len(common_columns))
+            placeholders = ", ".join(["%s"] * len(common_columns))
             columns_str = ", ".join(common_columns)
 
             for row in old_expenses:
@@ -4356,7 +4375,7 @@ def merge_old_database(old_db_path):
             old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM attendance")
             old_attendance = old_cursor.fetchall()
 
-            placeholders = ", ".join(["?"] * len(common_columns))
+            placeholders = ", ".join(["%s"] * len(common_columns))
             columns_str = ", ".join(common_columns)
 
             for row in old_attendance:
@@ -4399,7 +4418,7 @@ def member_login():
         cursor.execute("""
         SELECT member_id, full_name, birthday, status
         FROM members
-        WHERE member_id = ?
+        WHERE member_id = %s
         """, (member_id,))
 
         member = cursor.fetchone()
@@ -4502,7 +4521,7 @@ def feed():
             cursor.execute("""
             INSERT INTO feed_posts
             (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
-            VALUES (?, ?, ?, ?, 0, ?, ?)
+            VALUES (%s, %s, %s, %s, 0, %s, %s)
             """, (
                 session["member_id"],
                 session["member_name"],
@@ -4531,17 +4550,17 @@ def feed():
     for post in posts:
         post_id = post[0]
 
-        cursor.execute("SELECT COUNT(*) FROM feed_likes WHERE post_id = ?", (post_id,))
+        cursor.execute("SELECT COUNT(*) FROM feed_likes WHERE post_id = %s", (post_id,))
         like_count = cursor.fetchone()[0]
 
         cursor.execute("""
-        SELECT COUNT(*) FROM feed_likes WHERE post_id = ? AND member_id = ?
+        SELECT COUNT(*) FROM feed_likes WHERE post_id = %s AND member_id = %s
         """, (post_id, session["member_id"]))
         liked_by_me = cursor.fetchone()[0] > 0
 
         cursor.execute("""
         SELECT full_name, comment_text, comment_date, comment_time
-        FROM feed_comments WHERE post_id = ? ORDER BY id ASC
+        FROM feed_comments WHERE post_id = %s ORDER BY id ASC
         """, (post_id,))
         comments = cursor.fetchall()
 
@@ -4581,7 +4600,7 @@ def feed_delete_post(post_id):
 
     # Siguraduhing sariling post lang ng member ang puwedeng i-delete
     cursor.execute(
-        "DELETE FROM feed_posts WHERE id = ? AND member_id = ?",
+        "DELETE FROM feed_posts WHERE id = %s AND member_id = %s",
         (post_id, session["member_id"])
     )
 
@@ -4602,16 +4621,16 @@ def feed_like_post(post_id):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT id FROM feed_likes WHERE post_id = ? AND member_id = ?",
+        "SELECT id FROM feed_likes WHERE post_id = %s AND member_id = %s",
         (post_id, session["member_id"])
     )
     existing = cursor.fetchone()
 
     if existing:
-        cursor.execute("DELETE FROM feed_likes WHERE id = ?", (existing[0],))
+        cursor.execute("DELETE FROM feed_likes WHERE id = %s", (existing[0],))
     else:
         cursor.execute(
-            "INSERT INTO feed_likes (post_id, member_id) VALUES (?, ?)",
+            "INSERT INTO feed_likes (post_id, member_id) VALUES (%s, %s)",
             (post_id, session["member_id"])
         )
 
@@ -4638,7 +4657,7 @@ def feed_add_comment(post_id):
 
         cursor.execute("""
         INSERT INTO feed_comments (post_id, member_id, full_name, comment_text, comment_date, comment_time)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             post_id,
             session["member_id"],
@@ -4665,12 +4684,12 @@ def feed_pin_post(post_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT is_pinned FROM feed_posts WHERE id = ?", (post_id,))
+    cursor.execute("SELECT is_pinned FROM feed_posts WHERE id = %s", (post_id,))
     row = cursor.fetchone()
 
     if row:
         new_value = 0 if row[0] == 1 else 1
-        cursor.execute("UPDATE feed_posts SET is_pinned = ? WHERE id = ?", (new_value, post_id))
+        cursor.execute("UPDATE feed_posts SET is_pinned = %s WHERE id = %s", (new_value, post_id))
         conn.commit()
 
     conn.close()
@@ -4689,22 +4708,22 @@ def member_portal_profile():
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM members WHERE member_id = ?", (session["member_id"],))
+    cursor.execute("SELECT * FROM members WHERE member_id = %s", (session["member_id"],))
     member = cursor.fetchone()
 
     cursor.execute("""
     SELECT payment_date, payment_type, amount
-    FROM payments WHERE member_id = ? ORDER BY id DESC
+    FROM payments WHERE member_id = %s ORDER BY id DESC
     """, (session["member_id"],))
     payments = cursor.fetchall()
 
     cursor.execute("""
-    SELECT COALESCE(SUM(amount), 0) FROM payments WHERE member_id = ?
+    SELECT COALESCE(SUM(amount), 0) FROM payments WHERE member_id = %s
     """, (session["member_id"],))
     total_payment = cursor.fetchone()[0]
 
     cursor.execute("""
-    SELECT photo_path FROM member_photos WHERE member_id = ? ORDER BY id DESC LIMIT 1
+    SELECT photo_path FROM member_photos WHERE member_id = %s ORDER BY id DESC LIMIT 1
     """, (session["member_id"],))
     photo_row = cursor.fetchone()
     photo_path = photo_row[0] if photo_row else None
@@ -4740,131 +4759,6 @@ def admin_feed():
     return render_template("admin_feed.html", posts=posts, username=session["username"])
 
 
-@app.route("/admin_feed/post", methods=["POST"])
-def admin_feed_post():
-
-    if "username" not in session:
-        return redirect("/login")
-
-    content = request.form.get("content", "").strip()
-    photo_file = request.files.get("photo")
-
-    photo_filename = None
-
-    if photo_file and photo_file.filename != "":
-        photo_filename = secure_filename(
-            f"feed_admin_{session['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo_file.filename}"
-        )
-        os.makedirs("static/feed_uploads", exist_ok=True)
-        photo_file.save(os.path.join("static/feed_uploads", photo_filename))
-
-    if content or photo_filename:
-        conn = get_db()
-        cursor = conn.cursor()
-
-        now = datetime.now()
-
-        # member_id field gagamitin nating "ADMIN" tag para makilala
-        # ang mga post mula sa staff/admin, hindi mula sa isang member.
-        cursor.execute("""
-        INSERT INTO feed_posts
-        (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
-        VALUES (?, ?, ?, ?, 0, ?, ?)
-        """, (
-            "ADMIN",
-            session["username"],
-            content,
-            photo_filename,
-            now.strftime("%B %d, %Y"),
-            now.strftime("%I:%M %p")
-        ))
-
-        conn.commit()
-        conn.close()
-
-    return redirect("/admin_feed")
-
-
-@app.route("/admin_feed/delete/<int:post_id>")
-def admin_feed_delete(post_id):
-
-    if "username" not in session:
-        return redirect("/login")
-
-    # Admin/staff ay puwedeng mag-delete ng KAHIT ANONG post
-    # (sariling post man o galing sa member), dahil sila ang
-    # moderator ng community feed.
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM feed_posts WHERE id = ?", (post_id,))
-
-    conn.commit()
-    conn.close()
-
-    return redirect("/admin_feed")
-
-@app.route("/registration_confirmation/<member_id>")
-def registration_confirmation(member_id):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT member_id, full_name, proof_of_payment
-    FROM members
-    WHERE member_id = ?
-    """, (member_id,))
-
-    row = cursor.fetchone()
-    conn.close()
-
-    if not row:
-        return "Applicant Not Found"
-
-    member = {
-        "member_id": row[0],
-        "full_name": row[1],
-        "proof_uploaded": bool(row[2])
-    }
-
-    return render_template(
-        "registration_confirmation.html",
-        member=member
-    )
-
-
-@app.route("/upload_proof_of_payment", methods=["POST"])
-def upload_proof_of_payment():
-
-    member_id = request.form["member_id"]
-    proof_file = request.files.get("proof_of_payment")
-
-    if proof_file and proof_file.filename:
-
-        os.makedirs("static/proof_of_payment", exist_ok=True)
-
-        proof_filename = secure_filename(
-            f"{member_id}_{proof_file.filename}"
-        )
-
-        proof_file.save(
-            os.path.join("static/proof_of_payment", proof_filename)
-        )
-
-        conn = get_db()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-        UPDATE members
-        SET proof_of_payment = ?
-        WHERE member_id = ?
-        """, (proof_filename, member_id))
-
-        conn.commit()
-        conn.close()
-
-    return redirect(f"/registration_confirmation/{member_id}")
 
 @app.route("/logout")
 def logout():
@@ -4875,6 +4769,15 @@ def logout():
 
 
 if __name__ == "__main__":
+
+    # ── TEST SUPABASE CONNECTION BAGO MAGSIMULA ──────────────
+    try:
+        test_conn = get_db()
+        test_conn.close()
+        print("[SUPABASE] Matagumpay na nakakonekta sa Supabase database!")
+    except Exception as conn_error:
+        print(f"[SUPABASE] WARNING: Hindi makakonekta sa Supabase: {conn_error}")
+        print("[SUPABASE] Siguraduhing tama ang DATABASE_URL sa .env file mo.")
 
     app.run(
         debug=True

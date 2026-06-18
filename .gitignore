@@ -1,0 +1,37 @@
+# PINAKA-MAHALAGA: Ang .env file ay naglalaman ng database
+# password mo — HUWAG ITONG ILAGAY SA GITHUB
+.env
+*.env
+ 
+# Database files — huwag i-upload ang lokal na SQLite copies
+*.db
+database/
+backups/
+database/auto_backups/
+ 
+# Python cache files — hindi kailangan sa GitHub
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+ 
+# Uploaded files ng users (photos, receipts, atbp.)
+# Hindi kailangan i-upload ang mga ito sa GitHub
+static/uploads/
+static/receipts/
+static/proof_of_payment/
+static/feed_uploads/
+ 
+# VS Code settings
+.vscode/
+ 
+# PyInstaller (kung ginagamit)
+dist/
+build/
+*.spec
+ 
+# Temporary files
+*.tmp
+*.log
+temp/
