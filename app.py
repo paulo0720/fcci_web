@@ -43,7 +43,6 @@ app.config[
 ] = UPLOAD_FOLDER
 
 DB_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
     "database",
     "fcci.db"
 )
@@ -51,64 +50,6 @@ DB_PATH = os.path.join(
 
 def get_db():
     return sqlite3.connect(DB_PATH)
-
-
-def fetch_member_with_photo(cursor, member_id):
-    """
-    Kinukuha ang lahat ng columns ng isang member (SELECT *) PLUS
-    ang photo_path mula sa member_photos table, idinadagdag bilang
-    HULING ELEMENT ng tuple. Ginagawa itong list para magamit ang
-    .append(), tapos ibinabalik bilang tuple para gumana pa rin ang
-    member[index] access pattern sa templates.
-
-    Kung walang member na nahanap, nagbabalik ng None.
-    """
-    cursor.execute("SELECT * FROM members WHERE member_id = ?", (member_id,))
-    row = cursor.fetchone()
-
-    if row is None:
-        return None
-
-    cursor.execute("""
-    SELECT photo_path FROM member_photos
-    WHERE member_id = ?
-    ORDER BY id DESC LIMIT 1
-    """, (member_id,))
-
-    photo_row = cursor.fetchone()
-    photo_path = photo_row[0] if photo_row else None
-
-    return tuple(list(row) + [photo_path])
-
-
-def fetch_all_members_with_photo(cursor, where_clause="", params=()):
-    """
-    Kinukuha ang lahat ng members (o filtered gamit ang where_clause)
-    PLUS photo_path bilang huling column ng bawat row. Ginagamit ito
-    sa mga listahan tulad ng registration_approval at members list.
-    """
-    query = "SELECT * FROM members"
-    if where_clause:
-        query += f" WHERE {where_clause}"
-
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-
-    results = []
-
-    for row in rows:
-        cursor.execute("""
-        SELECT photo_path FROM member_photos
-        WHERE member_id = ?
-        ORDER BY id DESC LIMIT 1
-        """, (row[1],))  # row[1] = member_id column
-
-        photo_row = cursor.fetchone()
-        photo_path = photo_row[0] if photo_row else None
-
-        results.append(tuple(list(row) + [photo_path]))
-
-    return results
 
 
 @app.route("/")
@@ -249,7 +190,7 @@ def member_registration():
         conn.close()
 
         return redirect(
-            f"/registration_confirmation/{member_id}"
+            f"/applicant_slip/{member_id}"
         )
 
     return render_template(
@@ -746,11 +687,12 @@ def edit_member(member_id):
             )
 
             cursor.execute("""
-            INSERT INTO member_photos (member_id, photo_path)
-            VALUES (?, ?)
+            UPDATE members
+            SET photo_path = ?
+            WHERE member_id = ?
             """, (
-                member_id,
-                photo_filename
+                photo_filename,
+                member_id
             ))
 
         cursor.execute("""
@@ -778,7 +720,13 @@ def edit_member(member_id):
             f"/view_member/{member_id}"
         )
 
-    member = fetch_member_with_photo(cursor, member_id)
+    cursor.execute("""
+    SELECT *
+    FROM members
+    WHERE member_id = ?
+    """, (member_id,))
+
+    member = cursor.fetchone()
 
     conn.close()
 
@@ -849,7 +797,13 @@ def view_member(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    member = fetch_member_with_photo(cursor, member_id)
+    cursor.execute("""
+    SELECT *
+    FROM members
+    WHERE member_id = ?
+    """, (member_id,))
+
+    member = cursor.fetchone()
 
     conn.close()
 
@@ -1028,7 +982,13 @@ def member_id_card(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    member = fetch_member_with_photo(cursor, member_id)
+    cursor.execute("""
+    SELECT *
+    FROM members
+    WHERE member_id = ?
+    """, (member_id,))
+
+    member = cursor.fetchone()
 
     conn.close()
 
@@ -2255,7 +2215,13 @@ def member_profile(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    member = fetch_member_with_photo(cursor, member_id)
+    cursor.execute("""
+    SELECT *
+    FROM members
+    WHERE member_id = ?
+    """, (member_id,))
+
+    member = cursor.fetchone()
 
     if not member:
 
@@ -2326,7 +2292,13 @@ def withdrawals():
 
         member_id = request.form["member_id"]
 
-        member = fetch_member_with_photo(cursor, member_id)
+        cursor.execute("""
+        SELECT *
+        FROM members
+        WHERE member_id = ?
+        """, (member_id,))
+
+        member = cursor.fetchone()
 
         if member:
 
@@ -3601,69 +3573,6 @@ def reject_applicant(member_id):
         "/registration_approval"
     )
 
-@app.route("/registration_confirmation/<member_id>")
-def registration_confirmation(member_id):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT member_id, full_name, proof_of_payment
-    FROM members
-    WHERE member_id = ?
-    """, (member_id,))
-
-    row = cursor.fetchone()
-    conn.close()
-
-    if not row:
-        return "Applicant Not Found"
-
-    member = {
-        "member_id": row[0],
-        "full_name": row[1],
-        "proof_uploaded": bool(row[2])
-    }
-
-    return render_template(
-        "registration_confirmation.html",
-        member=member
-    )
-
-
-@app.route("/upload_proof_of_payment", methods=["POST"])
-def upload_proof_of_payment():
-
-    member_id = request.form["member_id"]
-    proof_file = request.files.get("proof_of_payment")
-
-    if proof_file and proof_file.filename:
-
-        os.makedirs("static/proof_of_payment", exist_ok=True)
-
-        proof_filename = secure_filename(
-            f"{member_id}_{proof_file.filename}"
-        )
-
-        proof_file.save(
-            os.path.join("static/proof_of_payment", proof_filename)
-        )
-
-        conn = get_db()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-        UPDATE members
-        SET proof_of_payment = ?
-        WHERE member_id = ?
-        """, (proof_filename, member_id))
-
-        conn.commit()
-        conn.close()
-
-    return redirect(f"/registration_confirmation/{member_id}")
-
-
 @app.route("/applicant_slip/<member_id>")
 def applicant_slip(member_id):
 
@@ -3841,10 +3750,14 @@ def registration_approval():
     conn = get_db()
     cursor = conn.cursor()
 
-    applicants = fetch_all_members_with_photo(
-        cursor,
-        where_clause="status='Applicant'"
-    )
+    cursor.execute("""
+    SELECT *
+    FROM members
+    WHERE status='Applicant'
+    ORDER BY id DESC
+    """)
+
+    applicants = cursor.fetchall()
 
     conn.close()
 
@@ -4827,6 +4740,131 @@ def admin_feed():
     return render_template("admin_feed.html", posts=posts, username=session["username"])
 
 
+@app.route("/admin_feed/post", methods=["POST"])
+def admin_feed_post():
+
+    if "username" not in session:
+        return redirect("/login")
+
+    content = request.form.get("content", "").strip()
+    photo_file = request.files.get("photo")
+
+    photo_filename = None
+
+    if photo_file and photo_file.filename != "":
+        photo_filename = secure_filename(
+            f"feed_admin_{session['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo_file.filename}"
+        )
+        os.makedirs("static/feed_uploads", exist_ok=True)
+        photo_file.save(os.path.join("static/feed_uploads", photo_filename))
+
+    if content or photo_filename:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        now = datetime.now()
+
+        # member_id field gagamitin nating "ADMIN" tag para makilala
+        # ang mga post mula sa staff/admin, hindi mula sa isang member.
+        cursor.execute("""
+        INSERT INTO feed_posts
+        (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
+        VALUES (?, ?, ?, ?, 0, ?, ?)
+        """, (
+            "ADMIN",
+            session["username"],
+            content,
+            photo_filename,
+            now.strftime("%B %d, %Y"),
+            now.strftime("%I:%M %p")
+        ))
+
+        conn.commit()
+        conn.close()
+
+    return redirect("/admin_feed")
+
+
+@app.route("/admin_feed/delete/<int:post_id>")
+def admin_feed_delete(post_id):
+
+    if "username" not in session:
+        return redirect("/login")
+
+    # Admin/staff ay puwedeng mag-delete ng KAHIT ANONG post
+    # (sariling post man o galing sa member), dahil sila ang
+    # moderator ng community feed.
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM feed_posts WHERE id = ?", (post_id,))
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/admin_feed")
+
+@app.route("/registration_confirmation/<member_id>")
+def registration_confirmation(member_id):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT member_id, full_name, proof_of_payment
+    FROM members
+    WHERE member_id = ?
+    """, (member_id,))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return "Applicant Not Found"
+
+    member = {
+        "member_id": row[0],
+        "full_name": row[1],
+        "proof_uploaded": bool(row[2])
+    }
+
+    return render_template(
+        "registration_confirmation.html",
+        member=member
+    )
+
+
+@app.route("/upload_proof_of_payment", methods=["POST"])
+def upload_proof_of_payment():
+
+    member_id = request.form["member_id"]
+    proof_file = request.files.get("proof_of_payment")
+
+    if proof_file and proof_file.filename:
+
+        os.makedirs("static/proof_of_payment", exist_ok=True)
+
+        proof_filename = secure_filename(
+            f"{member_id}_{proof_file.filename}"
+        )
+
+        proof_file.save(
+            os.path.join("static/proof_of_payment", proof_filename)
+        )
+
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        UPDATE members
+        SET proof_of_payment = ?
+        WHERE member_id = ?
+        """, (proof_filename, member_id))
+
+        conn.commit()
+        conn.close()
+
+    return redirect(f"/registration_confirmation/{member_id}")
 
 @app.route("/logout")
 def logout():
@@ -4837,41 +4875,6 @@ def logout():
 
 
 if __name__ == "__main__":
-
-    # ── AUTO-BACKUP TUWING NAGSISIMULA ANG APP ──────────────
-    # Para hindi na maulit ang nawawalang data, gumagawa tayo ng
-    # timestamped na kopya ng database BAGO pa man tumakbo ang app.
-    # Ang mga lumang auto-backups (lagpas 20 na) ay awtomatikong
-    # tinatanggal para hindi mapuno ang disk space.
-    try:
-        if os.path.exists(DB_PATH):
-            backup_folder = os.path.join(
-                os.path.dirname(DB_PATH), "auto_backups"
-            )
-            os.makedirs(backup_folder, exist_ok=True)
-
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_file = os.path.join(
-                backup_folder, f"fcci_auto_{timestamp}.db"
-            )
-            shutil.copy2(DB_PATH, backup_file)
-            print(f"[AUTO-BACKUP] Na-save ang backup: {backup_file}")
-
-            # Linisin ang mga lumang backup, panatilihin lang ang
-            # pinaka-bagong 20
-            all_backups = sorted(
-                [
-                    f for f in os.listdir(backup_folder)
-                    if f.startswith("fcci_auto_") and f.endswith(".db")
-                ]
-            )
-
-            if len(all_backups) > 20:
-                for old_backup in all_backups[:-20]:
-                    os.remove(os.path.join(backup_folder, old_backup))
-
-    except Exception as backup_error:
-        print(f"[AUTO-BACKUP] Warning: hindi nagawa ang backup: {backup_error}")
 
     app.run(
         debug=True
