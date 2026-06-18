@@ -97,7 +97,7 @@
 
   <div class="profile-card">
     {% if photo_path %}
-    <img src="/static/uploads/{{ photo_path }}" class="profile-photo">
+    <img src="{{ photo_path }}" class="profile-photo">
     {% else %}
     <img src="/static/default_avatar.png" class="profile-photo">
     {% endif %}
