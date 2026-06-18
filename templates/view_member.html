@@ -126,7 +126,7 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
     <div class="row">
       <div class="col-md-4 text-center">
         {% if member[11] %}
-        <img src="{{ url_for('static', filename='uploads/' + member[11]) }}" style="width:220px;height:220px;object-fit:cover;border-radius:16px;border:1px solid var(--glass-border);">
+        <img src="{{ member[11] }}" style="width:220px;height:220px;object-fit:cover;border-radius:16px;border:1px solid var(--glass-border);">
         {% else %}
         <div style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;border-radius:16px;background:rgba(0,100,60,0.05);color:var(--text-dim);margin:0 auto;">No Photo</div>
         {% endif %}
