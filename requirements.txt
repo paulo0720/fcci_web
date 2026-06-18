@@ -7,3 +7,4 @@ reportlab
 openpyxl
 opencv-python-headless
 psycopg2-binary
+python-dotenv
