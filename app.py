@@ -871,6 +871,59 @@ def view_member(member_id):
         username=session["username"]
     )
 
+
+@app.route("/check_duplicate_payment")
+def check_duplicate_payment():
+
+    if "username" not in session:
+        return jsonify({"error": "Not logged in"}), 401
+
+    member_id = request.args.get("member_id", "").strip()
+    payment_type = request.args.get("payment_type", "")
+    payment_month = request.args.get("payment_month", "")
+    payment_year = request.args.get("payment_year", "")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if payment_type == "Registration Fee":
+
+        cursor.execute("""
+        SELECT status FROM members WHERE member_id = %s
+        """, (member_id,))
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if row and row[0] == "Active":
+            return jsonify({
+                "duplicate": True,
+                "message": f"Ang member na ito ({member_id}) ay Active na at nakabayad na ng Registration Fee. Hindi na ito dapat bayaran ulit."
+            })
+
+        return jsonify({"duplicate": False})
+
+    else:
+        cursor.execute("""
+        SELECT COUNT(*) FROM payments
+        WHERE member_id = %s
+        AND payment_type = 'Monthly Contribution'
+        AND payment_month = %s
+        AND payment_year = %s
+        """, (member_id, payment_month, payment_year))
+
+        count = cursor.fetchone()[0]
+        conn.close()
+
+        if count > 0:
+            return jsonify({
+                "duplicate": True,
+                "message": f"Nakabayad na ang member na ito ng Monthly Contribution para sa {payment_month} {payment_year}. Hindi na ito dapat bayaran ulit."
+            })
+
+        return jsonify({"duplicate": False})
+
+
 @app.route(
     "/payments",
     methods=["GET", "POST"]
@@ -959,13 +1012,28 @@ def payments():
 
         if payment_type == "Registration Fee":
 
+            # Gumamit ng MAX existing number imbes na COUNT(*),
+            # para hindi mag-clash kapag may na-delete na member
+            # sa gitna ng sequence (hal. FCCI-2026-000002 na-delete,
+            # pero may FCCI-2026-000003 pa rin)
             cursor.execute("""
-            SELECT COUNT(*)
+            SELECT member_id
             FROM members
-            WHERE member_id LIKE 'FCCI-%'
+            WHERE member_id LIKE 'FCCI-%%'
             """)
 
-            count = cursor.fetchone()[0] + 1
+            existing_ids = cursor.fetchall()
+
+            highest_num = 0
+            for row in existing_ids:
+                try:
+                    num_part = int(row[0].split("-")[-1])
+                    if num_part > highest_num:
+                        highest_num = num_part
+                except (ValueError, IndexError):
+                    continue
+
+            count = highest_num + 1
 
             new_member_id = (
                 f"FCCI-{datetime.now().year}-{count:06d}"
