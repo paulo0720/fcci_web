@@ -266,6 +266,16 @@ def member_registration():
             photo_filename
         ))
 
+        if photo_filename:
+            cursor.execute("""
+            INSERT INTO member_photos
+            (member_id, photo_path)
+            VALUES (%s, %s)
+            """, (
+                member_id,
+                photo_filename
+            ))
+
         conn.commit()
         conn.close()
 
