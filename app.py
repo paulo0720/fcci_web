@@ -202,11 +202,6 @@ def member_registration():
 
         photo = request.files.get("photo")
 
-        photo_filename = ""
-
-        if photo and photo.filename:
-            photo_filename = upload_photo(photo, folder="fcci_member_photos") or ""
-
         cursor.execute("""
         INSERT INTO members
         (
@@ -219,11 +214,10 @@ def member_registration():
             email,
             birthday,
             date_registered,
-            status,
-            photo_path
+            status
         )
         VALUES
-        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             member_id,
@@ -235,9 +229,17 @@ def member_registration():
             email,
             birthday,
             datetime.now().strftime("%Y-%m-%d"),
-            "Applicant",
-            photo_filename
+            "Applicant"
         ))
+
+        # I-upload ang photo sa Cloudinary at i-save sa member_photos
+        if photo and photo.filename:
+            photo_url = upload_photo(photo, folder="fcci_member_photos")
+            if photo_url:
+                cursor.execute("""
+                INSERT INTO member_photos (member_id, photo_path)
+                VALUES (%s, %s)
+                """, (member_id, photo_url))
 
         conn.commit()
         conn.close()
@@ -649,11 +651,6 @@ def add_member():
         photo = request.files["photo"]
         
 
-        photo_filename = ""
-
-        if photo and photo.filename:
-            photo_filename = upload_photo(photo, folder="fcci_member_photos") or ""
-
         conn = get_db()
         cursor = conn.cursor()
 
@@ -669,11 +666,10 @@ def add_member():
             email,
             birthday,
             date_registered,
-            status,
-            photo_path
+            status
         )
         VALUES
-        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             member_id,
             full_name,
@@ -684,9 +680,18 @@ def add_member():
             email,
             birthday,
             datetime.now().strftime("%Y-%m-%d"),
-            "Applicant",
-            photo_filename
+            "Active"
         ))
+
+        # I-upload ang photo sa Cloudinary at i-save ang URL
+        # sa member_photos table (hiwalay na table)
+        if photo and photo.filename:
+            photo_url = upload_photo(photo, folder="fcci_member_photos")
+            if photo_url:
+                cursor.execute("""
+                INSERT INTO member_photos (member_id, photo_path)
+                VALUES (%s, %s)
+                """, (member_id, photo_url))
 
         conn.commit()
         conn.close()
