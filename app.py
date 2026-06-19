@@ -4597,7 +4597,7 @@ def feed_like_post(post_id):
     existing = cursor.fetchone()
 
     if existing:
-        cursor.execute("DELETE FROM feed_likes WHERE id = %s", (existing[0],))
+        cursor.execute("DELETE FROM feed_likes WHERE id = %s", (existing[False],))
     else:
         cursor.execute(
             "INSERT INTO feed_likes (post_id, member_id) VALUES (%s, %s)",
@@ -4658,7 +4658,7 @@ def feed_pin_post(post_id):
     row = cursor.fetchone()
 
     if row:
-        new_value = 0 if row[0] == 1 else 1
+        new_value = False if row[False] == True else True
         cursor.execute("UPDATE feed_posts SET is_pinned = %s WHERE id = %s", (new_value, post_id))
         conn.commit()
 
