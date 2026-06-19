@@ -115,8 +115,6 @@ def fetch_all_members_with_photo(cursor, where_clause="", params=()):
     return results
 
 
-@app.route("/")
-
 def download_photo_for_pdf(member_id):
     """
     Kunin ang Cloudinary photo URL ng member mula sa member_photos
@@ -149,6 +147,7 @@ def download_photo_for_pdf(member_id):
     return None
 
 
+@app.route("/")
 def home():
     return redirect("/login")
 
