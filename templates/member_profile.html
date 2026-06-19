@@ -29,12 +29,12 @@ rel="stylesheet">
 <div class="col-md-3 text-center">
 
 {% if member[12] %}
-
 <img
-src="{{ url_for('static', filename='uploads/' + member[12]) }}"
+src="{{ member[12] }}"
 class="img-fluid rounded border"
 style="width:220px;height:220px;object-fit:cover;">
 
+  
 {% else %}
 
 <img
