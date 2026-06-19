@@ -211,12 +211,27 @@ def member_registration():
         conn = get_db()
         cursor = conn.cursor()
 
+        # Hanapin ang pinakamataas na existing APP- number,
+        # hindi yung total count (para hindi mag-clash kapag may
+        # na-delete o na-convert na applicant sa gitna ng sequence)
         cursor.execute("""
-        SELECT COUNT(*)
+        SELECT member_id
         FROM members
+        WHERE member_id LIKE 'APP-%%'
         """)
 
-        count = cursor.fetchone()[0] + 1
+        existing_app_ids = cursor.fetchall()
+
+        highest_num = 0
+        for row in existing_app_ids:
+            try:
+                num_part = int(row[0].split("-")[-1])
+                if num_part > highest_num:
+                    highest_num = num_part
+            except (ValueError, IndexError):
+                continue
+
+        count = highest_num + 1
 
         member_id = (
             f"APP-{datetime.now().year}-{count:06d}"
@@ -647,37 +662,33 @@ def add_member():
 
     if request.method == "POST":
 
+        # Hanapin ang pinakamataas na existing APP- number
+        # (hindi FCCI-, dahil "Applicant" pa ang status nito —
+        # dapat mag-bayad muna ng Registration Fee bago maging
+        # Active member, gaya ng public registration flow)
         cursor.execute("""
         SELECT member_id
         FROM members
-        ORDER BY id DESC
-        LIMIT 1
+        WHERE member_id LIKE 'APP-%%'
         """)
 
-        last = cursor.fetchone()
+        existing_app_ids = cursor.fetchall()
 
-        if last:
-
+        highest_num = 0
+        for row in existing_app_ids:
             try:
+                num_part = int(row[0].split("-")[-1])
+                if num_part > highest_num:
+                    highest_num = num_part
+            except (ValueError, IndexError):
+                continue
 
-                last_no = int(
-                    last[0].split("-")[-1]
-                )
-
-                next_no = last_no + 1
-
-            except:
-
-                next_no = 1
-
-        else:
-
-            next_no = 1
+        next_no = highest_num + 1
 
         current_year = datetime.now().year
 
         member_id = (
-            f"FCCI-{current_year}-{next_no:06d}"
+            f"APP-{current_year}-{next_no:06d}"
         )
         full_name = request.form["full_name"]
         contact = request.form["contact"]
@@ -707,11 +718,10 @@ def add_member():
             email,
             birthday,
             date_registered,
-            status,
-            photo_path
+            status
         )
         VALUES
-        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             member_id,
             full_name,
@@ -722,9 +732,15 @@ def add_member():
             email,
             birthday,
             datetime.now().strftime("%Y-%m-%d"),
-            "Applicant",
-            photo_filename
+            "Applicant"
         ))
+
+        # I-upload ang photo sa Cloudinary at i-save sa member_photos
+        if photo_filename:
+            cursor.execute("""
+            INSERT INTO member_photos (member_id, photo_path)
+            VALUES (%s, %s)
+            """, (member_id, photo_filename))
 
         conn.commit()
         conn.close()
