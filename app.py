@@ -67,7 +67,7 @@ def fetch_member_with_photo(cursor, member_id):
 
     Kung walang member na nahanap, nagbabalik ng None.
     """
-    cursor.execute("SELECT * FROM members WHERE member_id = %s", (member_id,))
+    cursor.execute("SELECT id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment FROM members WHERE member_id = %s", (member_id,))
     row = cursor.fetchone()
 
     if row is None:
@@ -91,7 +91,7 @@ def fetch_all_members_with_photo(cursor, where_clause="", params=()):
     PLUS photo_path bilang huling column ng bawat row. Ginagamit ito
     sa mga listahan tulad ng registration_approval at members list.
     """
-    query = "SELECT * FROM members"
+    query = "SELECT id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment FROM members"
     if where_clause:
         query += f" WHERE {where_clause}"
 
@@ -116,6 +116,39 @@ def fetch_all_members_with_photo(cursor, where_clause="", params=()):
 
 
 @app.route("/")
+
+def download_photo_for_pdf(member_id):
+    """
+    Kunin ang Cloudinary photo URL ng member mula sa member_photos
+    table, i-download sa temporary file, at ibalik ang local path
+    para magamit ng ReportLab Image(). Nagbabalik ng None kung
+    walang photo o nag-error ang download.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT photo_path FROM member_photos
+        WHERE member_id = %s
+        ORDER BY id DESC LIMIT 1
+        """, (member_id,))
+        photo_row = cursor.fetchone()
+        conn.close()
+
+        if photo_row and photo_row[0]:
+            photo_url = photo_row[0]
+            if photo_url.startswith("http"):
+                import urllib.request
+                import tempfile
+                tmp_photo = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                urllib.request.urlretrieve(photo_url, tmp_photo.name)
+                return tmp_photo.name
+    except Exception as e:
+        print(f"[PDF] Photo download error: {e}")
+
+    return None
+
+
 def home():
     return redirect("/login")
 
@@ -2425,7 +2458,8 @@ def withdrawal_certificate(member_id):
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT *
+    SELECT
+    id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment
     FROM members
     WHERE member_id = %s
     """, (member_id,))
@@ -2511,16 +2545,9 @@ def withdrawal_certificate(member_id):
     )
 
 
-    photo_path = ""
+    photo_path = download_photo_for_pdf(member[1])
 
-    if len(member) > 11 and member[11]:
-
-        photo_path = (
-            "static/uploads/" +
-            member[11]
-        )
-
-    if photo_path and os.path.exists(photo_path):
+    if photo_path:
 
         story.append(
             Image(
@@ -2684,7 +2711,8 @@ def member_profile_pdf(member_id):
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT *
+    SELECT
+    id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment
     FROM members
     WHERE member_id = %s
     """, (member_id,))
@@ -2781,18 +2809,9 @@ def member_profile_pdf(member_id):
         Spacer(1,20)
     )
 
-    photo_path = ""
+    photo_path = download_photo_for_pdf(member[1])
 
-    if len(member) > 11 and member[11]:
-
-        photo_path = (
-            "static/uploads/"
-            + member[11]
-        )
-
-    if os.path.exists(
-        photo_path
-    ):
+    if photo_path:
 
         img = Image(
             photo_path,
@@ -3633,9 +3652,10 @@ def applicant_slip(member_id):
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT *
+    SELECT
+    id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment
     FROM members
-    WHERE member_id=%s
+    WHERE member_id = %s
     """, (
         member_id,
     ))
@@ -3717,26 +3737,12 @@ def applicant_slip(member_id):
         Spacer(1,20)
     )
 
-    if member[11]:
+    # Kunin ang applicant photo mula sa member_photos table (Cloudinary)
+    slip_photo_path = download_photo_for_pdf(member_id)
 
-        photo_path = (
-            "static/uploads/" +
-            member[11]
-        )
-
-        if os.path.exists(photo_path):
-
-            content.append(
-                Image(
-                    photo_path,
-                    width=120,
-                    height=120
-                )
-            )
-
-            content.append(
-                Spacer(1,10)
-            )
+    if slip_photo_path:
+        content.append(Image(slip_photo_path, width=120, height=120))
+        content.append(Spacer(1, 10))
 
     content.append(
         Image(
@@ -4663,7 +4669,7 @@ def member_portal_profile():
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM members WHERE member_id = %s", (session["member_id"],))
+    cursor.execute("SELECT id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment FROM members WHERE member_id = %s", (session["member_id"],))
     member = cursor.fetchone()
 
     cursor.execute("""
