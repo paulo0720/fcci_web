@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 import cv2
 import qrcode
 from datetime import datetime
+from cloudinary_helper import upload_photo, upload_file
+from email_helper import send_welcome_email, send_payment_confirmation_email
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -66,7 +68,7 @@ def fetch_member_with_photo(cursor, member_id):
 
     Kung walang member na nahanap, nagbabalik ng None.
     """
-    cursor.execute("SELECT * FROM members WHERE member_id = %s", (member_id,))
+    cursor.execute("SELECT id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment FROM members WHERE member_id = %s", (member_id,))
     row = cursor.fetchone()
 
     if row is None:
@@ -90,7 +92,7 @@ def fetch_all_members_with_photo(cursor, where_clause="", params=()):
     PLUS photo_path bilang huling column ng bawat row. Ginagamit ito
     sa mga listahan tulad ng registration_approval at members list.
     """
-    query = "SELECT * FROM members"
+    query = "SELECT id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment FROM members"
     if where_clause:
         query += f" WHERE {where_clause}"
 
@@ -112,6 +114,38 @@ def fetch_all_members_with_photo(cursor, where_clause="", params=()):
         results.append(tuple(list(row) + [photo_path]))
 
     return results
+
+
+def download_photo_for_pdf(member_id):
+    """
+    Kunin ang Cloudinary photo URL ng member mula sa member_photos
+    table, i-download sa temporary file, at ibalik ang local path
+    para magamit ng ReportLab Image(). Nagbabalik ng None kung
+    walang photo o nag-error ang download.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT photo_path FROM member_photos
+        WHERE member_id = %s
+        ORDER BY id DESC LIMIT 1
+        """, (member_id,))
+        photo_row = cursor.fetchone()
+        conn.close()
+
+        if photo_row and photo_row[0]:
+            photo_url = photo_row[0]
+            if photo_url.startswith("http"):
+                import urllib.request
+                import tempfile
+                tmp_photo = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                urllib.request.urlretrieve(photo_url, tmp_photo.name)
+                return tmp_photo.name
+    except Exception as e:
+        print(f"[PDF] Photo download error: {e}")
+
+    return None
 
 
 @app.route("/")
@@ -199,22 +233,7 @@ def member_registration():
         photo_filename = ""
 
         if photo and photo.filename:
-
-            os.makedirs(
-                app.config["UPLOAD_FOLDER"],
-                exist_ok=True
-            )
-
-            photo_filename = secure_filename(
-                photo.filename
-            )
-
-            photo.save(
-                os.path.join(
-                    app.config["UPLOAD_FOLDER"],
-                    photo_filename
-                )
-            )
+            photo_filename = upload_photo(photo, folder="fcci_member_photos") or ""
 
         cursor.execute("""
         INSERT INTO members
@@ -247,6 +266,16 @@ def member_registration():
             "Applicant",
             photo_filename
         ))
+
+        if photo_filename:
+            cursor.execute("""
+            INSERT INTO member_photos
+            (member_id, photo_path)
+            VALUES (%s, %s)
+            """, (
+                member_id,
+                photo_filename
+            ))
 
         conn.commit()
         conn.close()
@@ -660,20 +689,8 @@ def add_member():
 
         photo_filename = ""
 
-        if photo:
-
-            photo_filename = secure_filename(
-                photo.filename
-            )
-
-            photo.save(
-                os.path.join(
-                    app.config["UPLOAD_FOLDER"],
-                    photo_filename
-                )
-            )
-
-        
+        if photo and photo.filename:
+            photo_filename = upload_photo(photo, folder="fcci_member_photos") or ""
 
         conn = get_db()
         cursor = conn.cursor()
@@ -737,24 +754,16 @@ def edit_member(member_id):
 
         if photo and photo.filename:
 
-            photo_filename = secure_filename(
-                photo.filename
-            )
+            photo_url = upload_photo(photo, folder="fcci_member_photos")
 
-            photo.save(
-                os.path.join(
-                    app.config["UPLOAD_FOLDER"],
-                    photo_filename
-                )
-            )
-
-            cursor.execute("""
-            INSERT INTO member_photos (member_id, photo_path)
-            VALUES (%s, %s)
-            """, (
-                member_id,
-                photo_filename
-            ))
+            if photo_url:
+                cursor.execute("""
+                INSERT INTO member_photos (member_id, photo_path)
+                VALUES (%s, %s)
+                """, (
+                    member_id,
+                    photo_url
+                ))
 
         cursor.execute("""
         UPDATE members
@@ -916,6 +925,13 @@ def payments():
 
             return "Member ID Not Found"
 
+        # Kunin ang full_name at email ng member BAGO mag-INSERT,
+        # para magamit sa pagpapadala ng confirmation email mamaya
+        cursor.execute("""
+        SELECT full_name, email FROM members WHERE member_id = %s
+        """, (member_id,))
+        payer_info = cursor.fetchone()
+
         cursor.execute("""
         INSERT INTO payments
         (
@@ -984,7 +1000,32 @@ def payments():
                 old_member_id
             ))
 
+            # I-update din ang member_photos para hindi mawala ang photo
+            cursor.execute("""
+            UPDATE member_photos
+            SET member_id = %s
+            WHERE member_id = %s
+            """, (
+                new_member_id,
+                old_member_id
+            ))
+
         conn.commit()
+
+        # I-send ang payment confirmation email (hindi mag-crash
+        # ang app kung walang email o nag-error ang pagpapadala)
+        if payer_info and payer_info[1]:
+            try:
+                send_payment_confirmation_email(
+                    payer_info[1],
+                    payer_info[0],
+                    payment_type,
+                    amount,
+                    receipt_no,
+                    payment_date
+                )
+            except Exception as e:
+                print(f"[EMAIL] Failed to send payment confirmation: {e}")
 
     cursor.execute("""
     SELECT
@@ -999,6 +1040,7 @@ def payments():
 
     cursor.execute("""
     SELECT
+        id,
         receipt_no,
         member_id,
         payment_type,
@@ -1019,6 +1061,27 @@ def payments():
         payment_history=payment_history,
         username=session["username"]
     )
+
+
+@app.route("/delete_payment/<int:payment_id>")
+def delete_payment(payment_id):
+
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM payments WHERE id = %s",
+        (payment_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/payments")
+
 
 @app.route(
     "/member_id_card/<member_id>"
@@ -1088,16 +1151,7 @@ def expenses():
             receipt_file.filename
         ):
 
-            receipt_filename = secure_filename(
-                receipt_file.filename
-            )
-
-            receipt_file.save(
-                os.path.join(
-                    "static/receipts",
-                    receipt_filename
-                )
-            )
+            receipt_filename = upload_file(receipt_file, folder="fcci_receipts") or ""
 
         cursor.execute("""
         INSERT INTO expenses
@@ -2279,7 +2333,7 @@ def member_profile(member_id):
 
     cursor.execute("""
     SELECT
-        IFNULL(SUM(amount),0)
+        COALESCE(SUM(amount),0)
     FROM payments
     WHERE member_id = %s
     """, (member_id,))
@@ -2335,7 +2389,7 @@ def withdrawals():
 
             cursor.execute("""
             SELECT
-                IFNULL(SUM(amount),0)
+                COALESCE(SUM(amount),0)
             FROM payments
             WHERE member_id = %s
             AND payment_type = 'Monthly Contribution'
@@ -2458,7 +2512,8 @@ def withdrawal_certificate(member_id):
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT *
+    SELECT
+    id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment
     FROM members
     WHERE member_id = %s
     """, (member_id,))
@@ -2471,7 +2526,7 @@ def withdrawal_certificate(member_id):
     
     cursor.execute("""
     SELECT
-        IFNULL(SUM(amount),0)
+        COALESCE(SUM(amount),0)
     FROM payments
     WHERE member_id = %s
     AND payment_type =
@@ -2544,16 +2599,9 @@ def withdrawal_certificate(member_id):
     )
 
 
-    photo_path = ""
+    photo_path = download_photo_for_pdf(member[1])
 
-    if len(member) > 11 and member[11]:
-
-        photo_path = (
-            "static/uploads/" +
-            member[11]
-        )
-
-    if photo_path and os.path.exists(photo_path):
+    if photo_path:
 
         story.append(
             Image(
@@ -2717,7 +2765,8 @@ def member_profile_pdf(member_id):
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT *
+    SELECT
+    id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment
     FROM members
     WHERE member_id = %s
     """, (member_id,))
@@ -2732,7 +2781,7 @@ def member_profile_pdf(member_id):
 
     cursor.execute("""
     SELECT
-        IFNULL(SUM(amount),0)
+        COALESCE(SUM(amount),0)
     FROM payments
     WHERE member_id = %s
     """, (member_id,))
@@ -2814,18 +2863,9 @@ def member_profile_pdf(member_id):
         Spacer(1,20)
     )
 
-    photo_path = ""
+    photo_path = download_photo_for_pdf(member[1])
 
-    if len(member) > 11 and member[11]:
-
-        photo_path = (
-            "static/uploads/"
-            + member[11]
-        )
-
-    if os.path.exists(
-        photo_path
-    ):
+    if photo_path:
 
         img = Image(
             photo_path,
@@ -3563,6 +3603,13 @@ def approve_applicant(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
+    # Kunin muna ang member details bago mag-update,
+    # para magamit sa pagpapadala ng welcome email
+    cursor.execute("""
+    SELECT full_name, email FROM members WHERE member_id = %s
+    """, (member_id,))
+    applicant_info = cursor.fetchone()
+
     cursor.execute("""
     UPDATE members
     SET status='Active'
@@ -3573,6 +3620,18 @@ def approve_applicant(member_id):
 
     conn.commit()
     conn.close()
+
+    # I-send ang welcome email (hindi mag-crash ang app kung
+    # walang email o nag-error ang pagpapadala)
+    if applicant_info and applicant_info[1]:
+        try:
+            send_welcome_email(
+                applicant_info[1],
+                applicant_info[0],
+                member_id
+            )
+        except Exception as e:
+            print(f"[EMAIL] Failed to send welcome email: {e}")
 
     return redirect(
         "/registration_approval"
@@ -3642,15 +3701,7 @@ def upload_proof_of_payment():
 
     if proof_file and proof_file.filename:
 
-        os.makedirs("static/proof_of_payment", exist_ok=True)
-
-        proof_filename = secure_filename(
-            f"{member_id}_{proof_file.filename}"
-        )
-
-        proof_file.save(
-            os.path.join("static/proof_of_payment", proof_filename)
-        )
+        proof_filename = upload_photo(proof_file, folder="fcci_proof_of_payment") or ""
 
         conn = get_db()
         cursor = conn.cursor()
@@ -3674,9 +3725,10 @@ def applicant_slip(member_id):
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT *
+    SELECT
+    id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment
     FROM members
-    WHERE member_id=%s
+    WHERE member_id = %s
     """, (
         member_id,
     ))
@@ -3758,26 +3810,12 @@ def applicant_slip(member_id):
         Spacer(1,20)
     )
 
-    if member[11]:
+    # Kunin ang applicant photo mula sa member_photos table (Cloudinary)
+    slip_photo_path = download_photo_for_pdf(member_id)
 
-        photo_path = (
-            "static/uploads/" +
-            member[11]
-        )
-
-        if os.path.exists(photo_path):
-
-            content.append(
-                Image(
-                    photo_path,
-                    width=120,
-                    height=120
-                )
-            )
-
-            content.append(
-                Spacer(1,10)
-            )
+    if slip_photo_path:
+        content.append(Image(slip_photo_path, width=120, height=120))
+        content.append(Spacer(1, 10))
 
     content.append(
         Image(
@@ -4509,11 +4547,7 @@ def feed():
         photo_filename = None
 
         if photo_file and photo_file.filename != "":
-            photo_filename = secure_filename(
-                f"feed_{session['member_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo_file.filename}"
-            )
-            os.makedirs("static/feed_uploads", exist_ok=True)
-            photo_file.save(os.path.join("static/feed_uploads", photo_filename))
+            photo_filename = upload_photo(photo_file, folder="fcci_feed") or None
 
         if content or photo_filename:
             now = datetime.now()
@@ -4521,7 +4555,7 @@ def feed():
             cursor.execute("""
             INSERT INTO feed_posts
             (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
-            VALUES (%s, %s, %s, %s, 0, %s, %s)
+            VALUES (%s, %s, %s, %s, FALSE, %s, %s)
             """, (
                 session["member_id"],
                 session["member_name"],
@@ -4627,7 +4661,7 @@ def feed_like_post(post_id):
     existing = cursor.fetchone()
 
     if existing:
-        cursor.execute("DELETE FROM feed_likes WHERE id = %s", (existing[0],))
+        cursor.execute("DELETE FROM feed_likes WHERE id = %s", (existing[False],))
     else:
         cursor.execute(
             "INSERT INTO feed_likes (post_id, member_id) VALUES (%s, %s)",
@@ -4688,7 +4722,7 @@ def feed_pin_post(post_id):
     row = cursor.fetchone()
 
     if row:
-        new_value = 0 if row[0] == 1 else 1
+        new_value = False if row[False] == True else True
         cursor.execute("UPDATE feed_posts SET is_pinned = %s WHERE id = %s", (new_value, post_id))
         conn.commit()
 
@@ -4708,7 +4742,7 @@ def member_portal_profile():
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM members WHERE member_id = %s", (session["member_id"],))
+    cursor.execute("SELECT id, member_id, full_name, contact, address, registration_fee, member_since, email, birthday, date_registered, status, proof_of_payment FROM members WHERE member_id = %s", (session["member_id"],))
     member = cursor.fetchone()
 
     cursor.execute("""
@@ -4767,6 +4801,48 @@ def logout():
 
     return redirect("/login")
 
+
+
+@app.route("/admin_feed/post", methods=["POST"])
+def admin_feed_post():
+    if "username" not in session:
+        return redirect("/login")
+    content_text = request.form.get("content", "").strip()
+    photo_file = request.files.get("photo")
+    photo_filename = None
+    if photo_file and photo_file.filename != "":
+        photo_filename = upload_photo(photo_file, folder="fcci_feed")
+    if content_text or photo_filename:
+        conn = get_db()
+        cursor = conn.cursor()
+        now = datetime.now()
+        cursor.execute("""
+        INSERT INTO feed_posts
+        (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
+        VALUES (%s, %s, %s, %s, FALSE, %s, %s)
+        """, (
+            "ADMIN",
+            session["username"],
+            content_text,
+            photo_filename,
+            now.strftime("%B %d, %Y"),
+            now.strftime("%I:%M %p")
+        ))
+        conn.commit()
+        conn.close()
+    return redirect("/admin_feed")
+
+
+@app.route("/admin_feed/delete/<int:post_id>")
+def admin_feed_delete(post_id):
+    if "username" not in session:
+        return redirect("/login")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM feed_posts WHERE id = %s", (post_id,))
+    conn.commit()
+    conn.close()
+    return redirect("/admin_feed")
 
 if __name__ == "__main__":
 
