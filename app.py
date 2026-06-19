@@ -1017,6 +1017,7 @@ def payments():
 
     cursor.execute("""
     SELECT
+        id,
         receipt_no,
         member_id,
         payment_type,
@@ -1037,6 +1038,27 @@ def payments():
         payment_history=payment_history,
         username=session["username"]
     )
+
+
+@app.route("/delete_payment/<int:payment_id>")
+def delete_payment(payment_id):
+
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM payments WHERE id = %s",
+        (payment_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/payments")
+
 
 @app.route(
     "/member_id_card/<member_id>"
