@@ -1,67 +1,84 @@
 import smtplib
 import os
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
- 
+
 load_dotenv()
- 
+
 GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
- 
- 
-def send_email(to_email, subject, html_body):
+
+
+def _send_email_now(to_email, subject, html_body):
     """
-    Magpadala ng email gamit ang Gmail SMTP.
- 
-    Params:
-        to_email   — email address ng tatanggap
-        subject    — subject line ng email
-        html_body  — HTML content ng email body
- 
-    Returns:
-        True  — successful na naipadala
-        False — may error (hindi nag-crash ang app, log lang)
+    Ang totoong pagpapadala ng email (synchronous). Ito ay
+    tinatawag sa loob ng background thread para hindi ma-block
+    ang main request (hal. pag-save ng payment) kahit mabagal
+    o naka-timeout ang Gmail connection.
     """
- 
+
     if not to_email or "@" not in to_email:
         print(f"[EMAIL] Invalid email address: {to_email}")
         return False
- 
+
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
         print("[EMAIL] Walang GMAIL_ADDRESS o GMAIL_APP_PASSWORD sa .env")
         return False
- 
+
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = f"FCCI Filipino Community Center <{GMAIL_ADDRESS}>"
         msg["To"] = to_email
- 
+
         html_part = MIMEText(html_body, "html")
         msg.attach(html_part)
- 
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+
+        # MAHALAGA: may timeout para hindi ito mag-hang nang
+        # walang hanggan kung naka-block o mabagal ang network
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as server:
             server.starttls()
             server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
             server.sendmail(GMAIL_ADDRESS, to_email, msg.as_string())
- 
+
         print(f"[EMAIL] Successfully sent to {to_email}")
         return True
- 
+
     except Exception as e:
         print(f"[EMAIL] Error sending to {to_email}: {e}")
         return False
- 
- 
+
+
+def send_email(to_email, subject, html_body):
+    """
+    Magpadala ng email gamit ang Gmail SMTP — TUMATAKBO SA
+    BACKGROUND THREAD para hindi ma-block ang request na
+    tumawag dito (hal. pag-save ng payment o pag-approve).
+
+    Agad itong nagre-return (hindi naghihintay matapos ang
+    email), kaya hindi kailanman magdudulot ng timeout o
+    pag-hang ang routes na gumagamit nito.
+    """
+
+    thread = threading.Thread(
+        target=_send_email_now,
+        args=(to_email, subject, html_body),
+        daemon=True
+    )
+    thread.start()
+    return True
+
+
 def send_welcome_email(to_email, full_name, member_id):
     """
     Ipinapadala kapag na-approve ang isang applicant at naging
     Official FCCI Member.
     """
- 
+
     subject = "🎉 Welcome to FCCI - You are now an Official Member!"
- 
+
     html_body = f"""
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
       <div style="background:linear-gradient(135deg,#00562a,#00a85c);padding:30px;border-radius:16px 16px 0 0;text-align:center;">
@@ -88,18 +105,18 @@ def send_welcome_email(to_email, full_name, member_id):
       </div>
     </div>
     """
- 
+
     return send_email(to_email, subject, html_body)
- 
- 
+
+
 def send_payment_confirmation_email(to_email, full_name, payment_type, amount, receipt_no, payment_date):
     """
     Ipinapadala kapag na-record ang isang payment (Registration Fee
     o Monthly Contribution).
     """
- 
+
     subject = f"✅ Payment Received - {payment_type}"
- 
+
     html_body = f"""
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
       <div style="background:linear-gradient(135deg,#00562a,#00a85c);padding:30px;border-radius:16px 16px 0 0;text-align:center;">
@@ -125,5 +142,5 @@ def send_payment_confirmation_email(to_email, full_name, payment_type, amount, r
       </div>
     </div>
     """
- 
+
     return send_email(to_email, subject, html_body)
