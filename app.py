@@ -4491,7 +4491,7 @@ def feed():
             cursor.execute("""
             INSERT INTO feed_posts
             (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
-            VALUES (%s, %s, %s, %s, 0, %s, %s)
+            VALUES (%s, %s, %s, %s, FALSE, %s, %s)
             """, (
                 session["member_id"],
                 session["member_name"],
@@ -4755,7 +4755,7 @@ def admin_feed_post():
         cursor.execute("""
         INSERT INTO feed_posts
         (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
-        VALUES (%s, %s, %s, %s, 0, %s, %s)
+        VALUES (%s, %s, %s, %s, FALSE, %s, %s)
         """, (
             "ADMIN",
             session["username"],
