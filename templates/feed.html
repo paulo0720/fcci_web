@@ -185,7 +185,7 @@
     {% endif %}
 
     {% if post.photo_path %}
-    <img src="/static/feed_uploads/{{ post.photo_path }}" class="post-photo">
+    <img src="{{ post.photo_path }}" class="post-photo">
     {% endif %}
 
     <div class="post-actions">

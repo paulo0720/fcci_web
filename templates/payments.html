@@ -244,11 +244,23 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
     <h5>Payment History</h5>
     <div style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Receipt No</th><th>Member ID</th><th>Type</th><th>Amount</th><th>Date</th></tr></thead>
+      <thead><tr><th>Receipt No</th><th>Member ID</th><th>Type</th><th>Amount</th><th>Date</th><th>Action</th></tr></thead>
       <tbody>
         {% for p in payment_history %}
-        <tr><td>{{ p[0] }}</td><td>{{ p[1] }}</td><td>{{ p[2] }}</td><td>₩{{ p[3] }}</td><td>{{ p[4] }}</td></tr>
+        <tr>
+          <td>{{ p[1] }}</td>
+          <td>{{ p[2] }}</td>
+          <td>{{ p[3] }}</td>
+          <td>₩{{ "{:,}".format(p[4]) }}</td>
+          <td>{{ p[5] }}</td>
+          <td>
+            <a href="/delete_payment/{{ p[0] }}" class="btn-action btn-delete" onclick="return confirm('Delete this payment record? This action cannot be undone.')">🗑️ Delete</a>
+          </td>
+        </tr>
         {% endfor %}
+        {% if not payment_history %}
+        <tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px 0;">No payment records yet</td></tr>
+        {% endif %}
       </tbody>
     </table>
     </div>

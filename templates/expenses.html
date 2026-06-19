@@ -202,7 +202,7 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
           <td>{{ e[4] }}</td>
           <td>
             {% if e[5] %}
-            <a href="/static/receipts/{{ e[5] }}" target="_blank" class="btn-action btn-view">View</a>
+            <a href="{{ e[5] }}" target="_blank" class="btn-action btn-view">View</a>
             {% else %}
             <span style="color:var(--text-dim);font-size:12.5px;">No Receipt</span>
             {% endif %}

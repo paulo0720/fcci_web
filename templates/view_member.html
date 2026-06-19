@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Member Profile</title>
+<title>Member Profile - FCCI</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
 :root {
   --bg-base: #f4fbf7; --bg-mist: #e9f7ef;
-  --glass: rgba(255,255,255,0.7); --glass-border: rgba(0,150,90,0.18);
+  --glass: rgba(255,255,255,0.65); --glass-border: rgba(0,150,90,0.18);
   --emerald: #00a85c; --emerald-bright: #00c46a; --emerald-deep: #00562a;
   --text-main: #0c2418; --text-dim: #5c8270;
 }
@@ -20,17 +20,14 @@ body {
     radial-gradient(circle at 12% 8%, rgba(0,196,106,0.16) 0%, transparent 40%),
     radial-gradient(circle at 88% 18%, rgba(0,168,92,0.12) 0%, transparent 45%),
     linear-gradient(160deg, #ffffff 0%, var(--bg-base) 45%, var(--bg-mist) 100%);
-  background-attachment:fixed;
-  color:var(--text-main);
-  min-height:100vh;
+  background-attachment:fixed; color:var(--text-main); min-height:100vh;
 }
 .sidebar {
   width:250px; height:100vh; position:fixed; top:0; left:0;
   background:rgba(255,255,255,0.55); backdrop-filter:blur(22px);
   border-right:1px solid var(--glass-border);
   display:flex; flex-direction:column; z-index:10;
-  box-shadow:4px 0 24px rgba(0,100,60,0.06);
-  overflow-y:auto;
+  box-shadow:4px 0 24px rgba(0,100,60,0.06); overflow-y:auto;
 }
 .sidebar-brand { padding:28px 20px 22px; border-bottom:1px solid var(--glass-border); text-align:center; }
 .brand-logo-ring {
@@ -48,7 +45,7 @@ body {
   70% { transform:scale(1.25); opacity:0; }
   100% { transform:scale(1.25); opacity:0; }
 }
-.brand-logo-ring img { width:48px; height:48px; object-fit:contain; border-radius:50%; position:relative; z-index:1; box-shadow:0 2px 12px rgba(0,100,60,0.15); }
+.brand-logo-ring img { width:48px; height:48px; object-fit:contain; border-radius:50%; position:relative; z-index:1; }
 .brand-name {
   font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:700; letter-spacing:3px;
   background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright));
@@ -56,37 +53,50 @@ body {
 }
 .brand-sub { font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
 .sidebar-nav { padding:18px 12px; }
+.nav-label { font-size:10px; font-weight:600; color:rgba(92,130,112,0.6); letter-spacing:1.5px; text-transform:uppercase; padding:14px 12px 6px; }
 .sidebar-nav a, .sidebar-footer a {
   display:flex; align-items:center; gap:11px; padding:11px 14px; margin-bottom:3px;
   border-radius:10px; color:var(--text-dim); text-decoration:none;
   font-size:13.5px; font-weight:500; border:1px solid transparent; transition:all 0.25s ease;
 }
-.sidebar-nav a:hover, .sidebar-nav a.active { background:rgba(0,196,106,0.1); color:var(--emerald-deep); }
+.sidebar-nav a:hover { background:rgba(0,196,106,0.08); border-color:var(--glass-border); color:var(--emerald-deep); }
+.sidebar-nav a.active {
+  background:linear-gradient(90deg, rgba(0,196,106,0.16), rgba(0,196,106,0.02));
+  border-color:rgba(0,196,106,0.4); color:var(--emerald-deep);
+  box-shadow:0 0 18px rgba(0,196,106,0.12) inset; font-weight:600;
+}
+.nav-icon { font-size:15px; width:18px; text-align:center; }
 .sidebar-footer { padding:16px 12px; border-top:1px solid var(--glass-border); }
+.sidebar-footer a.logout:hover { background:rgba(220,53,69,0.08); border-color:rgba(220,53,69,0.25); color:#c0392b; }
 .main-content { margin-left:250px; padding:32px 36px; position:relative; z-index:1; }
-.topbar h4 { font-family:'Space Grotesk', sans-serif; font-size:24px; font-weight:600; margin-bottom:22px; }
+.topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+.topbar h4 { font-family:'Space Grotesk', sans-serif; font-size:26px; font-weight:600; margin:0; }
 .glass-card {
   background:var(--glass); backdrop-filter:blur(18px); border:1px solid var(--glass-border);
-  border-radius:18px; padding:22px; box-shadow:0 4px 20px rgba(0,100,60,0.06); margin-bottom:20px;
+  border-radius:18px; padding:28px; box-shadow:0 4px 20px rgba(0,100,60,0.06);
 }
-label { display:block; font-size:12px; font-weight:600; color:var(--emerald-deep); letter-spacing:0.4px; text-transform:uppercase; margin-bottom:6px; }
-.form-control { background:rgba(255,255,255,0.8); border:1px solid var(--glass-border); border-radius:12px; padding:11px 16px; font-size:14px; color:var(--text-main); width:100%; }
-.form-control:focus { outline:none; border-color:var(--emerald); box-shadow:0 0 0 3px rgba(0,196,106,0.15); }
-.form-control::placeholder { color:#9bb8a8; }
-.btn-go { background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none; border-radius:12px; padding:11px 24px; font-weight:600; font-size:14px; box-shadow:0 6px 18px rgba(0,168,92,0.3); text-decoration:none; display:inline-block; cursor:pointer; }
-.btn-go:hover { color:#fff; }
+.btn-cancel {
+  background:rgba(0,100,60,0.08); color:var(--emerald-deep); border:1px solid var(--glass-border);
+  border-radius:12px; padding:10px 22px; font-weight:600; font-size:13.5px; text-decoration:none;
+}
+.profile-photo {
+  width:220px; height:220px; object-fit:cover; border-radius:16px;
+  border:1px solid var(--glass-border); margin:0 auto; display:block;
+}
+.photo-placeholder {
+  width:220px; height:220px; display:flex; align-items:center; justify-content:center;
+  border-radius:16px; background:rgba(0,100,60,0.05); color:var(--text-dim); margin:0 auto;
+}
 table { width:100%; border-collapse:collapse; }
-th { font-size:10.5px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.6px; text-align:left; padding-bottom:10px; border-bottom:1px solid var(--glass-border); }
-td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1px solid rgba(0,100,60,0.06); }
-.badge-pill { font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; }
+th { text-align:left; padding:10px 6px; font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; width:160px; vertical-align:top; }
+td { padding:10px 6px; font-size:14.5px; border-bottom:1px solid rgba(0,100,60,0.06); }
+.badge-pill { font-size:11.5px; font-weight:700; padding:4px 12px; border-radius:20px; }
 .badge-active { background:rgba(0,196,106,0.14); color:var(--emerald-deep); }
-.badge-danger { background:rgba(220,53,69,0.12); color:#c0392b; }
-.btn-action { padding:5px 12px; border-radius:8px; font-size:12px; font-weight:600; border:none; text-decoration:none; display:inline-block; margin:2px; }
-.btn-view { background:rgba(0,150,200,0.12); color:#0077b0; }
+.badge-other { background:rgba(220,53,69,0.1); color:#c0392b; }
+.btn-action { padding:8px 18px; border-radius:10px; font-size:13.5px; font-weight:600; border:none; text-decoration:none; display:inline-block; margin-right:8px; }
 .btn-edit { background:rgba(255,170,0,0.14); color:#c97300; }
+.btn-id { background:rgba(150,90,255,0.12); color:#7a3fd0; }
 .btn-delete { background:rgba(220,53,69,0.12); color:#c0392b; }
-
-
 </style>
 </head>
 <body>
@@ -98,37 +108,41 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
     <div class="brand-sub">United in Faith</div>
   </div>
   <nav class="sidebar-nav">
+    <div class="nav-label">Main</div>
     <a href="/dashboard"><span class="nav-icon">⬡</span> Dashboard</a>
     <a href="/admin_feed"><span class="nav-icon">📰</span> Community Feed</a>
+    <div class="nav-label">Members</div>
     <a href="/members" class="active"><span class="nav-icon">◈</span> Members</a>
     <a href="/registration_approval"><span class="nav-icon">◉</span> Reg. Approval</a>
+    <div class="nav-label">Finance</div>
     <a href="/payments"><span class="nav-icon">◎</span> Payments</a>
     <a href="/expenses"><span class="nav-icon">◐</span> Expenses</a>
     <a href="/donations"><span class="nav-icon">◭</span> Donations</a>
     <a href="/withdrawals"><span class="nav-icon">▣</span> Withdrawals</a>
+    <div class="nav-label">Tools</div>
     <a href="/attendance"><span class="nav-icon">▤</span> Attendance</a>
     <a href="/exports"><span class="nav-icon">▥</span> Export Center</a>
-
   </nav>
   <div class="sidebar-footer">
     <a href="/settings"><span class="nav-icon">⚙</span> Settings</a>
-    <a href="/logout"><span class="nav-icon">⏻</span> Logout</a>
+    <a href="/logout" class="logout"><span class="nav-icon">⏻</span> Logout</a>
   </div>
 </div>
 
 <div class="main-content">
 
-  <div class="topbar"><h4>👤 Member Profile</h4></div>
-
-  <a href="/members" class="btn-go" style="background:rgba(0,100,60,0.08);color:var(--emerald-deep);box-shadow:none;margin-bottom:18px;">← Back to Members</a>
+  <div class="topbar">
+    <h4>👤 Member Profile</h4>
+    <a href="/members" class="btn-cancel">← Back to Members</a>
+  </div>
 
   <div class="glass-card">
     <div class="row">
-      <div class="col-md-4 text-center">
-        {% if member[11] %}
-        <img src="{{ url_for('static', filename='uploads/' + member[11]) }}" style="width:220px;height:220px;object-fit:cover;border-radius:16px;border:1px solid var(--glass-border);">
+      <div class="col-md-4 text-center mb-3">
+        {% if member[12] %}
+        <img src="{{ member[12] }}" class="profile-photo">
         {% else %}
-        <div style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;border-radius:16px;background:rgba(0,100,60,0.05);color:var(--text-dim);margin:0 auto;">No Photo</div>
+        <div class="photo-placeholder">No Photo</div>
         {% endif %}
       </div>
 
@@ -138,18 +152,20 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
           <tr><th>Full Name</th><td>{{ member[2] }}</td></tr>
           <tr><th>Contact</th><td>{{ member[3] }}</td></tr>
           <tr><th>Address</th><td>{{ member[4] }}</td></tr>
-          <tr><th>Registration Fee</th><td>₩{{ member[5] }}</td></tr>
+          <tr><th>Registration Fee</th><td>₩{{ "{:,}".format(member[5] or 0) }}</td></tr>
           <tr><th>Member Since</th><td>{{ member[6] }}</td></tr>
           <tr><th>Email</th><td>{{ member[7] }}</td></tr>
           <tr><th>Birthday</th><td>{{ member[8] }}</td></tr>
           <tr><th>Date Registered</th><td>{{ member[9] }}</td></tr>
-          <tr><th>Status</th><td><span class="badge-pill {{ 'badge-active' if member[10] == 'Active' else 'badge-danger' }}">{{ member[10] }}</span></td></tr>
+          <tr><th>Status</th><td>
+            <span class="badge-pill {{ 'badge-active' if member[10] == 'Active' else 'badge-other' }}">{{ member[10] }}</span>
+          </td></tr>
         </table>
 
-        <div class="mt-3">
-          <a href="/edit_member/{{ member[1] }}" class="btn-action btn-edit">Edit Member</a>
-          <a href="/member_id_card/{{ member[1] }}" class="btn-action btn-view">Generate ID</a>
-          <a href="/delete_member/{{ member[1] }}" class="btn-action btn-delete" onclick="return confirm('Delete this member permanently?')">Delete Member</a>
+        <div class="mt-4">
+          <a href="/edit_member/{{ member[1] }}" class="btn-action btn-edit">✏️ Edit Member</a>
+          <a href="/member_id_card/{{ member[1] }}" class="btn-action btn-id">🪪 Generate ID</a>
+          <a href="/delete_member/{{ member[1] }}" class="btn-action btn-delete" onclick="return confirm('Delete this member permanently?')">🗑️ Delete Member</a>
         </div>
       </div>
     </div>

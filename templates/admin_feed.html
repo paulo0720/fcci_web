@@ -203,7 +203,7 @@ body::before {
     </div>
 
     {% if post[3] %}<div class="post-content">{{ post[3] }}</div>{% endif %}
-    {% if post[4] %}<img src="/static/feed_uploads/{{ post[4] }}" class="post-photo">{% endif %}
+    {% if post[4] %}<img src="{{ post[4] }}" class="post-photo">{% endif %}
 
     <div class="post-actions">
       <a href="/feed/pin/{{ post[0] }}" class="pin-btn {{ 'unpin' if post[5] else 'pin' }}">

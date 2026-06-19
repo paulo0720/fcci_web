@@ -501,7 +501,7 @@
           <div class="birthday-item">
             <div class="birthday-avatar">
               {% if b.photo %}
-                <img src="/static/uploads/{{ b.photo }}" alt="{{ b.full_name }}">
+                <img src="{{ b.photo }}" alt="{{ b.full_name }}">
               {% else %}
                 {{ b.full_name[0] | upper }}
               {% endif %}

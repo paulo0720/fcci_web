@@ -136,12 +136,34 @@ body{
 
 .back-content{
 
+    position:relative;
+    height:calc(100% - 40px);
+
     padding:15px;
 
     font-size:8px;
 }
 
+.back-watermark{
 
+    position:absolute;
+
+    top:50%;
+    left:50%;
+
+    transform:translate(-50%,-50%);
+
+    width:160px;
+
+    opacity:.08;
+
+    z-index:0;
+}
+
+.back-text{
+    position:relative;
+    z-index:1;
+}
 
 .vision{
 
@@ -222,10 +244,10 @@ class="watermark">
 
 <div class="col-4 text-center">
 
-{% if member[11] %}
+{% if member[12] %}
 
 <img
-src="/static/uploads/{{ member[11] }}"
+src="{{ member[12] }}"
 class="member-photo">
 
 {% endif %}
@@ -291,14 +313,14 @@ Official Membership Identification
 </p>
 
 </div>
-<div class="id-body">
+
+<div class="back-content">
 
 <img
 src="/static/logo/fcci_logo.jpeg"
-class="watermark">
+class="back-watermark">
 
-<div class="back-content">
-    
+<div class="back-text">
 
 <div class="vision">
 
@@ -325,7 +347,7 @@ Member Signature
 
 </div>
 
-<div style="margin-top:0px;text-align:left;">
+<div style="margin-top:0px;text-align:right;">
 
 {{ member[2] }}
 
@@ -336,6 +358,8 @@ Member Signature
 <b>
 TO GOD BE THE GLORY!
 </b>
+
+</div>
 
 </div>
 

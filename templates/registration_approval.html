@@ -149,8 +149,8 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
         {% for a in applicants %}
         <tr>
           <td>
-            {% if a[11] %}
-            <img src="{{ url_for('static', filename='uploads/' + a[11]) }}" width="50" height="50" style="object-fit:cover;border-radius:8px;">
+            {% if a[12] %}
+            <img src="{{ a[12] }}" width="50" height="50" style="object-fit:cover;border-radius:8px;">
             {% endif %}
           </td>
           <td>{{ a[1] }}</td>
@@ -159,8 +159,8 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
           <td>{{ a[7] }}</td>
           <td>{{ a[9] }}</td>
           <td>
-            {% if a[12] %}
-            <a href="{{ url_for('static', filename='proof_of_payment/' + a[12]) }}" target="_blank" class="proof-badge proof-yes">✅ View Proof</a>
+            {% if a[11] %}
+            <a href="{{ a[11] }}" target="_blank" class="proof-badge proof-yes">✅ View Proof</a>
             {% else %}
             <span class="proof-badge proof-no">⏳ Not yet uploaded</span>
             {% endif %}
