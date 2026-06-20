@@ -1261,6 +1261,46 @@ def member_id_card(member_id):
         qr_file=f"{member_id}.png"
     )
 
+
+@app.route("/bulk_id_cards", methods=["POST"])
+def bulk_id_cards():
+
+    if "username" not in session:
+        return redirect("/login")
+
+    member_ids = request.form.getlist("selected_members")
+
+    if not member_ids:
+        return redirect("/members")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    members_list = []
+
+    for mid in member_ids:
+
+        member = fetch_member_with_photo(cursor, mid)
+
+        if member:
+
+            qr = qrcode.make(mid)
+            qr_path = f"static/qr/{mid}.png"
+            qr.save(qr_path)
+
+            members_list.append({
+                "member": member,
+                "qr_file": f"{mid}.png"
+            })
+
+    conn.close()
+
+    return render_template(
+        "bulk_id_cards.html",
+        members_list=members_list
+    )
+
+
 @app.route(
 "/expenses",
 methods=["GET","POST"]
