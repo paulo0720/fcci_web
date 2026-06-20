@@ -2469,7 +2469,9 @@ def member_profile(member_id):
     SELECT
         payment_date,
         payment_type,
-        amount
+        amount,
+        payment_month,
+        payment_year
     FROM payments
     WHERE member_id = %s
     ORDER BY id DESC
