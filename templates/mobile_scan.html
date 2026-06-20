@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCCI Mobile Scanner</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+:root {
+  --bg-base: #f4fbf7; --bg-mist: #e9f7ef;
+  --glass: rgba(255,255,255,0.7); --glass-border: rgba(0,150,90,0.18);
+  --emerald: #00a85c; --emerald-bright: #00c46a; --emerald-deep: #00562a;
+  --text-main: #0c2418; --text-dim: #5c8270;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family:'Inter', -apple-system, sans-serif;
+  background: linear-gradient(160deg, #ffffff 0%, var(--bg-base) 45%, var(--bg-mist) 100%);
+  color:var(--text-main); min-height:100vh;
+  display:flex; flex-direction:column; align-items:center; padding:20px;
+}
+.logo-ring {
+  width:64px; height:64px; border-radius:50%; margin:16px auto 8px;
+  display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(circle, rgba(0,196,106,0.18), transparent 70%);
+}
+.logo-ring img { width:48px; height:48px; object-fit:contain; border-radius:50%; }
+h2 { font-size:18px; font-weight:700; color:var(--emerald-deep); margin-bottom:4px; text-align:center; }
+.sub { font-size:12.5px; color:var(--text-dim); margin-bottom:20px; text-align:center; }
+
+.status-badge {
+  font-size:12px; font-weight:700; padding:6px 16px; border-radius:20px;
+  margin-bottom:16px;
+}
+.status-connected { background:rgba(0,196,106,0.14); color:var(--emerald-deep); }
+.status-error { background:rgba(220,53,69,0.1); color:#c0392b; }
+
+#reader {
+  width:100%; max-width:380px; border-radius:16px; overflow:hidden;
+  border:1px solid var(--glass-border); box-shadow:0 4px 20px rgba(0,100,60,0.08);
+}
+
+.success-flash {
+  width:100%; max-width:380px; background:rgba(0,196,106,0.12);
+  border:1px solid rgba(0,196,106,0.35); border-radius:16px;
+  padding:20px; text-align:center; margin-top:16px; display:none;
+}
+.success-flash .check { font-size:36px; }
+.success-flash .code { font-family:'Courier New', monospace; font-size:14px; color:var(--emerald-deep); font-weight:700; margin-top:6px; }
+
+.invalid-box {
+  text-align:center; padding:40px 20px; max-width:380px;
+}
+.invalid-box .icon { font-size:48px; margin-bottom:12px; }
+.invalid-box h3 { color:#c0392b; margin-bottom:8px; }
+.invalid-box p { font-size:13.5px; color:var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div class="logo-ring"><img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI"></div>
+
+{% if valid_session %}
+
+<h2>📱 FCCI Mobile Scanner</h2>
+<div class="sub">Naka-connect sa: {{ target_page|capitalize }} page</div>
+<div class="status-badge status-connected">✅ Paired — Code {{ pair_code }}</div>
+
+<div id="reader"></div>
+
+<div class="success-flash" id="successFlash">
+  <div class="check">✅</div>
+  <div>Na-send sa screen!</div>
+  <div class="code" id="lastScannedCode"></div>
+</div>
+
+<script>
+const pairCode = "{{ pair_code }}";
+let scannerActive = true;
+
+function onScanSuccess(decodedText) {
+  if (!scannerActive) return;
+
+  fetch("/submit_mobile_scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `pair_code=${encodeURIComponent(pairCode)}&scanned_value=${encodeURIComponent(decodedText)}`
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById('lastScannedCode').textContent = decodedText;
+      document.getElementById('successFlash').style.display = 'block';
+
+      // Mag-vibrate kung supported (haptic feedback)
+      if (navigator.vibrate) navigator.vibrate(150);
+
+      setTimeout(() => {
+        document.getElementById('successFlash').style.display = 'none';
+      }, 2000);
+    }
+  });
+}
+
+let scanner = new Html5QrcodeScanner("reader", { fps:10, qrbox:240 });
+scanner.render(onScanSuccess);
+</script>
+
+{% else %}
+
+<div class="invalid-box">
+  <div class="icon">⚠️</div>
+  <h3>Invalid o Expired na Code</h3>
+  <p>Hindi mahanap ang pairing session na ito. Bumalik sa screen (iPad/PC) at gumawa ng bagong pairing code, tapos i-scan o i-type ulit ito.</p>
+</div>
+
+{% endif %}
+
+</body>
+</html>
