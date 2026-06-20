@@ -219,31 +219,44 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
   </form>
 
   <div class="glass-card">
-    <div style="overflow-x:auto;">
-    <table>
-      <thead>
-        <tr><th>ID</th><th>Name</th><th>Contact</th><th>Email</th><th>Status</th><th>Action</th></tr>
-      </thead>
-      <tbody>
-        {% for m in members %}
-        <tr>
-          <td>{{ m[0] }}</td>
-          <td>{{ m[1] }}</td>
-          <td>{{ m[2] }}</td>
-          <td>{{ m[3] }}</td>
-          <td>{{ m[4] }}</td>
-          <td>
-            <a href="/view_member/{{ m[0] }}" class="btn-action btn-view">View</a>
-            <a href="/member_profile/{{ m[0] }}" class="btn-action btn-profile">Profile</a>
-            <a href="/member_id_card/{{ m[0] }}" class="btn-action btn-id">ID</a>
-            <a href="/edit_member/{{ m[0] }}" class="btn-action btn-edit">Edit</a>
-            <a href="/delete_member/{{ m[0] }}" class="btn-action btn-delete" onclick="return confirm('Delete this member permanently? This action cannot be undone.')">Delete</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    </div>
+    <form method="POST" action="/bulk_id_cards" target="_blank" id="bulkPrintForm">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--emerald-deep);text-transform:none;margin:0;">
+          <input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)" style="width:16px;height:16px;cursor:pointer;">
+          Select All
+        </label>
+        <button type="submit" class="btn-go" style="background:linear-gradient(135deg,#7a3fd0,#9b6fe8);" id="bulkPrintBtn" disabled>
+          🖨️ Print Selected IDs (<span id="selectedCount">0</span>)
+        </button>
+      </div>
+
+      <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th style="width:36px;"></th><th>ID</th><th>Name</th><th>Contact</th><th>Email</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for m in members %}
+          <tr>
+            <td><input type="checkbox" name="selected_members" value="{{ m[0] }}" class="member-checkbox" onclick="updateSelectedCount()" style="width:16px;height:16px;cursor:pointer;"></td>
+            <td>{{ m[0] }}</td>
+            <td>{{ m[1] }}</td>
+            <td>{{ m[2] }}</td>
+            <td>{{ m[3] }}</td>
+            <td>{{ m[4] }}</td>
+            <td>
+              <a href="/view_member/{{ m[0] }}" class="btn-action btn-view">View</a>
+              <a href="/member_profile/{{ m[0] }}" class="btn-action btn-profile">Profile</a>
+              <a href="/member_id_card/{{ m[0] }}" class="btn-action btn-id">ID</a>
+              <a href="/edit_member/{{ m[0] }}" class="btn-action btn-edit">Edit</a>
+              <a href="/delete_member/{{ m[0] }}" class="btn-action btn-delete" onclick="return confirm('Delete this member permanently? This action cannot be undone.')">Delete</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </form>
   </div>
 
 </div>
@@ -305,11 +318,16 @@ function closePairModal() {
   }
 }
 
+let pairPollInFlight = false;
+
 function startPairPolling() {
   if (pairPollInterval) clearInterval(pairPollInterval);
 
   pairPollInterval = setInterval(() => {
     if (!currentPairCode) return;
+    // Iwasan ang overlapping requests kung mabagal ang server
+    if (pairPollInFlight) return;
+    pairPollInFlight = true;
 
     fetch(`/check_pair_scan/${currentPairCode}`)
       .then(res => res.json())
@@ -318,8 +336,27 @@ function startPairPolling() {
           closePairModal();
           window.location = "/member_profile/" + data.value;
         }
-      });
-  }, 2000);
+        pairPollInFlight = false;
+      })
+      .catch(() => { pairPollInFlight = false; });
+  }, 500);
+}
+
+// ── BULK ID PRINT SELECTION ──────────────────────────────────
+function toggleSelectAll(checkbox) {
+  const allCheckboxes = document.querySelectorAll('.member-checkbox');
+  allCheckboxes.forEach(cb => cb.checked = checkbox.checked);
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const checked = document.querySelectorAll('.member-checkbox:checked').length;
+  document.getElementById('selectedCount').textContent = checked;
+  document.getElementById('bulkPrintBtn').disabled = (checked === 0);
+
+  // I-update din ang Select All checkbox state
+  const total = document.querySelectorAll('.member-checkbox').length;
+  document.getElementById('selectAllCheckbox').checked = (checked === total && total > 0);
 }
 </script>
 
