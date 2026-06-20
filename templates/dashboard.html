@@ -526,22 +526,26 @@
     <div class="col-md-7">
       <div class="glass-card h-100" style="cursor:default;">
         <div class="section-title">Recent Payments</div>
+        <div style="overflow-x:auto;">
         <table>
           <thead>
-            <tr><th>Member ID</th><th>Amount</th></tr>
+            <tr><th>Name</th><th>Type</th><th>Month</th><th>Amount</th></tr>
           </thead>
           <tbody>
             {% for p in recent_payments %}
             <tr>
-              <td>{{ p[0] }}</td>
+              <td>{{ p[2] or p[0] }}</td>
+              <td style="font-size:11.5px;color:var(--text-dim);">{{ p[3] }}</td>
+              <td style="font-size:11.5px;">{{ p[4] }} {{ p[5] }}</td>
               <td><span class="amount-pill">₩{{ "{:,}".format(p[1]) }}</span></td>
             </tr>
             {% endfor %}
             {% if not recent_payments %}
-            <tr><td colspan="2" style="text-align:center;color:var(--text-dim);padding:20px 0;">No recent payments</td></tr>
+            <tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:20px 0;">No recent payments</td></tr>
             {% endif %}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
 
