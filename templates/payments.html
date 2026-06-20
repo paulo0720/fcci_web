@@ -241,16 +241,32 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
   </div>
 
   <div class="glass-card">
+    <h5>🔍 Search Member Payments</h5>
+    <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px;">I-type ang pangalan ng member para makita lahat ng binayaran niyang buwan — madaling makita kung may duplicate.</p>
+    <input type="text" id="memberSearchBox" class="form-control" placeholder="I-type ang pangalan ng member..." oninput="searchMemberPayments(this.value)">
+    <div id="searchResultsBox" style="margin-top:14px;display:none;">
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Receipt No</th><th>Name</th><th>Type</th><th>Month</th><th>Amount</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="searchResultsBody"></tbody>
+      </table>
+      </div>
+    </div>
+    <div id="searchNoResults" style="display:none;text-align:center;color:var(--text-dim);padding:16px 0;font-size:13px;">Walang nahanap na payment para sa pangalang ito.</div>
+  </div>
+
+  <div class="glass-card">
     <h5>Payment History</h5>
     <div style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Receipt No</th><th>Member ID</th><th>Type</th><th>Amount</th><th>Date</th><th>Action</th></tr></thead>
+      <thead><tr><th>Receipt No</th><th>Name</th><th>Type</th><th>Month</th><th>Amount</th><th>Date</th><th>Action</th></tr></thead>
       <tbody>
         {% for p in payment_history %}
         <tr>
           <td>{{ p[1] }}</td>
-          <td>{{ p[2] }}</td>
+          <td>{{ p[6] or p[2] }}</td>
           <td>{{ p[3] }}</td>
+          <td>{{ p[7] }} {{ p[8] }}</td>
           <td>₩{{ "{:,}".format(p[4]) }}</td>
           <td>{{ p[5] }}</td>
           <td>
@@ -259,7 +275,7 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
         </tr>
         {% endfor %}
         {% if not payment_history %}
-        <tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px 0;">No payment records yet</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:var(--text-dim);padding:20px 0;">No payment records yet</td></tr>
         {% endif %}
       </tbody>
     </table>
@@ -267,6 +283,49 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
   </div>
 
 </div>
+
+<script>
+let searchDebounce = null;
+
+function searchMemberPayments(name) {
+  clearTimeout(searchDebounce);
+
+  const resultsBox = document.getElementById('searchResultsBox');
+  const noResultsBox = document.getElementById('searchNoResults');
+  const resultsBody = document.getElementById('searchResultsBody');
+
+  if (!name.trim()) {
+    resultsBox.style.display = 'none';
+    noResultsBox.style.display = 'none';
+    return;
+  }
+
+  searchDebounce = setTimeout(() => {
+    fetch(`/search_member_payments?name=${encodeURIComponent(name)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.results && data.results.length > 0) {
+          resultsBody.innerHTML = data.results.map(p => `
+            <tr>
+              <td>${p.receipt_no}</td>
+              <td>${p.full_name}</td>
+              <td>${p.payment_type}</td>
+              <td>${p.payment_month || ''} ${p.payment_year || ''}</td>
+              <td>₩${p.amount.toLocaleString()}</td>
+              <td>${p.payment_date}</td>
+              <td><a href="/delete_payment/${p.id}" class="btn-action btn-delete" onclick="return confirm('Delete this payment record? This action cannot be undone.')">🗑️ Delete</a></td>
+            </tr>
+          `).join('');
+          resultsBox.style.display = 'block';
+          noResultsBox.style.display = 'none';
+        } else {
+          resultsBox.style.display = 'none';
+          noResultsBox.style.display = 'block';
+        }
+      });
+  }, 300);
+}
+</script>
 
 <script>
 let scannerActive = false;
