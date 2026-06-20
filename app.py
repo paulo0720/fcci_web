@@ -4070,6 +4070,138 @@ def get_member_info(member_id):
         "status": member[2]
     })
 
+
+# ============================================================
+# WIRELESS PHONE SCANNER PAIRING SYSTEM
+# Ginagamit para makapag-scan ng QR gamit ang isang phone, at
+# automatic na lalabas ang resulta sa ibang device (hal. iPad
+# o PC) na naka-display sa Payments/Attendance/Members page.
+# ============================================================
+
+import random
+import string
+
+
+def generate_pair_code():
+    return "".join(random.choices(string.digits, k=6))
+
+
+@app.route("/create_pair_session", methods=["POST"])
+def create_pair_session():
+
+    if "username" not in session:
+        return jsonify({"error": "Not logged in"}), 401
+
+    target_page = request.form.get("target_page", "payments")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Gumawa ng unique 6-digit code (subukan ulit kung sakaling
+    # may existing na pareho)
+    pair_code = generate_pair_code()
+
+    for _ in range(5):
+        cursor.execute(
+            "SELECT id FROM pairing_sessions WHERE pair_code = %s",
+            (pair_code,)
+        )
+        if not cursor.fetchone():
+            break
+        pair_code = generate_pair_code()
+
+    cursor.execute("""
+    INSERT INTO pairing_sessions (pair_code, target_page, scanned_value)
+    VALUES (%s, %s, NULL)
+    """, (pair_code, target_page))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"pair_code": pair_code})
+
+
+@app.route("/mobile_scan/<pair_code>")
+def mobile_scan(pair_code):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, target_page FROM pairing_sessions WHERE pair_code = %s",
+        (pair_code,)
+    )
+    session_row = cursor.fetchone()
+    conn.close()
+
+    if not session_row:
+        return render_template(
+            "mobile_scan.html",
+            valid_session=False,
+            pair_code=pair_code
+        )
+
+    return render_template(
+        "mobile_scan.html",
+        valid_session=True,
+        pair_code=pair_code,
+        target_page=session_row[1]
+    )
+
+
+@app.route("/submit_mobile_scan", methods=["POST"])
+def submit_mobile_scan():
+
+    pair_code = request.form.get("pair_code", "")
+    scanned_value = request.form.get("scanned_value", "")
+
+    if not pair_code or not scanned_value:
+        return jsonify({"success": False, "error": "Missing data"})
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    UPDATE pairing_sessions
+    SET scanned_value = %s, updated_at = NOW()
+    WHERE pair_code = %s
+    """, (scanned_value, pair_code))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True})
+
+
+@app.route("/check_pair_scan/<pair_code>")
+def check_pair_scan(pair_code):
+
+    if "username" not in session:
+        return jsonify({"error": "Not logged in"}), 401
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT scanned_value FROM pairing_sessions WHERE pair_code = %s
+    """, (pair_code,))
+
+    row = cursor.fetchone()
+
+    if row and row[0]:
+        # I-clear agad pagkatapos mabasa, para hindi paulit-ulit
+        # mag-trigger ang parehong scan
+        cursor.execute("""
+        UPDATE pairing_sessions SET scanned_value = NULL WHERE pair_code = %s
+        """, (pair_code,))
+        conn.commit()
+        conn.close()
+        return jsonify({"has_scan": True, "value": row[0]})
+
+    conn.close()
+    return jsonify({"has_scan": False})
+
+
 @app.route("/settings")
 def settings():
  
