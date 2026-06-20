@@ -236,7 +236,10 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
   </div>
 
   <div class="glass-card">
-    <h5>Today's Attendance</h5>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h5 style="margin:0;">Today's Attendance</h5>
+      <a href="/attendance" class="btn-go" style="padding:7px 16px;font-size:12.5px;">🔄 Refresh List</a>
+    </div>
     <div style="overflow-x:auto;">
     <table>
       <thead><tr><th>Member ID</th><th>Name</th><th>Date</th><th>Time In</th><th>Time Out</th></tr></thead>
@@ -260,9 +263,21 @@ function onScanSuccess(decodedText) {
   })
   .then(response => response.json())
   .then(data => {
-    document.getElementById("scan_result").innerHTML =
-      "<div class='pill' style='display:block;padding:10px 16px;'>" + data.message + "</div>";
-    setTimeout(() => { location.reload(); }, 5000);
+    // HINDI na natin niri-reload ang buong page — sisira ito sa
+    // active na phone pairing connection. Sa halip, idinadagdag
+    // lang natin ang resulta sa isang "live" na listahan sa screen.
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'pill';
+    resultDiv.style.cssText = 'display:block;padding:10px 16px;margin-bottom:8px;';
+    resultDiv.textContent = data.message;
+
+    const scanResult = document.getElementById("scan_result");
+    scanResult.insertBefore(resultDiv, scanResult.firstChild);
+
+    // Panatilihin lang ang pinaka-bagong 5 entries sa screen
+    while (scanResult.children.length > 5) {
+      scanResult.removeChild(scanResult.lastChild);
+    }
   });
 }
 let scanner = new Html5QrcodeScanner("reader", { fps:10, qrbox:250 });
@@ -315,6 +330,13 @@ function closePairModal() {
   }
 }
 
+function minimizePairModal() {
+  // Itago lang ang modal, PERO patuloy pa rin ang polling sa
+  // background — para hindi na kailangang i-pair ulit sa bawat
+  // susunod na tao na mag-a-attend
+  document.getElementById('pairModal').style.display = 'none';
+}
+
 function startPairPolling() {
   if (pairPollInterval) clearInterval(pairPollInterval);
 
@@ -325,13 +347,27 @@ function startPairPolling() {
       .then(res => res.json())
       .then(data => {
         if (data.has_scan) {
-          closePairModal();
-          // Gamitin ang parehong onScanSuccess function na ginagamit
-          // ng regular QR scanner — para record agad ang attendance
+          // HINDI natin isasara ang pairing — patuloy itong
+          // tatanggap ng bagong scans mula sa parehong phone.
+          // I-minimize lang ang modal kung bukas pa ito.
+          minimizePairModal();
           onScanSuccess(data.value);
+          showPairLiveIndicator();
         }
       });
   }, 2000);
+}
+
+function showPairLiveIndicator() {
+  let indicator = document.getElementById('pairLiveIndicator');
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.id = 'pairLiveIndicator';
+    indicator.style.cssText = 'position:fixed;bottom:20px;right:20px;background:rgba(0,196,106,0.95);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,100,60,0.3);z-index:400;display:flex;align-items:center;gap:8px;cursor:pointer;';
+    indicator.onclick = function() { document.getElementById('pairModal').style.display = 'flex'; };
+    document.body.appendChild(indicator);
+  }
+  indicator.innerHTML = '<span class="pulse-dot" style="background:#fff;"></span> Phone Scanner Active — i-click para tingnan';
 }
 </script>
 
