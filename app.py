@@ -3790,31 +3790,48 @@ def approve_applicant(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    # Generate FCCI ID
-    new_member_id = member_id
+    # Kunin ang susunod na FCCI number
+    cursor.execute("""
+        SELECT member_id
+        FROM members
+        WHERE member_id LIKE 'FCCI-%'
+        ORDER BY member_id DESC
+        LIMIT 1
+    """)
 
-    if str(member_id).startswith("APP-"):
-        new_member_id = str(member_id).replace("APP-", "FCCI-", 1)
+    last_member = cursor.fetchone()
 
-    # Activate member
+    if last_member:
+        last_num = int(last_member[0].split("-")[-1])
+        next_num = last_num + 1
+    else:
+        next_num = 1
+
+    year = datetime.now().year
+
+    new_member_id = f"FCCI-{year}-{next_num:06d}"
+
+    # Update applicant
     cursor.execute("""
         UPDATE members
         SET
             member_id = %s,
-            status = 'Active'
+            status = 'Active',
+            registration_fee = 20000,
+            member_since = CURRENT_DATE
         WHERE member_id = %s
-    """, (new_member_id, member_id))
+    """, (
+        new_member_id,
+        member_id
+    ))
 
     # Generate receipt number
-    year = datetime.now().year
-    month = datetime.now().strftime("%B")
-
     cursor.execute("SELECT COUNT(*) FROM payments")
     payment_count = cursor.fetchone()[0] + 1
 
     receipt_no = f"RCPT-{year}-{payment_count:06d}"
 
-    # Create Registration Fee payment record
+    # Create registration payment record
     cursor.execute("""
         INSERT INTO payments
         (
@@ -3840,13 +3857,13 @@ def approve_applicant(member_id):
         receipt_no,
         new_member_id,
         year,
-        month
+        datetime.now().strftime("%B")
     ))
 
     conn.commit()
     conn.close()
 
-    flash("Applicant approved successfully!", "success")
+    flash(f"Applicant approved! New ID: {new_member_id}", "success")
 
     return redirect("/registration_approval")
 
