@@ -3863,7 +3863,6 @@ def approve_applicant(member_id):
     conn.commit()
     conn.close()
 
-    flash(f"Applicant approved! New ID: {new_member_id}", "success")
 
     return redirect("/registration_approval")
 
