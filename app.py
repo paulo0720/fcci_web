@@ -3779,51 +3779,76 @@ def export_pdf_report():
 
 
 
-@app.route(
-"/approve_applicant/<member_id>"
-)
+@app.route("/approve_applicant/<member_id>")
 def approve_applicant(member_id):
-
 
     if "username" not in session:
         return redirect("/login")
 
+    from datetime import datetime
+
     conn = get_db()
     cursor = conn.cursor()
 
-    # Kunin muna ang member details bago mag-update,
-    # para magamit sa pagpapadala ng welcome email
-    cursor.execute("""
-    SELECT full_name, email FROM members WHERE member_id = %s
-    """, (member_id,))
-    applicant_info = cursor.fetchone()
+    # Generate FCCI ID
+    new_member_id = member_id
 
+    if str(member_id).startswith("APP-"):
+        new_member_id = str(member_id).replace("APP-", "FCCI-", 1)
+
+    # Activate member
     cursor.execute("""
-    UPDATE members
-    SET status='Active'
-    WHERE member_id=%s
+        UPDATE members
+        SET
+            member_id = %s,
+            status = 'Active'
+        WHERE member_id = %s
+    """, (new_member_id, member_id))
+
+    # Generate receipt number
+    year = datetime.now().year
+    month = datetime.now().strftime("%B")
+
+    cursor.execute("SELECT COUNT(*) FROM payments")
+    payment_count = cursor.fetchone()[0] + 1
+
+    receipt_no = f"RCPT-{year}-{payment_count:06d}"
+
+    # Create Registration Fee payment record
+    cursor.execute("""
+        INSERT INTO payments
+        (
+            receipt_no,
+            member_id,
+            payment_type,
+            amount,
+            payment_date,
+            payment_year,
+            payment_month
+        )
+        VALUES
+        (
+            %s,
+            %s,
+            'Registration Fee',
+            20000,
+            CURRENT_DATE,
+            %s,
+            %s
+        )
     """, (
-        member_id,
+        receipt_no,
+        new_member_id,
+        year,
+        month
     ))
 
     conn.commit()
     conn.close()
 
-    # I-send ang welcome email (hindi mag-crash ang app kung
-    # walang email o nag-error ang pagpapadala)
-    if applicant_info and applicant_info[1]:
-        try:
-            send_welcome_email(
-                applicant_info[1],
-                applicant_info[0],
-                member_id
-            )
-        except Exception as e:
-            print(f"[EMAIL] Failed to send welcome email: {e}")
+    flash("Applicant approved successfully!", "success")
 
-    return redirect(
-        "/registration_approval"
-    )
+    return redirect("/registration_approval")
 
 @app.route(
 "/reject_applicant/<member_id>"
