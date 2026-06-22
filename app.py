@@ -1084,73 +1084,12 @@ def payments():
             
         ))
 
-        if payment_type == "Registration Fee":
-
-            # Gumamit ng MAX existing number imbes na COUNT(*),
-            # para hindi mag-clash kapag may na-delete na member
-            # sa gitna ng sequence (hal. FCCI-2026-000002 na-delete,
-            # pero may FCCI-2026-000003 pa rin)
-            cursor.execute("""
-            SELECT member_id
-            FROM members
-            WHERE member_id LIKE 'FCCI-%%'
-            """)
-
-            existing_ids = cursor.fetchall()
-
-            highest_num = 0
-            for row in existing_ids:
-                try:
-                    num_part = int(row[0].split("-")[-1])
-                    if num_part > highest_num:
-                        highest_num = num_part
-                except (ValueError, IndexError):
-                    continue
-
-            count = highest_num + 1
-
-            new_member_id = (
-                f"FCCI-{datetime.now().year}-{count:06d}"
-            )
-
-            member_since = (
-                f"{payment_month} {payment_year}"
-            )
-
-            old_member_id = member_id
-
-            cursor.execute("""
-            UPDATE members
-            SET
-                member_id = %s,
-                registration_fee = 20000,
-                member_since = %s,
-                status = 'Active'
-            WHERE member_id = %s
-            """, (
-                new_member_id,
-                member_since,
-                old_member_id
-            ))
-
-            cursor.execute("""
-            UPDATE payments
-            SET member_id = %s
-            WHERE member_id = %s
-            """, (
-                new_member_id,
-                old_member_id
-            ))
-
-            # I-update din ang member_photos para hindi mawala ang photo
-            cursor.execute("""
-            UPDATE member_photos
-            SET member_id = %s
-            WHERE member_id = %s
-            """, (
-                new_member_id,
-                old_member_id
-            ))
+        # TANGGAL NA ANG APP→FCCI CONVERSION DITO.
+        # Ang conversion ay automatic na nangyayari sa
+        # /approve_applicant route na lang — kapag nag-click
+        # ang admin ng "Approve" sa Registration Approval page.
+        # Doon na sinesset ang FCCI ID, Active status, at
+        # Registration Fee record nang sabay-sabay.
 
         conn.commit()
 
@@ -3779,90 +3718,100 @@ def export_pdf_report():
 
 
 
-@app.route("/approve_applicant/<member_id>")
+@app.route(
+"/approve_applicant/<member_id>"
+)
 def approve_applicant(member_id):
 
     if "username" not in session:
         return redirect("/login")
 
-    from datetime import datetime
-
     conn = get_db()
     cursor = conn.cursor()
 
-    # Kunin ang susunod na FCCI number
+    # ── STEP 1: Kunin ang member details ──────────────────────
     cursor.execute("""
-        SELECT member_id
-        FROM members
-        WHERE member_id LIKE 'FCCI-%'
-        ORDER BY member_id DESC
-        LIMIT 1
+    SELECT full_name, email FROM members WHERE member_id = %s
+    """, (member_id,))
+    applicant_info = cursor.fetchone()
+
+    if not applicant_info:
+        conn.close()
+        return redirect("/registration_approval")
+
+    full_name = applicant_info[0]
+    email = applicant_info[1]
+
+    # ── STEP 2: Generate bagong FCCI- member ID ───────────────
+    # Gamitin ang MAX existing FCCI number para hindi mag-clash
+    cursor.execute("""
+    SELECT member_id FROM members WHERE member_id LIKE 'FCCI-%%'
     """)
+    existing_fcci = cursor.fetchall()
 
-    last_member = cursor.fetchone()
+    highest_num = 0
+    for row in existing_fcci:
+        try:
+            num_part = int(row[0].split("-")[-1])
+            if num_part > highest_num:
+                highest_num = num_part
+        except (ValueError, IndexError):
+            continue
 
-    if last_member:
-        last_num = int(last_member[0].split("-")[-1])
-        next_num = last_num + 1
-    else:
-        next_num = 1
+    new_member_id = f"FCCI-{datetime.now().year}-{highest_num + 1:06d}"
+    now = datetime.now()
+    member_since = now.strftime("%B %Y")
+    payment_date = now.strftime("%Y-%m-%d")
 
-    year = datetime.now().year
-
-    new_member_id = f"FCCI-{year}-{next_num:06d}"
-
-    # Update applicant
+    # ── STEP 3: I-update ang member record ────────────────────
     cursor.execute("""
-        UPDATE members
-        SET
-            member_id = %s,
-            status = 'Active',
-            registration_fee = 20000,
-            member_since = CURRENT_DATE
-        WHERE member_id = %s
-    """, (
-        new_member_id,
-        member_id
-    ))
+    UPDATE members
+    SET
+        member_id = %s,
+        status = 'Active',
+        registration_fee = 20000,
+        member_since = %s
+    WHERE member_id = %s
+    """, (new_member_id, member_since, member_id))
 
-    # Generate receipt number
-    cursor.execute("SELECT COUNT(*) FROM payments")
-    payment_count = cursor.fetchone()[0] + 1
-
-    receipt_no = f"RCPT-{year}-{payment_count:06d}"
-
-    # Create registration payment record
+    # ── STEP 4: I-update ang member_photos table ──────────────
     cursor.execute("""
-        INSERT INTO payments
-        (
-            receipt_no,
-            member_id,
-            payment_type,
-            amount,
-            payment_date,
-            payment_year,
-            payment_month
-        )
-        VALUES
-        (
-            %s,
-            %s,
-            'Registration Fee',
-            20000,
-            CURRENT_DATE,
-            %s,
-            %s
-        )
+    UPDATE member_photos
+    SET member_id = %s
+    WHERE member_id = %s
+    """, (new_member_id, member_id))
+
+    # ── STEP 5: Gumawa ng payment record (Registration Fee) ───
+    cursor.execute("""
+    SELECT COUNT(*) FROM payments
+    """)
+    pay_count = cursor.fetchone()[0] + 1
+    receipt_no = f"RCPT-{datetime.now().year}-{pay_count:06d}"
+
+    cursor.execute("""
+    INSERT INTO payments
+    (receipt_no, member_id, payment_type, amount, payment_date,
+     payment_year, payment_month)
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
     """, (
         receipt_no,
         new_member_id,
-        year,
-        datetime.now().strftime("%B")
+        "Registration Fee",
+        20000,
+        payment_date,
+        str(now.year),
+        now.strftime("%B")
     ))
 
     conn.commit()
     conn.close()
 
+    # ── STEP 6: Magpadala ng welcome email (background) ───────
+    if email:
+        try:
+            send_welcome_email(email, full_name, new_member_id)
+        except Exception as e:
+            print(f"[EMAIL] Failed to send welcome email: {e}")
 
     return redirect("/registration_approval")
 
