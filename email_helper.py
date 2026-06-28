@@ -12,7 +12,7 @@ def _send_email_now(to_email, subject, html_body):
     """
 
     RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
-    FROM_EMAIL = "FCCI Filipino Community Center <onboarding@resend.dev>"
+    FROM_EMAIL = "FCCI Filipino Community Center <delivered@resend.dev>"
 
     if not to_email or "@" not in to_email:
         print(f"[EMAIL] Invalid email address: {to_email}")
