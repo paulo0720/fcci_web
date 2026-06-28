@@ -5146,6 +5146,83 @@ def member_portal_profile():
         photo_path=photo_path
     )
 
+
+@app.route("/member_portal_edit", methods=["GET", "POST"])
+def member_portal_edit():
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    member_id = session["member_id"]
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+
+        contact  = request.form.get("contact", "").strip()
+        address  = request.form.get("address", "").strip()
+        email    = request.form.get("email", "").strip()
+        birthday = request.form.get("birthday", "").strip()
+        photo    = request.files.get("photo")
+
+        # I-update ang member info — hindi pwedeng palitan
+        # ang full_name at member_id (admin lang ang pwede)
+        cursor.execute("""
+        UPDATE members
+        SET contact  = %s,
+            address  = %s,
+            email    = %s,
+            birthday = %s
+        WHERE member_id = %s
+        """, (contact, address, email, birthday, member_id))
+
+        # I-upload ang bagong photo kung may nilagay
+        if photo and photo.filename:
+            photo_url = upload_photo(photo, folder="fcci_member_photos")
+            if photo_url:
+                cursor.execute("""
+                SELECT id FROM member_photos WHERE member_id = %s
+                """, (member_id,))
+                existing = cursor.fetchone()
+                if existing:
+                    cursor.execute("""
+                    UPDATE member_photos SET photo_path = %s
+                    WHERE member_id = %s
+                    """, (photo_url, member_id))
+                else:
+                    cursor.execute("""
+                    INSERT INTO member_photos (member_id, photo_path)
+                    VALUES (%s, %s)
+                    """, (member_id, photo_url))
+
+        conn.commit()
+        conn.close()
+        return redirect("/member_portal_profile")
+
+    # GET — ipakita ang edit form
+    cursor.execute("""
+    SELECT id, member_id, full_name, contact, address,
+           registration_fee, member_since, email, birthday,
+           date_registered, status, proof_of_payment
+    FROM members WHERE member_id = %s
+    """, (member_id,))
+    member = cursor.fetchone()
+
+    cursor.execute("""
+    SELECT photo_path FROM member_photos
+    WHERE member_id = %s ORDER BY id DESC LIMIT 1
+    """, (member_id,))
+    photo_row = cursor.fetchone()
+    photo_path = photo_row[0] if photo_row else None
+    conn.close()
+
+    return render_template(
+        "member_portal_edit.html",
+        member=member,
+        photo_path=photo_path
+    )
+
+
 @app.route("/admin_feed")
 def admin_feed():
 
