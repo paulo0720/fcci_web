@@ -1092,6 +1092,59 @@ def payments():
         # Doon na sinesset ang FCCI ID, Active status, at
         # Registration Fee record nang sabay-sabay.
 
+        # ── OPTION B: Kung Registration Fee ang nabayad sa ──────
+        # Payments page at ang member ay Applicant pa (APP-),
+        # automatic na i-convert sa FCCI — parehong logic ng
+        # approve_applicant route
+        if payment_type == "Registration Fee" and member_id.startswith("APP-"):
+
+            # Hanapin ang pinakamataas na FCCI number
+            cursor.execute("""
+            SELECT member_id FROM members WHERE member_id LIKE 'FCCI-%%'
+            """)
+            existing_fcci = cursor.fetchall()
+            highest_num = 0
+            for row in existing_fcci:
+                try:
+                    num_part = int(row[0].split("-")[-1])
+                    if num_part > highest_num:
+                        highest_num = num_part
+                except (ValueError, IndexError):
+                    continue
+
+            new_member_id = f"FCCI-{datetime.now().year}-{highest_num + 1:06d}"
+
+            # Kunin ang stored member_since ng applicant
+            cursor.execute("""
+            SELECT member_since FROM members WHERE member_id = %s
+            """, (member_id,))
+            ms_row = cursor.fetchone()
+            stored_ms = ms_row[0] if ms_row and ms_row[0] else f"{payment_month} {payment_year}"
+
+            # I-update ang members table
+            cursor.execute("""
+            UPDATE members
+            SET member_id = %s,
+                status = 'Active',
+                registration_fee = 20000,
+                member_since = %s
+            WHERE member_id = %s
+            """, (new_member_id, stored_ms, member_id))
+
+            # I-update ang member_photos
+            cursor.execute("""
+            UPDATE member_photos
+            SET member_id = %s
+            WHERE member_id = %s
+            """, (new_member_id, member_id))
+
+            # I-update ang payment record na kakaka-INSERT lang
+            cursor.execute("""
+            UPDATE payments
+            SET member_id = %s
+            WHERE receipt_no = %s
+            """, (new_member_id, receipt_no))
+
         conn.commit()
 
         # I-send ang payment confirmation email (hindi mag-crash
