@@ -1115,12 +1115,12 @@ def payments():
 
             new_member_id = f"FCCI-{datetime.now().year}-{highest_num + 1:06d}"
 
-            # Kunin ang stored member_since ng applicant
-            cursor.execute("""
-            SELECT member_since FROM members WHERE member_id = %s
-            """, (member_id,))
-            ms_row = cursor.fetchone()
-            stored_ms = ms_row[0] if ms_row and ms_row[0] else f"{payment_month} {payment_year}"
+            # Gamitin ang payment month/year bilang member_since
+            # — ito ang "totoo" na petsa ng pagpasok, hindi yung
+            # posibleng maling nalagay sa registration form.
+            # Hal. kung nag-bayad siya ng "May 2026", "May 2026"
+            # din ang magiging member_since niya.
+            member_since_from_payment = f"{payment_month} {payment_year}"
 
             # I-update ang members table
             cursor.execute("""
@@ -1130,7 +1130,7 @@ def payments():
                 registration_fee = 20000,
                 member_since = %s
             WHERE member_id = %s
-            """, (new_member_id, stored_ms, member_id))
+            """, (new_member_id, member_since_from_payment, member_id))
 
             # I-update ang member_photos
             cursor.execute("""
