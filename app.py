@@ -702,6 +702,7 @@ def add_member():
         birthday = request.form["birthday"]
         email = request.form["email"]
         address = request.form["address"]
+        member_since_input = request.form.get("member_since", "").strip()
         photo = request.files["photo"]
         
 
@@ -735,7 +736,7 @@ def add_member():
             contact,
             address,
             0,
-            "",
+            member_since_input,
             email,
             birthday,
             datetime.now().strftime("%Y-%m-%d"),
@@ -3731,7 +3732,7 @@ def approve_applicant(member_id):
 
     # ── STEP 1: Kunin ang member details ──────────────────────
     cursor.execute("""
-    SELECT full_name, email FROM members WHERE member_id = %s
+    SELECT full_name, email, member_since FROM members WHERE member_id = %s
     """, (member_id,))
     applicant_info = cursor.fetchone()
 
@@ -3741,6 +3742,9 @@ def approve_applicant(member_id):
 
     full_name = applicant_info[0]
     email = applicant_info[1]
+    # Gamitin ang member_since na nilagay ng applicant sa
+    # registration form — kung wala, gamitin ang current month
+    stored_member_since = applicant_info[2]
 
     # ── STEP 2: Generate bagong FCCI- member ID ───────────────
     # Gamitin ang MAX existing FCCI number para hindi mag-clash
@@ -3760,7 +3764,9 @@ def approve_applicant(member_id):
 
     new_member_id = f"FCCI-{datetime.now().year}-{highest_num + 1:06d}"
     now = datetime.now()
-    member_since = now.strftime("%B %Y")
+    # Gamitin ang stored member_since kung may nalagay ang applicant,
+    # otherwise gamitin ang current month ng approval
+    member_since = stored_member_since if stored_member_since else now.strftime("%B %Y")
     payment_date = now.strftime("%Y-%m-%d")
 
     # ── STEP 3: I-update ang member record ────────────────────
@@ -3782,6 +3788,16 @@ def approve_applicant(member_id):
     """, (new_member_id, member_id))
 
     # ── STEP 5: Gumawa ng payment record (Registration Fee) ───
+    # I-parse ang member_since para makuha ang month at year
+    # (hal. "May 2026" → month="May", year="2026")
+    try:
+        since_parts = member_since.split()
+        pay_month = since_parts[0]  # hal. "May"
+        pay_year = since_parts[1]   # hal. "2026"
+    except:
+        pay_month = now.strftime("%B")
+        pay_year = str(now.year)
+
     cursor.execute("""
     SELECT COUNT(*) FROM payments
     """)
@@ -3799,8 +3815,8 @@ def approve_applicant(member_id):
         "Registration Fee",
         20000,
         payment_date,
-        str(now.year),
-        now.strftime("%B")
+        pay_year,
+        pay_month
     ))
 
     conn.commit()
