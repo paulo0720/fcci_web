@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edit My Profile - FCCI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #f4fbf7; --bg-mist: #e9f7ef;
+    --glass: rgba(255,255,255,0.7); --glass-border: rgba(0,150,90,0.18);
+    --emerald: #00a85c; --emerald-bright: #00c46a; --emerald-deep: #00562a;
+    --text-main: #0c2418; --text-dim: #5c8270;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Inter', sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(0,196,106,0.16) 0%, transparent 40%),
+      radial-gradient(circle at 88% 18%, rgba(0,168,92,0.12) 0%, transparent 45%),
+      linear-gradient(160deg, #ffffff 0%, var(--bg-base) 45%, var(--bg-mist) 100%);
+    background-attachment:fixed;
+    color:var(--text-main); min-height:100vh;
+  }
+  .topbar {
+    position:sticky; top:0; z-index:50;
+    background:rgba(255,255,255,0.75); backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--glass-border);
+    padding:14px 24px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .topbar-brand { display:flex; align-items:center; gap:10px; }
+  .topbar-brand img { width:36px; height:36px; border-radius:50%; object-fit:contain; }
+  .topbar-brand span {
+    font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:18px;
+    background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .topbar-nav { display:flex; gap:8px; }
+  .topbar-nav a {
+    text-decoration:none; color:var(--text-dim); font-size:13.5px; font-weight:600;
+    padding:8px 14px; border-radius:10px; transition:all 0.2s;
+  }
+  .topbar-nav a:hover, .topbar-nav a.active { background:rgba(0,196,106,0.1); color:var(--emerald-deep); }
+
+  .wrap { max-width:580px; margin:0 auto; padding:28px 16px 60px; }
+
+  .glass-card {
+    background:var(--glass); backdrop-filter:blur(18px); border:1px solid var(--glass-border);
+    border-radius:20px; padding:28px; box-shadow:0 6px 26px rgba(0,100,60,0.08); margin-bottom:20px;
+  }
+  .card-title { font-family:'Space Grotesk', sans-serif; font-size:18px; font-weight:700; color:var(--emerald-deep); margin-bottom:6px; }
+  .card-sub { font-size:12.5px; color:var(--text-dim); margin-bottom:22px; }
+
+  .current-photo {
+    width:90px; height:90px; border-radius:50%; object-fit:cover; margin:0 auto 16px; display:block;
+    border:3px solid rgba(0,196,106,0.3);
+  }
+  .photo-placeholder {
+    width:90px; height:90px; border-radius:50%; background:rgba(0,100,60,0.08);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text-dim); font-size:28px; margin:0 auto 16px;
+    border:2px dashed var(--glass-border);
+  }
+
+  .form-group { margin-bottom:18px; }
+  .form-group label {
+    display:block; font-size:11.5px; font-weight:600; color:var(--emerald-deep);
+    text-transform:uppercase; letter-spacing:0.5px; margin-bottom:7px;
+  }
+  .form-control {
+    background:rgba(255,255,255,0.85); border:1px solid var(--glass-border);
+    border-radius:12px; padding:11px 16px; font-size:14px; color:var(--text-main); width:100%;
+    transition:border-color 0.2s, box-shadow 0.2s;
+  }
+  .form-control:focus { outline:none; border-color:var(--emerald); box-shadow:0 0 0 3px rgba(0,196,106,0.15); }
+  textarea.form-control { resize:vertical; min-height:80px; }
+
+  .readonly-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(0,100,60,0.07); font-size:13.5px; margin-bottom:4px; }
+  .readonly-row .label { color:var(--text-dim); font-weight:600; font-size:12px; text-transform:uppercase; }
+  .readonly-row .value { color:var(--text-main); font-weight:600; }
+
+  .note-box { background:rgba(255,170,0,0.08); border:1px solid rgba(255,170,0,0.3); border-radius:12px; padding:12px 16px; font-size:12.5px; color:#8a6000; margin-bottom:20px; }
+
+  .btn-save {
+    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald));
+    color:#fff; border:none; border-radius:12px; padding:13px 0; width:100%;
+    font-weight:600; font-size:15px; box-shadow:0 6px 18px rgba(0,168,92,0.3);
+    cursor:pointer; margin-bottom:10px;
+  }
+  .btn-cancel {
+    display:block; text-align:center; background:rgba(0,100,60,0.07);
+    color:var(--emerald-deep); border:1px solid var(--glass-border);
+    border-radius:12px; padding:12px 0; font-weight:600; font-size:14px; text-decoration:none;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI">
+    <span>FCCI</span>
+  </div>
+  <div class="topbar-nav">
+    <a href="/feed">📰 Feed</a>
+    <a href="/member_portal_profile">👤 Profile</a>
+    <a href="/member_logout">⏻ Logout</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="glass-card">
+    <div class="card-title">✏️ Edit My Profile</div>
+    <div class="card-sub">I-update ang iyong personal na impormasyon</div>
+
+    <!-- Current Photo -->
+    {% if photo_path %}
+    <img src="{{ photo_path }}" class="current-photo">
+    {% else %}
+    <div class="photo-placeholder">👤</div>
+    {% endif %}
+
+    <!-- Hindi pwedeng palitan -->
+    <div class="note-box">
+      ⚠️ Ang <b>Full Name</b> at <b>Member ID</b> ay hindi pwedeng baguhin.
+      Makipag-ugnayan sa FCCI admin kung kailangan ng pagbabago.
+    </div>
+
+    <div class="readonly-row">
+      <span class="label">Member ID</span>
+      <span class="value">{{ member[1] }}</span>
+    </div>
+    <div class="readonly-row" style="margin-bottom:22px;">
+      <span class="label">Full Name</span>
+      <span class="value">{{ member[2] }}</span>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
+
+      <div class="form-group">
+        <label>Contact Number</label>
+        <input type="text" name="contact" class="form-control"
+               value="{{ member[3] }}" placeholder="09171234567">
+      </div>
+
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" name="email" class="form-control"
+               value="{{ member[7] }}" placeholder="juan@email.com">
+      </div>
+
+      <div class="form-group">
+        <label>Birthday</label>
+        <input type="date" name="birthday" class="form-control"
+               value="{{ member[8] }}">
+      </div>
+
+      <div class="form-group">
+        <label>Address</label>
+        <textarea name="address" class="form-control"
+                  placeholder="123 Mabini St., Brgy. San Jose">{{ member[4] }}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Update Photo (optional)</label>
+        <input type="file" name="photo" class="form-control" accept="image/*">
+        <p style="font-size:11.5px;color:var(--text-dim);margin-top:6px;">
+          Mag-upload ng bagong photo para palitan ang kasalukuyang profile picture.
+        </p>
+      </div>
+
+      <button type="submit" class="btn-save">💾 I-save ang Changes</button>
+      <a href="/member_portal_profile" class="btn-cancel">✕ Cancel</a>
+
+    </form>
+  </div>
+
+</div>
+
+</body>
+</html>
