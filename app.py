@@ -1086,14 +1086,8 @@ def payments():
             
         ))
 
-        # TANGGAL NA ANG APP→FCCI CONVERSION DITO.
-        # Ang conversion ay automatic na nangyayari sa
-        # /approve_applicant route na lang — kapag nag-click
-        # ang admin ng "Approve" sa Registration Approval page.
-        # Doon na sinesset ang FCCI ID, Active status, at
-        # Registration Fee record nang sabay-sabay.
-
-        # ── OPTION B: Kung Registration Fee ang nabayad sa ──────
+        # ── Kung Registration Fee ang nabayad at Applicant pa ang member,
+        # automatic na i-convert sa FCCI (Option B) ─────────────
         # Payments page at ang member ay Applicant pa (APP-),
         # automatic na i-convert sa FCCI — parehong logic ng
         # approve_applicant route
