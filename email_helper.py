@@ -1,66 +1,60 @@
-import smtplib
 import os
 import threading
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import urllib.request
+import urllib.error
+import json
 
 
 def _send_email_now(to_email, subject, html_body):
     """
-    Ang totoong pagpapadala ng email (synchronous).
-    Tinatawag sa loob ng background thread para hindi
-    ma-block ang main request.
+    Nagpapadala ng email gamit ang Resend API (HTTPS) —
+    hindi SMTP, kaya hindi naka-block sa Render free tier.
     """
 
-    # I-read ang env vars DITO sa loob ng function —
-    # hindi sa module level — para masigurado na
-    # naka-load na ang Render environment variables
-    GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "").strip()
-    GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
+    RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+    FROM_EMAIL = "FCCI Filipino Community Center <onboarding@resend.dev>"
 
     if not to_email or "@" not in to_email:
         print(f"[EMAIL] Invalid email address: {to_email}")
         return False
 
-    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
-        print("[EMAIL] ERROR: Walang GMAIL_ADDRESS o GMAIL_APP_PASSWORD sa environment")
-        print(f"[EMAIL] GMAIL_ADDRESS set: {bool(GMAIL_ADDRESS)}")
-        print(f"[EMAIL] GMAIL_APP_PASSWORD set: {bool(GMAIL_APP_PASSWORD)}")
+    if not RESEND_API_KEY:
+        print("[EMAIL] ERROR: Walang RESEND_API_KEY sa environment variables")
         return False
 
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"FCCI Filipino Community Center <{GMAIL_ADDRESS}>"
-        msg["To"] = to_email
+        payload = json.dumps({
+            "from": FROM_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_body
+        }).encode("utf-8")
 
-        html_part = MIMEText(html_body, "html")
-        msg.attach(html_part)
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            method="POST"
+        )
 
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
-            server.starttls()
-            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-            server.sendmail(GMAIL_ADDRESS, to_email, msg.as_string())
+        with urllib.request.urlopen(req, timeout=15) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            print(f"[EMAIL] Successfully sent to {to_email} | ID: {result.get('id')}")
+            return True
 
-        print(f"[EMAIL] ✅ Successfully sent to {to_email}")
-        return True
-
-    except smtplib.SMTPAuthenticationError:
-        print(f"[EMAIL] ❌ Authentication failed - check App Password in Render env vars")
-        return False
-    except smtplib.SMTPException as e:
-        print(f"[EMAIL] ❌ SMTP error sending to {to_email}: {e}")
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        print(f"[EMAIL] HTTP {e.code} error: {error_body}")
         return False
     except Exception as e:
-        print(f"[EMAIL] ❌ Unexpected error sending to {to_email}: {e}")
+        print(f"[EMAIL] Unexpected error sending to {to_email}: {e}")
         return False
 
 
 def send_email(to_email, subject, html_body):
-    """
-    Magpadala ng email sa background thread —
-    hindi nag-block ang main request.
-    """
     thread = threading.Thread(
         target=_send_email_now,
         args=(to_email, subject, html_body),
@@ -71,10 +65,7 @@ def send_email(to_email, subject, html_body):
 
 
 def send_welcome_email(to_email, full_name, member_id):
-    """
-    Welcome email kapag na-approve ang applicant.
-    """
-    subject = "🎉 Welcome to FCCI - You are now an Official Member!"
+    subject = "Maligayang pagdating sa FCCI - Ikaw ay Official Member na!"
 
     html_body = f"""
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
@@ -92,8 +83,7 @@ def send_welcome_email(to_email, full_name, member_id):
           <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#00562a;">{member_id}</p>
         </div>
         <p style="font-size:14.5px;color:#3a5045;line-height:1.6;">
-          Maaari ka nang mag-login sa member portal para tingnan ang iyong profile,
-          makipag-ugnayan sa community feed, at marami pang iba.
+          Maaari ka nang mag-login sa member portal para tingnan ang iyong profile at makipag-ugnayan sa community.
         </p>
         <p style="font-size:13.5px;color:#5c8270;margin-top:24px;">
           United in Faith, Serving with Love.<br>
@@ -110,10 +100,7 @@ def send_payment_confirmation_email(
     to_email, full_name, payment_type,
     amount, receipt_no, payment_date
 ):
-    """
-    Payment confirmation email kapag may nabayad.
-    """
-    subject = f"✅ Payment Received - {payment_type}"
+    subject = f"Payment Received - {payment_type}"
 
     html_body = f"""
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
@@ -129,7 +116,7 @@ def send_payment_confirmation_email(
           <table style="width:100%;font-size:13.5px;color:#0c2418;">
             <tr><td style="padding:6px 0;color:#5c8270;">Receipt No.</td><td style="padding:6px 0;text-align:right;font-weight:600;">{receipt_no}</td></tr>
             <tr><td style="padding:6px 0;color:#5c8270;">Payment Type</td><td style="padding:6px 0;text-align:right;font-weight:600;">{payment_type}</td></tr>
-            <tr><td style="padding:6px 0;color:#5c8270;">Amount</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#00562a;">₩{amount:,}</td></tr>
+            <tr><td style="padding:6px 0;color:#5c8270;">Amount</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#00562a;">&#8361;{amount:,}</td></tr>
             <tr><td style="padding:6px 0;color:#5c8270;">Date</td><td style="padding:6px 0;text-align:right;font-weight:600;">{payment_date}</td></tr>
           </table>
         </div>
