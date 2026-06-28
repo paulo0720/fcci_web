@@ -89,6 +89,7 @@
   <div class="topbar-nav">
     <a href="/feed">📰 Feed</a>
     <a href="/member_portal_profile" class="active">👤 Profile</a>
+    <a href="/member_portal_edit">✏️ Edit</a>
     <a href="/member_logout">⏻ Logout</a>
   </div>
 </div>
@@ -111,6 +112,13 @@
     <div class="info-row"><span class="label">Birthday</span><span class="value">{{ member[8] }}</span></div>
     <div class="info-row"><span class="label">Address</span><span class="value">{{ member[4] }}</span></div>
     <div class="info-row"><span class="label">Member Since</span><span class="value">{{ member[6] }}</span></div>
+
+    <a href="/member_portal_edit" style="display:block;text-align:center;margin-top:18px;
+       background:linear-gradient(135deg,#00562a,#00a85c);color:#fff;border-radius:12px;
+       padding:12px 0;font-weight:600;font-size:14px;text-decoration:none;
+       box-shadow:0 4px 14px rgba(0,168,92,0.25);">
+      ✏️ Edit My Profile
+    </a>
   </div>
 
   <div class="glass-card">
