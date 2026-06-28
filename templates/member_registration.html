@@ -138,21 +138,28 @@
 
       <div class="form-group">
         <label>Member Since — Buwan ng Pagpasok sa FCCI</label>
-        <select name="member_since" class="form-control" required>
-          <option value="">-- Piliin ang Buwan --</option>
-          <option value="January 2026">January 2026</option>
-          <option value="February 2026">February 2026</option>
-          <option value="March 2026">March 2026</option>
-          <option value="April 2026">April 2026</option>
-          <option value="May 2026">May 2026</option>
-          <option value="June 2026">June 2026</option>
-          <option value="July 2026">July 2026</option>
-          <option value="August 2026">August 2026</option>
-          <option value="September 2026">September 2026</option>
-          <option value="October 2026">October 2026</option>
-          <option value="November 2026">November 2026</option>
-          <option value="December 2026">December 2026</option>
-        </select>
+        <div style="display:flex;gap:10px;">
+          <select id="ms_month" class="form-control" required>
+            <option value="">-- Buwan --</option>
+            <option value="January">January</option>
+            <option value="February">February</option>
+            <option value="March">March</option>
+            <option value="April">April</option>
+            <option value="May">May</option>
+            <option value="June">June</option>
+            <option value="July">July</option>
+            <option value="August">August</option>
+            <option value="September">September</option>
+            <option value="October">October</option>
+            <option value="November">November</option>
+            <option value="December">December</option>
+          </select>
+          <select id="ms_year" class="form-control" required>
+            <option value="">-- Taon --</option>
+          </select>
+        </div>
+        <!-- Hidden input na siyang isesend sa server -->
+        <input type="hidden" name="member_since" id="member_since_value">
         <p style="font-size:11.5px;color:var(--text-dim);margin-top:6px;">Ang buwan na ito ang magiging official na "Member Since" mo kapag na-approve ka na ng admin.</p>
       </div>
 
@@ -161,10 +168,41 @@
         <input type="file" name="photo" class="form-control" accept="image/*">
       </div>
 
-      <button type="submit" class="btn-submit">Submit Registration</button>
+      <button type="submit" class="btn-submit" onclick="return combineMemberSince()">Submit Registration</button>
 
     </form>
   </div>
+
+<script>
+// Auto-generate years: 2025 hanggang current year + 3
+(function() {
+  const yearSelect = document.getElementById('ms_year');
+  const currentYear = new Date().getFullYear();
+  for (let y = 2025; y <= currentYear + 3; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    if (y === currentYear) opt.selected = true;
+    yearSelect.appendChild(opt);
+  }
+
+  // I-set ang default month sa current month
+  const months = ["January","February","March","April","May","June",
+                  "July","August","September","October","November","December"];
+  document.getElementById('ms_month').value = months[new Date().getMonth()];
+})();
+
+function combineMemberSince() {
+  const month = document.getElementById('ms_month').value;
+  const year = document.getElementById('ms_year').value;
+  if (!month || !year) {
+    alert('Piliin ang buwan at taon ng Member Since.');
+    return false;
+  }
+  document.getElementById('member_since_value').value = month + ' ' + year;
+  return true;
+}
+</script>
 
 </div>
 </body>
