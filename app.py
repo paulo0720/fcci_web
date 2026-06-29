@@ -49,13 +49,49 @@ app.config[
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# ── CONNECTION POOL ──────────────────────────────────────────
+# Gumagamit ng connection pool para hindi na kailangang gumawa
+# ng bagong koneksyon sa Supabase sa bawat request — mas mabilis!
+from psycopg2 import pool as pg_pool
+
+_db_pool = None
+
+def get_pool():
+    global _db_pool
+    if _db_pool is None or _db_pool.closed:
+        _db_pool = pg_pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=5,
+            dsn=DATABASE_URL
+        )
+    return _db_pool
+
 
 def get_db():
     """
-    Kumokonekta sa Supabase PostgreSQL database gamit ang
-    connection string mula sa .env file (DATABASE_URL).
+    Kumuha ng koneksyon mula sa connection pool.
+    Mas mabilis kaysa gumawa ng bagong koneksyon sa bawat request.
     """
-    return psycopg2.connect(DATABASE_URL)
+    try:
+        return get_pool().getconn()
+    except Exception:
+        # Fallback sa direct connect kung may pool error
+        import psycopg2
+        return psycopg2.connect(DATABASE_URL)
+
+
+def return_db(conn):
+    """
+    I-return ang koneksyon sa pool pagkatapos gamitin.
+    Tawagan ito imbes na conn.close() para ma-reuse ang koneksyon.
+    """
+    try:
+        get_pool().putconn(conn)
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def fetch_member_with_photo(cursor, member_id):
