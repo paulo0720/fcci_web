@@ -168,7 +168,29 @@
         <input type="file" name="photo" class="form-control" accept="image/*">
       </div>
 
-      <button type="submit" class="btn-submit" onclick="return combineMemberSince()">Submit Registration</button>
+      <button type="submit" class="btn-submit" id="submitBtn" onclick="return handleSubmit(this)">Submit Registration</button>
+
+<script>
+function handleSubmit(btn) {
+  // I-validate muna ang member_since
+  if (!combineMemberSince()) return false;
+
+  // I-disable ang button para hindi ma-double-click
+  btn.disabled = true;
+  btn.textContent = '⏳ Submitting...';
+  btn.style.opacity = '0.7';
+
+  // Safety net — i-re-enable ang button pagkatapos ng 15 segundo
+  // kung hindi natapos ang submit (hal. network issue)
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = 'Submit Registration';
+    btn.style.opacity = '1';
+  }, 15000);
+
+  return true;
+}
+</script>
 
     </form>
   </div>
