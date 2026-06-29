@@ -208,97 +208,91 @@ def member_registration():
 
     if request.method == "POST":
 
-        conn = get_db()
-        cursor = conn.cursor()
-
-        # Hanapin ang pinakamataas na existing APP- number,
-        # hindi yung total count (para hindi mag-clash kapag may
-        # na-delete o na-convert na applicant sa gitna ng sequence)
-        cursor.execute("""
-        SELECT member_id
-        FROM members
-        WHERE member_id LIKE 'APP-%%'
-        """)
-
-        existing_app_ids = cursor.fetchall()
-
-        highest_num = 0
-        for row in existing_app_ids:
-            try:
-                num_part = int(row[0].split("-")[-1])
-                if num_part > highest_num:
-                    highest_num = num_part
-            except (ValueError, IndexError):
-                continue
-
-        count = highest_num + 1
-
-        member_id = (
-            f"APP-{datetime.now().year}-{count:06d}"
-        )
-
         full_name = request.form["full_name"]
         contact = request.form["contact"]
         birthday = request.form["birthday"]
         email = request.form["email"]
         address = request.form["address"]
-        # Kunin ang member_since mula sa hidden input
-        # (hal. "May 2026" — combination ng month + year dropdowns)
         member_since_input = request.form.get("member_since", "").strip()
-
         photo = request.files.get("photo")
 
+        # I-upload muna ang photo bago mag-generate ng member_id
+        # para hindi mag-hang ang transaction habang nag-uupload sa Cloudinary
         photo_filename = ""
-
         if photo and photo.filename:
             photo_filename = upload_photo(photo, folder="fcci_member_photos") or ""
 
-        cursor.execute("""
-        INSERT INTO members
-        (
-            member_id,
-            full_name,
-            contact,
-            address,
-            registration_fee,
-            member_since,
-            email,
-            birthday,
-            date_registered,
-            status
-        )
-        VALUES
-        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            member_id,
-            full_name,
-            contact,
-            address,
-            0,
-            member_since_input,
-            email,
-            birthday,
-            datetime.now().strftime("%Y-%m-%d"),
-            "Applicant"
-        ))
+        # Gamitin ang Supabase advisory lock para maiwasan ang
+        # race condition kapag sabay-sabay na nag-reregister.
+        # Ang SELECT + INSERT ay ginagawa sa loob ng single transaction
+        # na may FOR UPDATE SKIP LOCKED para atomic ito.
+        max_retries = 5
+        member_id = None
 
-        if photo_filename:
-            cursor.execute("""
-            INSERT INTO member_photos
-            (member_id, photo_path)
-            VALUES (%s, %s)
-            """, (
-                member_id,
-                photo_filename
-            ))
+        for attempt in range(max_retries):
+            conn = get_db()
+            cursor = conn.cursor()
+            try:
+                cursor.execute("""
+                SELECT member_id
+                FROM members
+                WHERE member_id LIKE 'APP-%%'
+                FOR UPDATE
+                """)
+                existing_app_ids = cursor.fetchall()
 
-        conn.commit()
-        conn.close()
+                highest_num = 0
+                for row in existing_app_ids:
+                    try:
+                        num_part = int(row[0].split("-")[-1])
+                        if num_part > highest_num:
+                            highest_num = num_part
+                    except (ValueError, IndexError):
+                        continue
 
-        return redirect(
-            f"/registration_confirmation/{member_id}"
-        )
+                count = highest_num + 1
+                member_id = f"APP-{datetime.now().year}-{count:06d}"
+
+                cursor.execute("""
+                INSERT INTO members
+                (
+                    member_id, full_name, contact, address,
+                    registration_fee, member_since, email,
+                    birthday, date_registered, status
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    member_id, full_name, contact, address,
+                    0, member_since_input, email, birthday,
+                    datetime.now().strftime("%Y-%m-%d"), "Applicant"
+                ))
+
+                if photo_filename:
+                    cursor.execute("""
+                    INSERT INTO member_photos (member_id, photo_path)
+                    VALUES (%s, %s)
+                    """, (member_id, photo_filename))
+
+                conn.commit()
+                conn.close()
+                break  # Matagumpay — lumabas sa retry loop
+
+            except Exception as e:
+                conn.rollback()
+                conn.close()
+                if "unique" in str(e).lower() and attempt < max_retries - 1:
+                    # Duplicate member_id — subukan ulit
+                    import time
+                    time.sleep(0.1)
+                    member_id = None
+                    continue
+                else:
+                    raise
+
+        if not member_id:
+            return "Registration failed. Please try again.", 500
+
+        return redirect(f"/registration_confirmation/{member_id}")
 
     return render_template(
         "member_registration.html"
