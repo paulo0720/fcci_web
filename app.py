@@ -41,6 +41,40 @@ app = Flask(__name__)
 
 app.secret_key = "FCCI_SECRET_KEY"
 
+# ── GLOBAL ERROR LOGGING ────────────────────────────────────
+import logging
+import traceback
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"[500 ERROR] {error}\n{traceback.format_exc()}")
+    return """
+    <div style='font-family:Arial;padding:40px;text-align:center;'>
+      <h2>⚠️ May nangyaring error</h2>
+      <p>Nagreport na kami ng problema. Subukan mong mag-reload.</p>
+      <a href='/dashboard' style='color:#00562a;'>← Bumalik sa Dashboard</a>
+    </div>
+    """, 500
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return """
+    <div style='font-family:Arial;padding:40px;text-align:center;'>
+      <h2>🔍 Page Not Found</h2>
+      <p>Hindi mahanap ang page na hinahanap mo.</p>
+      <a href='/dashboard' style='color:#00562a;'>← Bumalik sa Dashboard</a>
+    </div>
+    """, 404
+
 UPLOAD_FOLDER = "static/uploads"
 
 app.config[
@@ -340,174 +374,152 @@ def dashboard():
     if "username" not in session:
         return redirect("/login")
 
-    conn = get_db()
-    cursor = conn.cursor()
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
 
-    # TOTAL MEMBERS
-    cursor.execute("SELECT COUNT(*) FROM members")
-    result = cursor.fetchone()
-    total_members = result[0] if result else 0
+        # ── OPTIMIZED: Lahat ng stats sa ISANG query ────────────
+        # Imbes na 5 hiwalay na queries, isang query na lang
+        cursor.execute("""
+        SELECT
+            (SELECT COUNT(*) FROM members)                              AS total_members,
+            (SELECT COALESCE(SUM(amount),0) FROM payments)             AS collections,
+            (SELECT COALESCE(SUM(amount),0) FROM donations)            AS donations,
+            (SELECT COALESCE(SUM(amount),0) FROM expenses)             AS expenses,
+            (SELECT COUNT(*) FROM members WHERE status = 'Applicant')  AS applicants,
+            (SELECT COUNT(*) FROM members WHERE status = 'Active')     AS active_count
+        """)
+        stats = cursor.fetchone()
+        total_members = stats[0] or 0
+        collections   = stats[1] or 0
+        donations     = stats[2] or 0
+        expenses      = stats[3] or 0
+        applicants    = stats[4] or 0
+        balance       = collections + donations - expenses
 
-    # COLLECTIONS
-    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments")
-    result = cursor.fetchone()
-    collections = result[0] if result else 0
+        # ── OPTIMIZED: Outstanding — isang query para sa lahat ──
+        # Imbes na mag-loop at mag-query sa bawat member/buwan,
+        # kunin lahat ng payments nang sabay at i-process sa Python
+        cursor.execute("""
+        SELECT member_id, member_since FROM members WHERE status = 'Active'
+        """)
+        active_members_list = cursor.fetchall()
 
-    # DONATIONS
-    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM donations")
-    result = cursor.fetchone()
-    donations = result[0] if result else 0
+        # Kunin lahat ng Monthly Contribution payments nang sabay
+        cursor.execute("""
+        SELECT member_id, payment_month, payment_year
+        FROM payments
+        WHERE payment_type = 'Monthly Contribution'
+        """)
+        all_mc_payments = cursor.fetchall()
 
-    # EXPENSES
-    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM expenses")
-    result = cursor.fetchone()
-    expenses = result[0] if result else 0
+        # Gumawa ng set para sa mabilis na lookup
+        paid_set = set()
+        for row in all_mc_payments:
+            paid_set.add((row[0], row[1], str(row[2])))
 
-    # BALANCE
-    balance = collections + donations - expenses
+        current_date = datetime.now()
+        month_map = {
+            "January":1,"February":2,"March":3,"April":4,
+            "May":5,"June":6,"July":7,"August":8,
+            "September":9,"October":10,"November":11,"December":12
+        }
 
-    # RECENT PAYMENTS
-    cursor.execute("""
-    SELECT
-        p.member_id,
-        p.amount,
-        m.full_name,
-        p.payment_type,
-        p.payment_month,
-        p.payment_year
-    FROM payments p
-    LEFT JOIN members m ON p.member_id = m.member_id
-    ORDER BY p.id DESC
-    LIMIT 10
-    """)
-    recent_payments = cursor.fetchall()
+        active_members  = 0
+        inactive_members = 0
+        total_outstanding = 0
 
-    # APPLICANTS COUNT
-    cursor.execute("SELECT COUNT(*) FROM members WHERE status='Applicant'")
-    result = cursor.fetchone()
-    applicants = result[0] if result else 0
-
-    # ACTIVE / INACTIVE / OUTSTANDING
-    active_members = 0
-    inactive_members = 0
-    total_outstanding = 0
-
-    cursor.execute("""
-        SELECT member_id, member_since
-        FROM members
-        WHERE status = 'Active'
-    """)
-    members = cursor.fetchall()
-
-    current_date = datetime.now()
-
-    month_map = {
-        "January":1, "February":2, "March":3,
-        "April":4, "May":5, "June":6,
-        "July":7, "August":8, "September":9,
-        "October":10, "November":11, "December":12
-    }
-
-    for member in members:
-        member_id = member[0]
-        member_since = member[1]
-
-        if not member_since:
-            continue
-
-        try:
-            parts = member_since.split()
-            month_name = parts[0]
-            year = int(parts[1])
-            month = month_map[month_name]
-        except:
-            continue
-
-        missing_count = 0
-
-        while (
-            year < current_date.year
-            or (year == current_date.year and month <= current_date.month)
-        ):
-            month_name_loop = datetime(year, month, 1).strftime("%B")
-
-            cursor.execute("""
-            SELECT COUNT(*)
-            FROM payments
-            WHERE member_id = %s
-            AND payment_type = 'Monthly Contribution'
-            AND payment_month = %s
-            AND payment_year = %s
-            """, (member_id, month_name_loop, str(year)))
-
-            result = cursor.fetchone()
-            paid = result[0] if result else 0
-
-            if paid == 0:
-                missing_count += 1
-
-            month += 1
-            if month > 12:
-                month = 1
-                year += 1
-
-        if missing_count < 5:
-            active_members += 1
-        else:
-            inactive_members += 1
-
-        total_outstanding += (missing_count * 10000)
-
-    # ── BIRTHDAY THIS MONTH ──────────────────────────────────
-    # Kinukuha ang lahat ng Active members na may birthday ngayong buwan
-    current_month = current_date.month
-    current_day   = current_date.day
-
-    cursor.execute("""
-    SELECT full_name, birthday, photo_path
-    FROM members
-    WHERE status = 'Active'
-    AND birthday IS NOT NULL
-    AND birthday != ''
-    ORDER BY birthday
-    """)
-
-    all_members = cursor.fetchall()
-    birthday_list = []
-
-    for row in all_members:
-        full_name  = row[0]
-        birthday   = row[1]   # expected format: YYYY-MM-DD
-        photo_path = row[2]
-
-        if not birthday:
-            continue
-
-        try:
-            # Try YYYY-MM-DD format first
-            bday_obj = datetime.strptime(birthday, "%Y-%m-%d")
-        except ValueError:
+        for member in active_members_list:
+            member_id    = member[0]
+            member_since = member[1]
+            if not member_since:
+                continue
             try:
-                # Fallback: MM/DD/YYYY
-                bday_obj = datetime.strptime(birthday, "%m/%d/%Y")
-            except ValueError:
+                parts = member_since.split()
+                month = month_map[parts[0]]
+                year  = int(parts[1])
+            except:
                 continue
 
-        if bday_obj.month == current_month:
-            is_today = (bday_obj.day == current_day)
+            missing_count = 0
+            y, m = year, month
+            while (y < current_date.year or
+                   (y == current_date.year and m <= current_date.month)):
+                month_name = datetime(y, m, 1).strftime("%B")
+                if (member_id, month_name, str(y)) not in paid_set:
+                    missing_count += 1
+                m += 1
+                if m > 12:
+                    m = 1
+                    y += 1
 
-            birthday_list.append({
-                "full_name": full_name,
-                "birthday":  bday_obj.strftime("%B %d"),
-                "photo":     photo_path or "",
-                "is_today":  is_today,
-                "day":       bday_obj.day   # para ma-sort
-            })
+            if missing_count < 5:
+                active_members += 1
+            else:
+                inactive_members += 1
+            total_outstanding += (missing_count * 10000)
 
-    # I-sort: today first, then by day of month
-    birthday_list.sort(key=lambda x: (not x["is_today"], x["day"]))
+        # ── RECENT PAYMENTS ──────────────────────────────────────
+        cursor.execute("""
+        SELECT p.member_id, p.amount, m.full_name,
+               p.payment_type, p.payment_month, p.payment_year
+        FROM payments p
+        LEFT JOIN members m ON p.member_id = m.member_id
+        ORDER BY p.id DESC LIMIT 10
+        """)
+        recent_payments = cursor.fetchall()
 
-    return_db(conn)
+        # ── BIRTHDAY THIS MONTH ──────────────────────────────────
+        current_month = current_date.month
+        current_day   = current_date.day
+
+        cursor.execute("""
+        SELECT m.full_name, m.birthday, mp.photo_path
+        FROM members m
+        LEFT JOIN member_photos mp ON m.member_id = mp.member_id
+        WHERE m.status = 'Active'
+        AND m.birthday IS NOT NULL AND m.birthday != ''
+        ORDER BY m.birthday
+        """)
+        all_members  = cursor.fetchall()
+        birthday_list = []
+
+        for row in all_members:
+            full_name  = row[0]
+            birthday   = row[1]
+            photo_path = row[2]
+            if not birthday:
+                continue
+            try:
+                bday_obj = datetime.strptime(birthday, "%Y-%m-%d")
+            except ValueError:
+                try:
+                    bday_obj = datetime.strptime(birthday, "%m/%d/%Y")
+                except ValueError:
+                    continue
+            if bday_obj.month == current_month:
+                is_today = (bday_obj.day == current_day)
+                birthday_list.append({
+                    "full_name": full_name,
+                    "birthday":  bday_obj.strftime("%B %d"),
+                    "photo":     photo_path or "",
+                    "is_today":  is_today,
+                    "day":       bday_obj.day
+                })
+
+        birthday_list.sort(key=lambda x: (not x["is_today"], x["day"]))
+
+        return_db(conn)
+
+    except Exception as e:
+        import traceback
+        print(f"[DASHBOARD ERROR] {e}")
+        print(traceback.format_exc())
+        total_members = collections = donations = expenses = 0
+        balance = applicants = active_members = 0
+        inactive_members = total_outstanding = 0
+        recent_payments = []
+        birthday_list = []
 
     return render_template(
         "dashboard.html",
