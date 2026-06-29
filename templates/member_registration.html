@@ -109,9 +109,9 @@
   </div>
   {% endif %}
 
-  {% if duplicate_error %}
+  {% if duplicate_error or error %}
   <div class="alert-duplicate">
-    ⚠️ {{ duplicate_error }}
+    ⚠️ {{ error or duplicate_error }}
   </div>
   {% endif %}
 
