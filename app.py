@@ -278,16 +278,52 @@ def member_registration():
 
     if request.method == "POST":
 
-        full_name = request.form["full_name"]
-        contact = request.form["contact"]
-        birthday = request.form["birthday"]
-        email = request.form["email"]
-        address = request.form["address"]
+        full_name          = request.form["full_name"]
+        contact            = request.form["contact"]
+        birthday           = request.form["birthday"]
+        email              = request.form["email"]
+        address            = request.form["address"]
         member_since_input = request.form.get("member_since", "").strip()
-        photo = request.files.get("photo")
+        photo              = request.files.get("photo")
 
-        # I-upload muna ang photo bago mag-generate ng member_id
-        # para hindi mag-hang ang transaction habang nag-uupload sa Cloudinary
+        # ── DUPLICATE CHECK BAGO MAG-UPLOAD ─────────────────────
+        # I-check muna kung may existing na member na may parehong
+        # contact o full_name — bago pa mag-upload sa Cloudinary
+        # para hindi masayang ang bandwidth at oras
+        conn   = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        SELECT member_id, full_name, status
+        FROM members
+        WHERE contact = %s OR lower(full_name) = lower(%s)
+        LIMIT 1
+        """, (contact, full_name))
+
+        existing = cursor.fetchone()
+        return_db(conn)
+
+        if existing:
+            existing_member_id = existing[0]
+            existing_name      = existing[1]
+            existing_status    = existing[2]
+
+            # Kung Applicant pa — i-redirect sa kanyang
+            # registration confirmation page
+            if existing_status == "Applicant":
+                return redirect(
+                    f"/registration_confirmation/{existing_member_id}"
+                )
+
+            # Kung Active na — mag-show ng friendly message
+            return render_template(
+                "member_registration.html",
+                error=f"Mukhang naka-register ka na! "
+                      f"Ang '{existing_name}' ay {existing_status} na. "
+                      f"Makipag-ugnayan sa FCCI admin kung may katanungan ka."
+            )
+
+        # Wala pang existing — i-upload ang photo at i-register
         photo_filename = ""
         if photo and photo.filename:
             photo_filename = upload_photo(photo, folder="fcci_member_photos") or ""
