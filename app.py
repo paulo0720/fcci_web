@@ -1221,10 +1221,66 @@ def delete_payment(payment_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "DELETE FROM payments WHERE id = %s",
-        (payment_id,)
-    )
+    # I-check muna kung Registration Fee ito bago i-delete
+    cursor.execute("""
+    SELECT member_id, payment_type FROM payments WHERE id = %s
+    """, (payment_id,))
+    payment = cursor.fetchone()
+
+    if payment:
+        paid_member_id = payment[0]
+        payment_type   = payment[1]
+
+        # I-delete ang payment
+        cursor.execute(
+            "DELETE FROM payments WHERE id = %s",
+            (payment_id,)
+        )
+
+        # Kung Registration Fee ang na-delete at FCCI member siya,
+        # i-revert siya pabalik sa APP- at Applicant status
+        if payment_type == "Registration Fee" and paid_member_id.startswith("FCCI-"):
+
+            # Hanapin ang pinakamataas na existing APP- number
+            cursor.execute("""
+            SELECT member_id FROM members WHERE member_id LIKE 'APP-%%'
+            """)
+            existing_app = cursor.fetchall()
+            highest_num = 0
+            for row in existing_app:
+                try:
+                    num_part = int(row[0].split("-")[-1])
+                    if num_part > highest_num:
+                        highest_num = num_part
+                except (ValueError, IndexError):
+                    continue
+
+            new_app_id = f"APP-{datetime.now().year}-{highest_num + 1:06d}"
+
+            # I-revert ang member sa APP- at Applicant status
+            cursor.execute("""
+            UPDATE members
+            SET member_id        = %s,
+                status           = 'Applicant',
+                registration_fee = 0,
+                member_since     = ''
+            WHERE member_id = %s
+            """, (new_app_id, paid_member_id))
+
+            # I-update din ang member_photos at payments tables
+            cursor.execute("""
+            UPDATE member_photos
+            SET member_id = %s
+            WHERE member_id = %s
+            """, (new_app_id, paid_member_id))
+
+            cursor.execute("""
+            UPDATE payments
+            SET member_id = %s
+            WHERE member_id = %s
+            """, (new_app_id, paid_member_id))
+
+            print(f"[REVERT] {paid_member_id} → {new_app_id} (Applicant)")
 
     conn.commit()
     conn.close()
