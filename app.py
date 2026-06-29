@@ -3937,18 +3937,44 @@ def upload_proof_of_payment():
 
     if proof_file and proof_file.filename:
 
-        proof_filename = upload_photo(proof_file, folder="fcci_proof_of_payment") or ""
+        # I-validate na image lang ang tinatanggap (hindi PDF
+        # o ibang file type na hindi dapat)
+        allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf'}
+        import os as _os
+        ext = _os.path.splitext(proof_file.filename)[1].lower()
+
+        if ext not in allowed_extensions:
+            return redirect(f"/registration_confirmation/{member_id}")
 
         conn = get_db()
         cursor = conn.cursor()
 
+        # I-check muna kung may existing na proof — kung meron,
+        # hindi na nag-uupload ng bago para maiwasan ang duplicates
+        # sa Cloudinary at sa database
         cursor.execute("""
-        UPDATE members
-        SET proof_of_payment = %s
-        WHERE member_id = %s
-        """, (proof_filename, member_id))
+        SELECT proof_of_payment FROM members WHERE member_id = %s
+        """, (member_id,))
+        row = cursor.fetchone()
+        existing_proof = row[0] if row else None
 
-        conn.commit()
+        if existing_proof:
+            # May proof na — hindi na mag-uupload ng bago
+            conn.close()
+            return redirect(f"/registration_confirmation/{member_id}")
+
+        # Wala pang proof — i-upload ang bago
+        proof_filename = upload_photo(proof_file, folder="fcci_proof_of_payment") or ""
+
+        if proof_filename:
+            cursor.execute("""
+            UPDATE members
+            SET proof_of_payment = %s
+            WHERE member_id = %s
+            """, (proof_filename, member_id))
+
+            conn.commit()
+
         conn.close()
 
     return redirect(f"/registration_confirmation/{member_id}")
