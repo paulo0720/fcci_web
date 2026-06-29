@@ -303,25 +303,20 @@ def member_registration():
             conn = get_db()
             cursor = conn.cursor()
             try:
+                # SQL MAX para sa APP ID — mas mabilis, FOR UPDATE
+                # para atomic (walang race condition)
                 cursor.execute("""
-                SELECT member_id
+                SELECT COALESCE(
+                    MAX(CAST(SPLIT_PART(member_id, '-', 3) AS INTEGER)),
+                    0
+                )
                 FROM members
                 WHERE member_id LIKE 'APP-%%'
                 FOR UPDATE
                 """)
-                existing_app_ids = cursor.fetchall()
-
-                highest_num = 0
-                for row in existing_app_ids:
-                    try:
-                        num_part = int(row[0].split("-")[-1])
-                        if num_part > highest_num:
-                            highest_num = num_part
-                    except (ValueError, IndexError):
-                        continue
-
-                count = highest_num + 1
-                member_id = f"APP-{datetime.now().year}-{count:06d}"
+                highest_num = cursor.fetchone()[0]
+                count       = highest_num + 1
+                member_id   = f"APP-{datetime.now().year}-{count:06d}"
 
                 cursor.execute("""
                 INSERT INTO members
@@ -719,29 +714,16 @@ def add_member():
         # dapat mag-bayad muna ng Registration Fee bago maging
         # Active member, gaya ng public registration flow)
         cursor.execute("""
-        SELECT member_id
+        SELECT COALESCE(
+            MAX(CAST(SPLIT_PART(member_id, '-', 3) AS INTEGER)),
+            0
+        )
         FROM members
         WHERE member_id LIKE 'APP-%%'
         """)
-
-        existing_app_ids = cursor.fetchall()
-
-        highest_num = 0
-        for row in existing_app_ids:
-            try:
-                num_part = int(row[0].split("-")[-1])
-                if num_part > highest_num:
-                    highest_num = num_part
-            except (ValueError, IndexError):
-                continue
-
-        next_no = highest_num + 1
-
-        current_year = datetime.now().year
-
-        member_id = (
-            f"APP-{current_year}-{next_no:06d}"
-        )
+        highest_num = cursor.fetchone()[0]
+        next_no     = highest_num + 1
+        member_id   = f"APP-{datetime.now().year}-{next_no:06d}"
         full_name = request.form["full_name"]
         contact = request.form["contact"]
         birthday = request.form["birthday"]
@@ -1145,20 +1127,16 @@ def payments():
         # approve_applicant route
         if payment_type == "Registration Fee" and member_id.startswith("APP-"):
 
-            # Hanapin ang pinakamataas na FCCI number
+            # SQL MAX para sa FCCI ID — mas mabilis kaysa Python loop
             cursor.execute("""
-            SELECT member_id FROM members WHERE member_id LIKE 'FCCI-%%'
+            SELECT COALESCE(
+                MAX(CAST(SPLIT_PART(member_id, '-', 3) AS INTEGER)),
+                0
+            )
+            FROM members
+            WHERE member_id LIKE 'FCCI-%%'
             """)
-            existing_fcci = cursor.fetchall()
-            highest_num = 0
-            for row in existing_fcci:
-                try:
-                    num_part = int(row[0].split("-")[-1])
-                    if num_part > highest_num:
-                        highest_num = num_part
-                except (ValueError, IndexError):
-                    continue
-
+            highest_num   = cursor.fetchone()[0]
             new_member_id = f"FCCI-{datetime.now().year}-{highest_num + 1:06d}"
 
             # Gamitin ang payment month/year bilang member_since
@@ -1291,21 +1269,17 @@ def delete_payment(payment_id):
         # i-revert siya pabalik sa APP- at Applicant status
         if payment_type == "Registration Fee" and paid_member_id.startswith("FCCI-"):
 
-            # Hanapin ang pinakamataas na existing APP- number
+            # SQL MAX para sa APP ID — mas mabilis at mas tama
             cursor.execute("""
-            SELECT member_id FROM members WHERE member_id LIKE 'APP-%%'
+            SELECT COALESCE(
+                MAX(CAST(SPLIT_PART(member_id, '-', 3) AS INTEGER)),
+                0
+            )
+            FROM members
+            WHERE member_id LIKE 'APP-%%'
             """)
-            existing_app = cursor.fetchall()
-            highest_num = 0
-            for row in existing_app:
-                try:
-                    num_part = int(row[0].split("-")[-1])
-                    if num_part > highest_num:
-                        highest_num = num_part
-                except (ValueError, IndexError):
-                    continue
-
-            new_app_id = f"APP-{datetime.now().year}-{highest_num + 1:06d}"
+            highest_num = cursor.fetchone()[0]
+            new_app_id  = f"APP-{datetime.now().year}-{highest_num + 1:06d}"
 
             # I-revert ang member sa APP- at Applicant status
             cursor.execute("""
@@ -3909,68 +3883,73 @@ def approve_applicant(member_id):
         return_db(conn)
         return redirect("/registration_approval")
 
-    full_name = applicant_info[0]
-    email = applicant_info[1]
-    # Gamitin ang member_since na nilagay ng applicant sa
-    # registration form — kung wala, gamitin ang current month
+    full_name           = applicant_info[0]
+    email               = applicant_info[1]
     stored_member_since = applicant_info[2]
 
-    # ── STEP 2: Generate bagong FCCI- member ID ───────────────
-    # Gamitin ang MAX existing FCCI number para hindi mag-clash
+    # ── STEP 2: I-check kung may existing na Registration Fee ──
+    # Para maiwasan ang duplicate kapag nag-double click ang admin
+    # o nag-retry ang browser
     cursor.execute("""
-    SELECT member_id FROM members WHERE member_id LIKE 'FCCI-%%'
+    SELECT 1 FROM payments
+    WHERE member_id = %s
+    AND payment_type = 'Registration Fee'
+    LIMIT 1
+    """, (member_id,))
+
+    if cursor.fetchone():
+        # May registration fee na — huwag nang gumawa ulit
+        print(f"[APPROVE] Duplicate registration fee blocked for {member_id}")
+        return_db(conn)
+        return redirect("/registration_approval")
+
+    # ── STEP 3: Generate bagong FCCI- ID gamit ang SQL MAX ────
+    # Mas mabilis at mas tama kaysa Python loop
+    cursor.execute("""
+    SELECT COALESCE(
+        MAX(CAST(SPLIT_PART(member_id, '-', 3) AS INTEGER)),
+        0
+    )
+    FROM members
+    WHERE member_id LIKE 'FCCI-%%'
     """)
-    existing_fcci = cursor.fetchall()
-
-    highest_num = 0
-    for row in existing_fcci:
-        try:
-            num_part = int(row[0].split("-")[-1])
-            if num_part > highest_num:
-                highest_num = num_part
-        except (ValueError, IndexError):
-            continue
-
+    highest_num   = cursor.fetchone()[0]
     new_member_id = f"FCCI-{datetime.now().year}-{highest_num + 1:06d}"
-    now = datetime.now()
-    # Gamitin ang stored member_since kung may nalagay ang applicant,
-    # otherwise gamitin ang current month ng approval
+
+    now          = datetime.now()
     member_since = stored_member_since if stored_member_since else now.strftime("%B %Y")
     payment_date = now.strftime("%Y-%m-%d")
 
-    # ── STEP 3: I-update ang member record ────────────────────
+    # ── STEP 4: I-update ang member record ────────────────────
     cursor.execute("""
     UPDATE members
-    SET
-        member_id = %s,
-        status = 'Active',
+    SET member_id        = %s,
+        status           = 'Active',
         registration_fee = 20000,
-        member_since = %s
+        member_since     = %s
     WHERE member_id = %s
     """, (new_member_id, member_since, member_id))
 
-    # ── STEP 4: I-update ang member_photos table ──────────────
+    # ── STEP 5: I-update ang member_photos table ──────────────
     cursor.execute("""
     UPDATE member_photos
     SET member_id = %s
     WHERE member_id = %s
     """, (new_member_id, member_id))
 
-    # ── STEP 5: Gumawa ng payment record (Registration Fee) ───
-    # I-parse ang member_since para makuha ang month at year
-    # (hal. "May 2026" → month="May", year="2026")
+    # ── STEP 6: Gumawa ng payment record (Registration Fee) ───
     try:
         since_parts = member_since.split()
-        pay_month = since_parts[0]  # hal. "May"
-        pay_year = since_parts[1]   # hal. "2026"
+        pay_month   = since_parts[0]
+        pay_year    = since_parts[1]
     except:
         pay_month = now.strftime("%B")
-        pay_year = str(now.year)
+        pay_year  = str(now.year)
 
     cursor.execute("""
     SELECT COALESCE(MAX(id), 0) FROM payments
     """)
-    pay_count = cursor.fetchone()[0] + 1
+    pay_count  = cursor.fetchone()[0] + 1
     receipt_no = f"RCPT-{datetime.now().year}-{pay_count:06d}"
 
     cursor.execute("""
@@ -3979,24 +3958,20 @@ def approve_applicant(member_id):
      payment_year, payment_month)
     VALUES (%s, %s, %s, %s, %s, %s, %s)
     """, (
-        receipt_no,
-        new_member_id,
-        "Registration Fee",
-        20000,
-        payment_date,
-        pay_year,
-        pay_month
+        receipt_no, new_member_id, "Registration Fee",
+        20000, payment_date, pay_year, pay_month
     ))
 
     conn.commit()
     return_db(conn)
 
-    # ── STEP 6: Magpadala ng welcome email (background) ───────
+    # ── STEP 7: Magpadala ng welcome email (background) ───────
     if email:
         try:
             send_welcome_email(email, full_name, new_member_id)
+            print(f"[EMAIL] Welcome email sent to {email} for {new_member_id}")
         except Exception as e:
-            print(f"[EMAIL] Failed to send welcome email: {e}")
+            print(f"[EMAIL] Failed to send welcome email to {email}: {e}")
 
     return redirect("/registration_approval")
 
