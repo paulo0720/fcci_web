@@ -562,10 +562,12 @@ def members():
             member_since
         FROM members
         WHERE
-            member_id LIKE %s
-            OR full_name LIKE %s
+            member_id ILIKE %s
+            OR full_name ILIKE %s
+            OR contact ILIKE %s
         ORDER BY full_name
         """, (
+            f"%{search}%",
             f"%{search}%",
             f"%{search}%"
         ))
