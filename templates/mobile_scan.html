@@ -55,6 +55,14 @@ h2 { font-size:18px; font-weight:700; color:var(--emerald-deep); margin-bottom:4
 .invalid-box h3 { color:#c0392b; margin-bottom:8px; }
 .invalid-box p { font-size:13.5px; color:var(--text-dim); }
 </style>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#00562a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FCCI">
+  <link rel="apple-touch-icon" href="/static/fcci_logo.jpeg">
 </head>
 <body>
 
@@ -116,5 +124,13 @@ scanner.render(onScanSuccess);
 
 {% endif %}
 
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+  });
+}
+</script>
 </body>
 </html>

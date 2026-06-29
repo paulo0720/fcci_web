@@ -79,6 +79,14 @@
   .admin-link a { color:var(--text-dim); text-decoration:none; }
   .admin-link a:hover { color:var(--emerald-deep); }
 </style>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#00562a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FCCI">
+  <link rel="apple-touch-icon" href="/static/fcci_logo.jpeg">
 </head>
 <body>
 
@@ -113,5 +121,13 @@
   </div>
 </div>
 
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+  });
+}
+</script>
 </body>
 </html>

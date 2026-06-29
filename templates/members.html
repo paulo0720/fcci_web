@@ -124,10 +124,53 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
 .scan-fab:hover { background:rgba(0,196,106,0.12); }
 #readerBox { display:none; margin-bottom:16px; border-radius:14px; overflow:hidden; }
 </style>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#00562a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FCCI">
+  <link rel="apple-touch-icon" href="/static/fcci_logo.jpeg">
+  <!-- Responsive CSS -->
+  <link rel="stylesheet" href="/static/fcci_responsive.css">
 </head>
 <body>
+<!-- Mobile Topbar -->
+<div class="mobile-topbar">
+  <button class="hamburger-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
+  <span class="mobile-topbar-title">Members</span>
+  <div style="width:40px;"></div>
+</div>
 
-<div class="sidebar">
+<!-- Sidebar Overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <a href="/dashboard" class="">
+    <span class="bn-icon">⬡</span>
+    <span class="bn-label">Home</span>
+  </a>
+  <a href="/members" class="active">
+    <span class="bn-icon">👥</span>
+    <span class="bn-label">Members</span>
+  </a>
+  <a href="/payments" class="">
+    <span class="bn-icon">💰</span>
+    <span class="bn-label">Payments</span>
+  </a>
+  <a href="/admin_feed" class="">
+    <span class="bn-icon">📰</span>
+    <span class="bn-label">Feed</span>
+  </a>
+  <a href="/attendance" class="">
+    <span class="bn-icon">⋯</span>
+    <span class="bn-label">More</span>
+  </a>
+</div>
+
+<div class="sidebar" id="sidebar">
   <div class="sidebar-brand">
     <div class="brand-logo-ring"><img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI"></div>
     <div class="brand-name">FCCI</div>
@@ -360,5 +403,31 @@ function updateSelectedCount() {
 }
 </script>
 
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+  });
+}
+function toggleSidebar() {
+  const s = document.getElementById("sidebar");
+  const o = document.getElementById("sidebarOverlay");
+  const b = document.getElementById("menuBtn");
+  const open = s.classList.contains("open");
+  s.classList.toggle("open", !open);
+  o.classList.toggle("show", !open);
+  b.textContent = open ? "☰" : "✕";
+}
+function closeSidebar() {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("sidebarOverlay").classList.remove("show");
+  const b = document.getElementById("menuBtn");
+  if (b) b.textContent = "☰";
+}
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 767) closeSidebar();
+});
+</script>
 </body>
 </html>
