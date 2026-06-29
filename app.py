@@ -1173,7 +1173,7 @@ def payments():
             WHERE member_id LIKE 'FCCI-%%'
             """)
             highest_num   = cursor.fetchone()[0]
-            new_member_id = f"FCCI-{datetime.now().year}-{highest_num + 1:06d}"
+            new_member_id = f"FCCI-2026-{highest_num + 1:06d}"
 
             # Gamitin ang payment month/year bilang member_since
             # — ito ang "totoo" na petsa ng pagpasok, hindi yung
@@ -3909,9 +3909,14 @@ def approve_applicant(member_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    # ── STEP 1: Kunin ang member details ──────────────────────
+    # ── STEP 1: Lock ang member row para walang race condition ──
+    # Kapag dalawang admin nag-approve sabay, ang FOR UPDATE
+    # ay magse-serialize — isa lang ang makakapag-proceed
     cursor.execute("""
-    SELECT full_name, email, member_since FROM members WHERE member_id = %s
+    SELECT full_name, email, member_since, status
+    FROM members
+    WHERE member_id = %s
+    FOR UPDATE
     """, (member_id,))
     applicant_info = cursor.fetchone()
 
@@ -3922,10 +3927,14 @@ def approve_applicant(member_id):
     full_name           = applicant_info[0]
     email               = applicant_info[1]
     stored_member_since = applicant_info[2]
+    current_status      = applicant_info[3]
+
+    # Kung Active na (na-approve na ng ibang admin), tumigil na
+    if current_status != "Applicant":
+        return_db(conn)
+        return redirect("/registration_approval")
 
     # ── STEP 2: I-check kung may existing na Registration Fee ──
-    # Para maiwasan ang duplicate kapag nag-double click ang admin
-    # o nag-retry ang browser
     cursor.execute("""
     SELECT 1 FROM payments
     WHERE member_id = %s
@@ -3934,7 +3943,6 @@ def approve_applicant(member_id):
     """, (member_id,))
 
     if cursor.fetchone():
-        # May registration fee na — huwag nang gumawa ulit
         print(f"[APPROVE] Duplicate registration fee blocked for {member_id}")
         return_db(conn)
         return redirect("/registration_approval")
@@ -3950,7 +3958,7 @@ def approve_applicant(member_id):
     WHERE member_id LIKE 'FCCI-%%'
     """)
     highest_num   = cursor.fetchone()[0]
-    new_member_id = f"FCCI-{datetime.now().year}-{highest_num + 1:06d}"
+    new_member_id = f"FCCI-2026-{highest_num + 1:06d}"
 
     now          = datetime.now()
     member_since = stored_member_since if stored_member_since else now.strftime("%B %Y")
@@ -3998,7 +4006,16 @@ def approve_applicant(member_id):
         20000, payment_date, pay_year, pay_month
     ))
 
-    conn.commit()
+    try:
+        conn.commit()
+    except Exception as e:
+        # Kung mag-disconnect ang Supabase sa gitna,
+        # i-rollback lahat para walang partial data
+        conn.rollback()
+        return_db(conn)
+        print(f"[APPROVE ERROR] Transaction failed for {member_id}: {e}")
+        return redirect("/registration_approval")
+
     return_db(conn)
 
     # ── STEP 7: Magpadala ng welcome email (background) ───────
@@ -4070,18 +4087,27 @@ def registration_confirmation(member_id):
 @app.route("/upload_proof_of_payment", methods=["POST"])
 def upload_proof_of_payment():
 
-    member_id = request.form["member_id"]
+    member_id  = request.form["member_id"]
     proof_file = request.files.get("proof_of_payment")
 
     if proof_file and proof_file.filename:
 
-        # I-validate na image lang ang tinatanggap (hindi PDF
-        # o ibang file type na hindi dapat)
         allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf'}
         import os as _os
         ext = _os.path.splitext(proof_file.filename)[1].lower()
 
         if ext not in allowed_extensions:
+            return redirect(f"/registration_confirmation/{member_id}")
+
+        # ── FILE SIZE LIMIT: max 10MB ────────────────────────
+        # I-read ang file content at i-check ang size
+        # bago mag-upload sa Cloudinary
+        proof_file.seek(0, 2)  # Pumunta sa dulo ng file
+        file_size = proof_file.tell()
+        proof_file.seek(0)     # Bumalik sa simula
+
+        max_size = 10 * 1024 * 1024  # 10MB
+        if file_size > max_size:
             return redirect(f"/registration_confirmation/{member_id}")
 
         conn = get_db()
@@ -4982,12 +5008,30 @@ def get_all_users():
 @app.route("/member_login", methods=["GET", "POST"])
 def member_login():
 
+    # ── RATE LIMITING — max 5 attempts per IP per 5 minutes ──
+    # Ginagamit ang Flask session para i-track ang failed attempts
+    # Simple pero epektibo para sa FCCI's scale
+    if "login_attempts" not in session:
+        session["login_attempts"] = 0
+        session["login_lockout_until"] = 0
+
+    import time
+    now_ts = time.time()
+
+    # I-check kung naka-lockout
+    if session.get("login_lockout_until", 0) > now_ts:
+        remaining = int(session["login_lockout_until"] - now_ts)
+        return render_template(
+            "member_login.html",
+            error=f"Napakaraming maling pagsubok. Subukan ulit pagkatapos ng {remaining} segundo."
+        )
+
     if request.method == "POST":
 
-        member_id = request.form["member_id"].strip()
-        birthday_input = request.form["birthday"]  # format: YYYY-MM-DD mula sa <input type="date">
+        member_id      = request.form["member_id"].strip()
+        birthday_input = request.form["birthday"]
 
-        conn = get_db()
+        conn   = get_db()
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -5000,18 +5044,29 @@ def member_login():
         return_db(conn)
 
         if not member:
+            session["login_attempts"] = session.get("login_attempts", 0) + 1
+            if session["login_attempts"] >= 5:
+                session["login_lockout_until"] = now_ts + 300  # 5 minuto
+                session["login_attempts"] = 0
             return render_template(
                 "member_login.html",
                 error="Member ID na hindi natagpuan. Pakitiyak na tama ang inilagay mo."
             )
 
         stored_birthday = member[2]
-        status = member[3]
+        status          = member[3]
 
-        # I-normalize ang dalawang birthday format papuntang YYYY-MM-DD bago icompare
         normalized_stored = normalize_birthday(stored_birthday)
 
         if normalized_stored != birthday_input:
+            session["login_attempts"] = session.get("login_attempts", 0) + 1
+            if session["login_attempts"] >= 5:
+                session["login_lockout_until"] = now_ts + 300  # 5 minuto
+                session["login_attempts"] = 0
+                return render_template(
+                    "member_login.html",
+                    error="Napakaraming maling pagsubok. Sandali lang at subukan ulit."
+                )
             return render_template(
                 "member_login.html",
                 error="Maling Member ID o Birthday. Subukan ulit."
