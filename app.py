@@ -83,13 +83,13 @@ def get_db():
 def return_db(conn):
     """
     I-return ang koneksyon sa pool pagkatapos gamitin.
-    Tawagan ito imbes na conn.close() para ma-reuse ang koneksyon.
+    Tawagan ito imbes na return_db(conn) para ma-reuse ang koneksyon.
     """
     try:
         get_pool().putconn(conn)
     except Exception:
         try:
-            conn.close()
+            return_db(conn)
         except Exception:
             pass
 
@@ -168,7 +168,7 @@ def download_photo_for_pdf(member_id):
         ORDER BY id DESC LIMIT 1
         """, (member_id,))
         photo_row = cursor.fetchone()
-        conn.close()
+        return_db(conn)
 
         if photo_row and photo_row[0]:
             photo_url = photo_row[0]
@@ -210,7 +210,7 @@ def login():
         """, (username,))
 
         user = cursor.fetchone()
-        conn.close()
+        return_db(conn)
 
         # Supports both hashed and plain passwords (para hindi masisira ang existing users)
         if user:
@@ -310,12 +310,12 @@ def member_registration():
                     """, (member_id, photo_filename))
 
                 conn.commit()
-                conn.close()
+                return_db(conn)
                 break  # Matagumpay — lumabas sa retry loop
 
             except Exception as e:
                 conn.rollback()
-                conn.close()
+                return_db(conn)
                 if "unique" in str(e).lower() and attempt < max_retries - 1:
                     # Duplicate member_id — subukan ulit
                     import time
@@ -507,7 +507,7 @@ def dashboard():
     # I-sort: today first, then by day of month
     birthday_list.sort(key=lambda x: (not x["is_today"], x["day"]))
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "dashboard.html",
@@ -676,7 +676,7 @@ def members():
 
     members = updated_members
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "members.html",
@@ -782,7 +782,7 @@ def add_member():
             """, (member_id, photo_filename))
 
         conn.commit()
-        conn.close()
+        return_db(conn)
 
         return redirect("/members")
 
@@ -841,7 +841,7 @@ def edit_member(member_id):
         ))
 
         conn.commit()
-        conn.close()
+        return_db(conn)
 
         return redirect(
             f"/view_member/{member_id}"
@@ -849,7 +849,7 @@ def edit_member(member_id):
 
     member = fetch_member_with_photo(cursor, member_id)
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "edit_member.html",
@@ -904,7 +904,7 @@ def delete_member(member_id):
     """, (member_id,))
 
     conn.commit()
-    conn.close()
+    return_db(conn)
 
     return redirect("/members")
 
@@ -920,7 +920,7 @@ def view_member(member_id):
 
     member = fetch_member_with_photo(cursor, member_id)
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "view_member.html",
@@ -956,7 +956,7 @@ def check_duplicate_payment():
         """, (member_id,))
 
         count = cursor.fetchone()[0]
-        conn.close()
+        return_db(conn)
 
         if count > 0:
             return jsonify({
@@ -976,7 +976,7 @@ def check_duplicate_payment():
         """, (member_id, payment_month, payment_year))
 
         count = cursor.fetchone()[0]
-        conn.close()
+        return_db(conn)
 
         if count > 0:
             return jsonify({
@@ -1019,7 +1019,7 @@ def search_member_payments():
     """, (f"%{search_term}%",))
 
     rows = cursor.fetchall()
-    conn.close()
+    return_db(conn)
 
     results = []
     for r in rows:
@@ -1088,7 +1088,7 @@ def payments():
 
         if exists == 0:
 
-            conn.close()
+            return_db(conn)
 
             return "Member ID Not Found"
 
@@ -1238,7 +1238,7 @@ def payments():
 
     payment_history = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "payments.html",
@@ -1319,7 +1319,7 @@ def delete_payment(payment_id):
             print(f"[REVERT] {paid_member_id} → {new_app_id} (Applicant)")
 
     conn.commit()
-    conn.close()
+    return_db(conn)
 
     return redirect("/payments")
 
@@ -1337,7 +1337,7 @@ def member_id_card(member_id):
 
     member = fetch_member_with_photo(cursor, member_id)
 
-    conn.close()
+    return_db(conn)
 
     if not member:
         return "Member Not Found"
@@ -1388,7 +1388,7 @@ def bulk_id_cards():
                 "qr_file": f"{mid}.png"
             })
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "bulk_id_cards.html",
@@ -1471,7 +1471,7 @@ def expenses():
 
     expense_history = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "expenses.html",
@@ -1536,7 +1536,7 @@ def donations():
 
     donation_history = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "donations.html",
@@ -1581,7 +1581,7 @@ def export_members():
 
     rows = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     wb = Workbook()
 
@@ -1646,7 +1646,7 @@ def export_payments():
 
     rows = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     wb = Workbook()
 
@@ -1709,7 +1709,7 @@ def export_donations():
 
     rows = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     wb = Workbook()
 
@@ -1774,7 +1774,7 @@ def donation_certificate(donation_id):
 
     donation = cursor.fetchone()
 
-    conn.close()
+    return_db(conn)
 
     if not donation:
         return "Donation Not Found"
@@ -1935,7 +1935,7 @@ def export_expenses():
 
     rows = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     wb = Workbook()
 
@@ -2006,7 +2006,7 @@ def export_attendance():
 
     rows = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     wb = Workbook()
 
@@ -2157,7 +2157,7 @@ def export_monitoring():
             row["Dec"]
         ])
 
-    conn.close()
+    return_db(conn)
 
     export_dir = "exports"
 
@@ -2315,7 +2315,7 @@ def attendance():
         cursor.fetchall()
     )
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "attendance.html",
@@ -2422,7 +2422,7 @@ def qr_attendance():
 
                     conn.commit()
 
-            conn.close()
+            return_db(conn)
 
             break
 
@@ -2488,7 +2488,7 @@ def qr_attendance_scan():
 
     if not member:
 
-        conn.close()
+        return_db(conn)
 
         return {
             "success":False,
@@ -2533,7 +2533,7 @@ def qr_attendance_scan():
 
         else:
 
-            conn.close()
+            return_db(conn)
 
             return {
                 "success":True,
@@ -2575,7 +2575,7 @@ def qr_attendance_scan():
 
     count = cursor.fetchone()[0]
 
-    conn.close()
+    return_db(conn)
 
     return {
         "success":True,
@@ -2597,7 +2597,7 @@ def member_profile(member_id):
 
     if not member:
 
-        conn.close()
+        return_db(conn)
         return "Member Not Found"
 
     cursor.execute("""
@@ -2633,7 +2633,7 @@ def member_profile(member_id):
 
     attendance = cursor.fetchone()
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "member_profile.html",
@@ -2736,7 +2736,7 @@ def withdrawals():
 
                 conn.commit()
 
-                conn.close()
+                return_db(conn)
 
                 return redirect(
                     "/withdrawals"
@@ -2752,7 +2752,7 @@ def withdrawals():
         cursor.fetchall()
     )
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "withdrawals.html",
@@ -2804,7 +2804,7 @@ def withdrawal_certificate(member_id):
     member = cursor.fetchone()
 
     if not member:
-        conn.close()
+        return_db(conn)
         return "Member Not Found"
     
     cursor.execute("""
@@ -2829,7 +2829,7 @@ def withdrawal_certificate(member_id):
         - refund_amount
     )
 
-    conn.close()
+    return_db(conn)
 
     os.makedirs(
         "exports",
@@ -3058,7 +3058,7 @@ def member_profile_pdf(member_id):
 
     if not member:
 
-        conn.close()
+        return_db(conn)
 
         return "Member Not Found"
 
@@ -3093,7 +3093,7 @@ def member_profile_pdf(member_id):
 
     payments = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     os.makedirs(
         "exports",
@@ -3368,7 +3368,7 @@ def dashboard_outstanding():
                 "amount": len(missing_months)*10000
             })
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "dashboard_outstanding.html",
@@ -3494,7 +3494,7 @@ def dashboard_active():
                 )
             )
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "dashboard_active.html",
@@ -3618,7 +3618,7 @@ def dashboard_inactive():
                 )
             )
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "dashboard_inactive.html",
@@ -3703,7 +3703,7 @@ def dashboard_applicants():
 
     applicants = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "dashboard_applicants.html",
@@ -3774,7 +3774,7 @@ def export_pdf_report():
         expenses
     )
 
-    conn.close()
+    return_db(conn)
 
     os.makedirs(
         "exports",
@@ -3892,7 +3892,7 @@ def approve_applicant(member_id):
     applicant_info = cursor.fetchone()
 
     if not applicant_info:
-        conn.close()
+        return_db(conn)
         return redirect("/registration_approval")
 
     full_name = applicant_info[0]
@@ -3975,7 +3975,7 @@ def approve_applicant(member_id):
     ))
 
     conn.commit()
-    conn.close()
+    return_db(conn)
 
     # ── STEP 6: Magpadala ng welcome email (background) ───────
     if email:
@@ -4006,7 +4006,7 @@ def reject_applicant(member_id):
     ))
 
     conn.commit()
-    conn.close()
+    return_db(conn)
 
     return redirect(
         "/registration_approval"
@@ -4025,7 +4025,7 @@ def registration_confirmation(member_id):
     """, (member_id,))
 
     row = cursor.fetchone()
-    conn.close()
+    return_db(conn)
 
     if not row:
         return "Applicant Not Found"
@@ -4073,7 +4073,7 @@ def upload_proof_of_payment():
 
         if existing_proof:
             # May proof na — hindi na mag-uupload ng bago
-            conn.close()
+            return_db(conn)
             return redirect(f"/registration_confirmation/{member_id}")
 
         # Wala pang proof — i-upload ang bago
@@ -4088,7 +4088,7 @@ def upload_proof_of_payment():
 
             conn.commit()
 
-        conn.close()
+        return_db(conn)
 
     return redirect(f"/registration_confirmation/{member_id}")
 
@@ -4110,7 +4110,7 @@ def applicant_slip(member_id):
 
     member = cursor.fetchone()
 
-    conn.close()
+    return_db(conn)
 
     if not member:
         return "Applicant Not Found"
@@ -4262,7 +4262,7 @@ def registration_approval():
         where_clause="status='Applicant'"
     )
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "registration_approval.html",
@@ -4285,7 +4285,7 @@ def get_member_info(member_id):
     """, (member_id,))
  
     member = cursor.fetchone()
-    conn.close()
+    return_db(conn)
  
     if not member:
         return jsonify({"found": False})
@@ -4343,7 +4343,7 @@ def create_pair_session():
     """, (pair_code, target_page))
 
     conn.commit()
-    conn.close()
+    return_db(conn)
 
     return jsonify({"pair_code": pair_code})
 
@@ -4359,7 +4359,7 @@ def mobile_scan(pair_code):
         (pair_code,)
     )
     session_row = cursor.fetchone()
-    conn.close()
+    return_db(conn)
 
     if not session_row:
         return render_template(
@@ -4395,7 +4395,7 @@ def submit_mobile_scan():
     """, (scanned_value, pair_code))
 
     conn.commit()
-    conn.close()
+    return_db(conn)
 
     return jsonify({"success": True})
 
@@ -4422,10 +4422,10 @@ def check_pair_scan(pair_code):
         UPDATE pairing_sessions SET scanned_value = NULL WHERE pair_code = %s
         """, (pair_code,))
         conn.commit()
-        conn.close()
+        return_db(conn)
         return jsonify({"has_scan": True, "value": row[0]})
 
-    conn.close()
+    return_db(conn)
     return jsonify({"has_scan": False})
 
 
@@ -4441,7 +4441,7 @@ def settings():
     cursor.execute("SELECT username, role FROM users ORDER BY username")
     all_users = cursor.fetchall()
  
-    conn.close()
+    return_db(conn)
  
     return render_template(
         "settings.html",
@@ -4470,7 +4470,7 @@ def change_username():
     row = cursor.fetchone()
  
     if not row:
-        conn.close()
+        return_db(conn)
         return redirect("/login")
  
     stored_password = row[0]
@@ -4482,7 +4482,7 @@ def change_username():
         password_ok = (stored_password == current_password)
  
     if not password_ok:
-        conn.close()
+        return_db(conn)
         return render_template(
             "settings.html",
             username=session["username"],
@@ -4498,7 +4498,7 @@ def change_username():
     taken = cursor.fetchone()[0]
  
     if taken > 0 and new_username != session["username"]:
-        conn.close()
+        return_db(conn)
         return render_template(
             "settings.html",
             username=session["username"],
@@ -4512,7 +4512,7 @@ def change_username():
         (new_username, session["username"])
     )
     conn.commit()
-    conn.close()
+    return_db(conn)
  
     session["username"] = new_username
  
@@ -4541,7 +4541,7 @@ def change_password():
     row = cursor.fetchone()
  
     if not row:
-        conn.close()
+        return_db(conn)
         return redirect("/login")
  
     stored_password = row[0]
@@ -4552,7 +4552,7 @@ def change_password():
         password_ok = (stored_password == current_password)
  
     if not password_ok:
-        conn.close()
+        return_db(conn)
         cursor2 = get_db().cursor()
         cursor2.execute("SELECT username, role FROM users ORDER BY username")
         all_users = cursor2.fetchall()
@@ -4564,7 +4564,7 @@ def change_password():
         )
  
     if new_password != confirm_password:
-        conn.close()
+        return_db(conn)
         cursor2 = get_db().cursor()
         cursor2.execute("SELECT username, role FROM users ORDER BY username")
         all_users = cursor2.fetchall()
@@ -4582,7 +4582,7 @@ def change_password():
         (hashed_password, session["username"])
     )
     conn.commit()
-    conn.close()
+    return_db(conn)
  
     cursor2 = get_db().cursor()
     cursor2.execute("SELECT username, role FROM users ORDER BY username")
@@ -4616,7 +4616,7 @@ def add_user():
     taken = cursor.fetchone()[0]
  
     if taken > 0:
-        conn.close()
+        return_db(conn)
         cursor2 = get_db().cursor()
         cursor2.execute("SELECT username, role FROM users ORDER BY username")
         all_users = cursor2.fetchall()
@@ -4634,7 +4634,7 @@ def add_user():
         (new_username, hashed_password, role)
     )
     conn.commit()
-    conn.close()
+    return_db(conn)
  
     cursor2 = get_db().cursor()
     cursor2.execute("SELECT username, role FROM users ORDER BY username")
@@ -4662,7 +4662,7 @@ def delete_donation(donation_id):
     )
  
     conn.commit()
-    conn.close()
+    return_db(conn)
  
     return redirect("/donations")
 
@@ -4731,6 +4731,10 @@ def merge_old_database(old_db_path):
     summary_parts = []
 
     def get_columns(cursor, table_name):
+        # Whitelist para maiwasan ang SQL injection
+        allowed = ["members","member_photos","payments","donations","expenses","attendance","feed_posts"]
+        if table_name not in allowed:
+            return []
         cursor.execute(f"PRAGMA table_info({table_name})")
         return [col[1] for col in cursor.fetchall()]
 
@@ -4753,6 +4757,7 @@ def merge_old_database(old_db_path):
         if "member_id" not in common_columns:
             summary_parts.append("Members: hindi na-merge — walang 'member_id' column na pareho sa dalawang database")
         else:
+            # common_columns comes from schema inspection, not user input
             old_cursor.execute(f"SELECT {', '.join(common_columns)} FROM members")
             old_members = old_cursor.fetchall()
 
@@ -4934,8 +4939,8 @@ def merge_old_database(old_db_path):
         summary_parts.append("Attendance: walang nahanap na table (okay lang, optional)")
 
     new_conn.commit()
-    new_conn.close()
-    old_conn.close()
+    new_return_db(conn)
+    old_return_db(conn)
 
     return "Matagumpay na na-merge ang backup! " + " | ".join(summary_parts)
 
@@ -4946,7 +4951,7 @@ def get_all_users():
     cursor = conn.cursor()
     cursor.execute("SELECT username, role FROM users ORDER BY username")
     users = cursor.fetchall()
-    conn.close()
+    return_db(conn)
     return users
 
 @app.route("/member_login", methods=["GET", "POST"])
@@ -4967,7 +4972,7 @@ def member_login():
         """, (member_id,))
 
         member = cursor.fetchone()
-        conn.close()
+        return_db(conn)
 
         if not member:
             return render_template(
@@ -5074,7 +5079,7 @@ def feed():
 
             conn.commit()
 
-        conn.close()
+        return_db(conn)
         return redirect("/feed")
 
     # GET request: kunin lahat ng posts, pinned muna, tapos pinaka-bago
@@ -5119,7 +5124,7 @@ def feed():
             "comments": comments
         })
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "feed.html",
@@ -5146,7 +5151,7 @@ def feed_delete_post(post_id):
     )
 
     conn.commit()
-    conn.close()
+    return_db(conn)
 
     return redirect("/feed")
 
@@ -5176,7 +5181,7 @@ def feed_like_post(post_id):
         )
 
     conn.commit()
-    conn.close()
+    return_db(conn)
 
     return redirect("/feed")
 
@@ -5209,7 +5214,7 @@ def feed_add_comment(post_id):
         ))
 
         conn.commit()
-        conn.close()
+        return_db(conn)
 
     return redirect("/feed")
 
@@ -5233,7 +5238,7 @@ def feed_pin_post(post_id):
         cursor.execute("UPDATE feed_posts SET is_pinned = %s WHERE id = %s", (new_value, post_id))
         conn.commit()
 
-    conn.close()
+    return_db(conn)
 
     # Ibalik sa pinanggalingang page (admin feed view o member feed)
     return redirect(request.referrer or "/feed")
@@ -5269,7 +5274,7 @@ def member_portal_profile():
     photo_row = cursor.fetchone()
     photo_path = photo_row[0] if photo_row else None
 
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "member_portal_profile.html",
@@ -5329,7 +5334,7 @@ def member_portal_edit():
                     """, (member_id, photo_url))
 
         conn.commit()
-        conn.close()
+        return_db(conn)
         return redirect("/member_portal_profile")
 
     # GET — ipakita ang edit form
@@ -5347,7 +5352,7 @@ def member_portal_edit():
     """, (member_id,))
     photo_row = cursor.fetchone()
     photo_path = photo_row[0] if photo_row else None
-    conn.close()
+    return_db(conn)
 
     return render_template(
         "member_portal_edit.html",
@@ -5372,7 +5377,7 @@ def admin_feed():
     """)
     posts = cursor.fetchall()
 
-    conn.close()
+    return_db(conn)
 
     return render_template("admin_feed.html", posts=posts, username=session["username"])
 
@@ -5413,7 +5418,7 @@ def admin_feed_post():
             now.strftime("%I:%M %p")
         ))
         conn.commit()
-        conn.close()
+        return_db(conn)
     return redirect("/admin_feed")
 
 
@@ -5425,7 +5430,7 @@ def admin_feed_delete(post_id):
     cursor = conn.cursor()
     cursor.execute("DELETE FROM feed_posts WHERE id = %s", (post_id,))
     conn.commit()
-    conn.close()
+    return_db(conn)
     return redirect("/admin_feed")
 
 if __name__ == "__main__":
@@ -5433,7 +5438,7 @@ if __name__ == "__main__":
     # ── TEST SUPABASE CONNECTION BAGO MAGSIMULA ──────────────
     try:
         test_conn = get_db()
-        test_conn.close()
+        test_return_db(conn)
         print("[SUPABASE] Matagumpay na nakakonekta sa Supabase database!")
     except Exception as conn_error:
         print(f"[SUPABASE] WARNING: Hindi makakonekta sa Supabase: {conn_error}")
