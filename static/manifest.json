@@ -1,0 +1,25 @@
+{
+  "name": "FCCI Member Management",
+  "short_name": "FCCI",
+  "description": "Filipino Community Center International - Member Management System",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f4fbf7",
+  "theme_color": "#00562a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/fcci_logo.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/fcci_logo.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"]
+}
