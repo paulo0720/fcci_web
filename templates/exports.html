@@ -135,8 +135,12 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
   <link rel="apple-touch-icon" href="/static/fcci_logo.jpeg">
   <!-- Responsive CSS -->
   <link rel="stylesheet" href="/static/fcci_responsive.css">
+
+  <link rel="stylesheet" href="/static/fcci_hud_theme.css">
 </head>
 <body>
+<div class="ambient-orb o1"></div>
+<div class="ambient-orb o2"></div>
 <!-- Mobile Topbar -->
 <div class="mobile-topbar">
   <button class="hamburger-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
@@ -247,5 +251,163 @@ window.addEventListener("resize", () => {
   if (window.innerWidth > 767) closeSidebar();
 });
 </script>
+<!-- ════════════════════════════════════════════════════════
+     FCCI AI ASSISTANT WIDGET (libre — keyword matching lang)
+     I-include ito sa lahat ng pages bago ang </body>
+════════════════════════════════════════════════════════ -->
+
+<button class="ai-launcher" id="aiLauncher" onclick="toggleAI()">
+  <div class="ai-launcher-ring"></div>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2a3 3 0 0 0-3 3v1.17A6 6 0 0 0 4 12v2a2 2 0 0 0-1 1.73v2a2 2 0 0 0 2 2h.18a3 3 0 0 0 5.64 0h2.36a3 3 0 0 0 5.64 0H19a2 2 0 0 0 2-2v-2a2 2 0 0 0-1-1.73v-2a6 6 0 0 0-5-5.83V5a3 3 0 0 0-3-3z"/>
+    <circle cx="9" cy="13" r="1"/>
+    <circle cx="15" cy="13" r="1"/>
+  </svg>
+  <div class="ai-launcher-dot"></div>
+</button>
+
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-panel-head">
+    <div class="ai-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2a3 3 0 0 0-3 3v1.17A6 6 0 0 0 4 12v2a2 2 0 0 0-1 1.73v2a2 2 0 0 0 2 2h.18a3 3 0 0 0 5.64 0h2.36a3 3 0 0 0 5.64 0H19a2 2 0 0 0 2-2v-2a2 2 0 0 0-1-1.73v-2a6 6 0 0 0-5-5.83V5a3 3 0 0 0-3-3z"/>
+        <circle cx="9" cy="13" r="1"/>
+        <circle cx="15" cy="13" r="1"/>
+      </svg>
+    </div>
+    <div class="ai-panel-titles">
+      <div class="ai-panel-name">FCCI Assistant</div>
+      <div class="ai-panel-status"><span class="ai-status-dot"></span> Online · Tagalog &amp; English</div>
+    </div>
+    <button class="ai-panel-close" onclick="toggleAI()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div class="ai-lang-toggle">
+    <button class="ai-lang-btn active" id="langTl" onclick="setLang('tl')">Tagalog</button>
+    <button class="ai-lang-btn" id="langEn" onclick="setLang('en')">English</button>
+  </div>
+
+  <div class="ai-messages" id="aiMessages">
+    <div class="ai-msg bot">
+      <div class="ai-msg-av">AI</div>
+      <div class="ai-msg-bubble">Kumusta! Ako ang FCCI Assistant. Tanungin mo ako tungkol sa members, payments, o kahit anong feature ng system. 😊</div>
+    </div>
+  </div>
+
+  <div class="ai-suggestions" id="aiSuggestions">
+    <span class="ai-chip" onclick="askSuggested(this)">Paano mag-add ng member?</span>
+    <span class="ai-chip" onclick="askSuggested(this)">Paano mag-approve ng applicant?</span>
+    <span class="ai-chip" onclick="askSuggested(this)">Paano mag-record ng payment?</span>
+  </div>
+
+  <div class="ai-input-row">
+    <input type="text" class="ai-input" id="aiInput" placeholder="Mag-tanong dito..." onkeydown="if(event.key==='Enter')sendAI()">
+    <button class="ai-send" onclick="sendAI()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  let currentLang = 'tl';
+
+  function toggleAI() {
+    document.getElementById('aiPanel').classList.toggle('open');
+  }
+
+  function setLang(lang) {
+    currentLang = lang;
+    document.getElementById('langTl').classList.toggle('active', lang === 'tl');
+    document.getElementById('langEn').classList.toggle('active', lang === 'en');
+    const input = document.getElementById('aiInput');
+    input.placeholder = lang === 'tl' ? 'Mag-tanong dito...' : 'Ask me anything...';
+
+    const chips = document.querySelectorAll('.ai-chip');
+    const tlChips = ['Paano mag-add ng member?', 'Paano mag-approve ng applicant?', 'Paano mag-record ng payment?'];
+    const enChips = ['How do I add a member?', 'How do I approve an applicant?', 'How do I record a payment?'];
+    chips.forEach((c, i) => { if (tlChips[i]) c.textContent = lang === 'tl' ? tlChips[i] : enChips[i]; });
+  }
+
+  function askSuggested(el) {
+    const input = document.getElementById('aiInput');
+    input.value = el.textContent;
+    sendAI();
+  }
+
+  const FCCI_RESPONSES = {
+    tl: [
+      { match: ['add', 'member', 'dagdag', 'bagong miyembro'], reply: 'Para magdagdag ng bagong member: pumunta sa <strong>Members</strong> sa sidebar, i-click ang "Add Member" button, punan ang form (pangalan, contact, address, member since), at i-save. Awtomatikong gagawa ng APP- o FCCI- ID ang system.' },
+      { match: ['approve', 'applicant', 'aprubahan', 'aprob'], reply: 'Pumunta sa <strong>Reg. Approval</strong> sa sidebar. Makikita mo doon ang lahat ng applicants na may status na "Applicant". I-click ang "Approve" button para i-convert sila sa opisyal na FCCI member — awtomatikong gagawa ng FCCI ID, magse-set ng Registration Fee, at magpapadala ng welcome email.' },
+      { match: ['payment', 'bayad', 'magbayad', 'record payment'], reply: 'Pumunta sa <strong>Payments</strong> sa sidebar. I-type ang member ID o pangalan, piliin ang payment type (Monthly Contribution o Registration Fee), ilagay ang buwan at taon, tapos i-click ang "Save Payment".' },
+      { match: ['outstanding', 'balance', 'utang'], reply: 'Makikita mo ang mga miyembrong may outstanding balance sa <strong>Dashboard</strong>. Ang outstanding ay kinukwenta base sa bilang ng buwan na hindi pa nababayaran simula sa member since nila.' },
+      { match: ['export', 'report', 'i-download'], reply: 'Pumunta sa <strong>Export Center</strong> sa sidebar para mag-download ng reports.' },
+      { match: ['scan', 'qr'], reply: 'Sa Members o Payments page, i-click ang QR scanner icon para mag-pair ng phone camera at mabilis na ma-scan ang member ID.' },
+      { match: ['attendance', 'pumasok', 'present'], reply: 'Pumunta sa <strong>Attendance</strong> sa sidebar para mag-record ng attendance gamit ang QR scanner o manual entry.' },
+      { match: ['delete', 'tanggal', 'burahin'], reply: 'Sa Member Profile, may "Delete Member" button. Mag-iingat dahil permanente ito at matatanggal lahat ng kaugnay na records.' },
+      { match: ['edit', 'baguhin', 'palitan'], reply: 'Sa Member Profile, i-click ang "Edit Member" button para baguhin ang impormasyon tulad ng contact, address, o member since.' },
+      { match: ['withdraw', 'umalis', 'withdrawal'], reply: 'Pumunta sa <strong>Withdrawals</strong> sa sidebar para mag-process ng member withdrawal at makagawa ng withdrawal certificate.' },
+    ],
+    en: [
+      { match: ['add', 'member', 'new member'], reply: 'To add a new member: go to <strong>Members</strong> in the sidebar, click "Add Member", fill in the form (name, contact, address, member since), then save. The system will auto-generate an APP- or FCCI- ID.' },
+      { match: ['approve', 'applicant'], reply: 'Go to <strong>Reg. Approval</strong> in the sidebar. You\'ll see all applicants with "Applicant" status there. Click "Approve" to convert them to an official FCCI member — it auto-generates an FCCI ID, sets the Registration Fee, and sends a welcome email.' },
+      { match: ['payment', 'record payment'], reply: 'Go to <strong>Payments</strong> in the sidebar. Type the member ID or name, select payment type (Monthly Contribution or Registration Fee), enter the month and year, then click "Save Payment".' },
+      { match: ['outstanding', 'balance'], reply: 'You can find members with outstanding balances on the <strong>Dashboard</strong>. Outstanding is calculated based on the number of unpaid months since their member-since date.' },
+      { match: ['export', 'report'], reply: 'Go to <strong>Export Center</strong> in the sidebar to download reports.' },
+      { match: ['scan', 'qr'], reply: 'On the Members or Payments page, click the QR scanner icon to pair your phone camera for quick member ID scanning.' },
+      { match: ['attendance'], reply: 'Go to <strong>Attendance</strong> in the sidebar to record attendance using the QR scanner or manual entry.' },
+      { match: ['delete'], reply: 'On the Member Profile, there\'s a "Delete Member" button. Be careful as this is permanent and removes all related records.' },
+      { match: ['edit'], reply: 'On the Member Profile, click "Edit Member" to change information like contact, address, or member since.' },
+      { match: ['withdraw', 'withdrawal'], reply: 'Go to <strong>Withdrawals</strong> in the sidebar to process a member withdrawal and generate a withdrawal certificate.' },
+    ]
+  };
+
+  const AI_FALLBACK = {
+    tl: 'Pasensya na, hindi ko masyadong naintindihan iyan. Pwede mo bang i-rephrase, o piliin ang isa sa mga suggestion sa ibaba?',
+    en: "Sorry, I didn't quite catch that. Could you rephrase, or try one of the suggestions below?"
+  };
+
+  function findAIResponse(text, lang) {
+    const lower = text.toLowerCase();
+    const pool = FCCI_RESPONSES[lang];
+    for (const item of pool) {
+      if (item.match.some(k => lower.includes(k))) return item.reply;
+    }
+    return AI_FALLBACK[lang];
+  }
+
+  function appendAIMessage(role, text) {
+    const wrap = document.getElementById('aiMessages');
+    const msg = document.createElement('div');
+    msg.className = 'ai-msg ' + role;
+    msg.innerHTML = `<div class="ai-msg-av">${role === 'bot' ? 'AI' : 'You'}</div><div class="ai-msg-bubble">${text}</div>`;
+    wrap.appendChild(msg);
+    wrap.scrollTop = wrap.scrollHeight;
+    return msg;
+  }
+
+  function sendAI() {
+    const input = document.getElementById('aiInput');
+    const text = input.value.trim();
+    if (!text) return;
+    appendAIMessage('user', text);
+    input.value = '';
+
+    const wrap = document.getElementById('aiMessages');
+    const typing = document.createElement('div');
+    typing.className = 'ai-msg bot';
+    typing.innerHTML = '<div class="ai-msg-av">AI</div><div class="ai-msg-bubble"><div class="ai-typing"><span></span><span></span><span></span></div></div>';
+    wrap.appendChild(typing);
+    wrap.scrollTop = wrap.scrollHeight;
+
+    setTimeout(() => {
+      typing.remove();
+      const reply = findAIResponse(text, currentLang);
+      appendAIMessage('bot', reply);
+    }, 600 + Math.random() * 400);
+  }
+</script>
+
 </body>
 </html>
