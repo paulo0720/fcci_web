@@ -1,0 +1,286 @@
+/* ============================================================
+   FCCI HUD THEME — fcci_hud_theme.css
+   I-link ito SA HULI, pagkatapos ng fcci_responsive.css,
+   para ma-override nito ang lumang emerald green variables.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ── Pinalitan: dating emerald green → HUD cyan/violet ──── */
+  --bg-base:       #f4f8fb;
+  --bg-mist:       #eef3f8;
+  --glass:         rgba(255,255,255,0.78);
+  --glass-border:  rgba(20,140,220,0.14);
+  --emerald:       #00d4c8;        /* dating emerald → cyan */
+  --emerald-bright:#00eadc;        /* dating emerald-bright → bright cyan */
+  --emerald-deep:  #0b1d2e;        /* dating emerald-deep → deep ink */
+  --text-main:     #0b1d2e;
+  --text-dim:      #6b7e8f;
+
+  /* ── Bagong HUD-specific variables ──────────────────────── */
+  --cyan:          #00d4c8;
+  --cyan-deep:     #00a89e;
+  --violet:        #7c6df0;
+  --gold:          #f0a93f;
+  --ink:           #0b1d2e;
+  --muted:         #6b7e8f;
+  --red:           #ef5d5d;
+  --font-display:  'Outfit', sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+}
+
+/* ── Body background — HUD ambient gradient + grid texture ── */
+body {
+  font-family: var(--font-display) !important;
+  background:
+    radial-gradient(ellipse 900px 600px at 0% -10%, rgba(0,212,200,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 700px 600px at 100% 0%, rgba(124,109,240,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 800px 500px at 50% 110%, rgba(240,169,63,0.06) 0%, transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, var(--bg-base) 100%) !important;
+  background-attachment: fixed !important;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,160,150,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,160,150,0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at 18% 0%, rgba(0,0,0,0.5) 0%, transparent 60%);
+  -webkit-mask-image: radial-gradient(ellipse at 18% 0%, rgba(0,0,0,0.5) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ambient floating orbs */
+.ambient-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+.ambient-orb.o1 {
+  width: 420px; height: 420px;
+  top: -120px; left: 22%;
+  background: radial-gradient(circle, rgba(0,212,200,0.45), transparent 70%);
+  animation: hud-drift1 24s ease-in-out infinite;
+}
+.ambient-orb.o2 {
+  width: 340px; height: 340px;
+  bottom: -100px; right: 4%;
+  background: radial-gradient(circle, rgba(124,109,240,0.35), transparent 70%);
+  animation: hud-drift2 28s ease-in-out infinite;
+}
+@keyframes hud-drift1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(50px, 35px); } }
+@keyframes hud-drift2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-35px, -30px); } }
+@media (prefers-reduced-motion: reduce) { .ambient-orb { animation: none; } }
+
+/* ── Sidebar refinements para sa HUD look ───────────────── */
+.sidebar {
+  background: rgba(255,255,255,0.72) !important;
+  backdrop-filter: blur(28px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.4) !important;
+}
+
+.brand-logo-ring {
+  background: linear-gradient(135deg, var(--cyan), var(--violet)) !important;
+}
+.brand-logo-ring::before { border-color: var(--cyan) !important; }
+
+.sidebar-nav a.active {
+  background: linear-gradient(90deg, rgba(0,212,200,0.13), rgba(124,109,240,0.04)) !important;
+  border-color: var(--cyan) !important;
+}
+.sidebar-nav a:hover { background: rgba(0,212,200,0.07) !important; color: var(--cyan-deep) !important; }
+
+/* ── Stat cards / glass cards glow accent ───────────────── */
+.stat-value, .card-title, h4, h5 {
+  font-family: var(--font-display) !important;
+}
+
+.amount-pill, .stat-value {
+  color: var(--cyan-deep) !important;
+}
+
+.btn-go, .btn-submit, .btn-save, .btn-submit-proof {
+  background: linear-gradient(135deg, var(--cyan-deep), var(--cyan)) !important;
+  box-shadow: 0 6px 18px rgba(0,212,200,0.3) !important;
+}
+
+/* Mono font for IDs, receipt numbers, codes */
+.receipt-no, .member-id-text, code, .mono {
+  font-family: var(--font-mono) !important;
+}
+
+/* ════════════════════════════════════════════════════════
+   AI ASSISTANT WIDGET
+════════════════════════════════════════════════════════ */
+.ai-launcher {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0,212,200,0.4);
+  z-index: 999;
+  color: #fff;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.2s;
+}
+.ai-launcher:hover { transform: scale(1.06); }
+.ai-launcher svg { width: 26px; height: 26px; z-index: 2; }
+
+.ai-launcher-ring {
+  position: absolute; inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--cyan);
+  opacity: 0.5;
+  animation: ai-pulse 2.4s ease-out infinite;
+}
+@keyframes ai-pulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  70% { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.ai-launcher-dot {
+  position: absolute; top: 4px; right: 4px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: #2ecc71;
+  border: 2px solid #fff;
+  z-index: 3;
+}
+
+.ai-panel {
+  position: fixed;
+  bottom: 96px; right: 24px;
+  width: 360px; max-width: calc(100vw - 32px);
+  height: 520px; max-height: calc(100vh - 140px);
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  box-shadow: 0 20px 60px rgba(0,40,60,0.18);
+  z-index: 999;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  transform: translateY(16px) scale(0.97);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.ai-panel.open {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ai-panel-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.ai-avatar {
+  width: 38px; height: 38px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; flex-shrink: 0;
+}
+.ai-avatar svg { width: 20px; height: 20px; }
+.ai-panel-titles { flex: 1; }
+.ai-panel-name { font-size: 14.5px; font-weight: 700; color: var(--ink); }
+.ai-panel-status { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.ai-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; display: inline-block; }
+.ai-panel-close {
+  width: 30px; height: 30px; border: none; background: rgba(0,0,0,0.04);
+  border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+}
+.ai-panel-close svg { width: 16px; height: 16px; }
+
+.ai-lang-toggle {
+  display: flex; gap: 6px; padding: 10px 18px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.ai-lang-btn {
+  flex: 1; padding: 6px 0; border: 1px solid var(--glass-border);
+  background: transparent; border-radius: 8px; font-size: 12px; font-weight: 600;
+  color: var(--muted); cursor: pointer; transition: all 0.2s;
+}
+.ai-lang-btn.active { background: var(--cyan); color: #fff; border-color: var(--cyan); }
+
+.ai-messages {
+  flex: 1; overflow-y: auto; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.ai-msg { display: flex; gap: 9px; align-items: flex-start; }
+.ai-msg.user { flex-direction: row-reverse; }
+.ai-msg-av {
+  width: 26px; height: 26px; border-radius: 8px;
+  background: rgba(0,212,200,0.12); color: var(--cyan-deep);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+.ai-msg.user .ai-msg-av { background: rgba(124,109,240,0.12); color: var(--violet); }
+.ai-msg-bubble {
+  background: rgba(0,0,0,0.04); padding: 10px 13px; border-radius: 14px;
+  font-size: 13px; line-height: 1.5; color: var(--ink); max-width: 240px;
+}
+.ai-msg.user .ai-msg-bubble { background: linear-gradient(135deg, var(--cyan), var(--cyan-deep)); color: #fff; }
+.ai-msg-bubble strong { font-weight: 700; }
+
+.ai-typing { display: flex; gap: 4px; padding: 2px 0; }
+.ai-typing span {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+  animation: ai-bounce 1.2s infinite;
+}
+.ai-typing span:nth-child(2) { animation-delay: 0.15s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ai-bounce { 0%,60%,100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+.ai-suggestions {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 0 18px 12px;
+}
+.ai-chip {
+  font-size: 11px; padding: 6px 11px; border-radius: 20px;
+  background: rgba(0,212,200,0.08); color: var(--cyan-deep);
+  border: 1px solid rgba(0,212,200,0.2); cursor: pointer;
+  transition: all 0.2s;
+}
+.ai-chip:hover { background: rgba(0,212,200,0.16); }
+
+.ai-input-row {
+  display: flex; gap: 8px; padding: 14px 18px;
+  border-top: 1px solid var(--glass-border);
+}
+.ai-input {
+  flex: 1; border: 1px solid var(--glass-border); border-radius: 12px;
+  padding: 10px 14px; font-size: 13px; outline: none; background: #fff;
+}
+.ai-input:focus { border-color: var(--cyan); }
+.ai-send {
+  width: 40px; height: 40px; border-radius: 12px; border: none;
+  background: linear-gradient(135deg, var(--cyan), var(--cyan-deep));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.ai-send svg { width: 17px; height: 17px; }
+
+@media (max-width: 767px) {
+  .ai-launcher { bottom: calc(var(--bottom-nav-h) + 14px); right: 16px; width: 52px; height: 52px; }
+  .ai-panel {
+    bottom: calc(var(--bottom-nav-h) + 80px);
+    right: 12px; left: 12px; width: auto;
+    height: 65vh;
+  }
+}
