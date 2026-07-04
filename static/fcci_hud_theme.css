@@ -284,3 +284,100 @@ body::before {
     height: 65vh;
   }
 }
+
+/* ════════════════════════════════════════════════════════
+   BALANCE HERO — dark navy HUD card with health ring orb
+════════════════════════════════════════════════════════ */
+.balance-hero {
+  background: linear-gradient(135deg, #0b2236 0%, #0d3349 50%, #0a2d40 100%);
+  border-radius: 22px;
+  padding: 0;
+  margin-bottom: 18px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 44px rgba(0,40,60,0.3);
+}
+.balance-hero-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,200,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,200,0.07) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(ellipse at 75% 30%, black 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 75% 30%, black 0%, transparent 70%);
+}
+.balance-hero-inner {
+  position: relative; z-index: 1;
+  padding: 28px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px;
+}
+.balance-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 1.5px;
+  text-transform: uppercase; color: rgba(255,255,255,0.5);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 7px;
+}
+.balance-tag::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cyan); box-shadow: 0 0 10px var(--cyan);
+  animation: blink-dot 2s ease-in-out infinite;
+}
+@keyframes blink-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.balance-amount {
+  font-size: 40px; font-weight: 800; color: #fff;
+  line-height: 1; margin-bottom: 8px;
+  text-shadow: 0 0 30px rgba(0,212,200,0.35);
+  font-family: var(--font-display);
+}
+.balance-sub { font-size: 12.5px; color: rgba(255,255,255,0.4); }
+
+.balance-right { position: relative; z-index: 1; display: flex; align-items: center; gap: 28px; }
+
+/* Signature health ring orb */
+.hud-orb-wrap { position: relative; width: 108px; height: 108px; flex-shrink: 0; }
+.hud-orb-glow {
+  position: absolute; inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,212,200,0.35), transparent 65%);
+  filter: blur(10px);
+  animation: orb-pulse 3.2s ease-in-out infinite;
+}
+@keyframes orb-pulse { 0%,100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.08); } }
+.hud-orb-wrap svg { position: relative; z-index: 1; transform: rotate(-90deg); }
+.hud-orb-track { fill: none; stroke: rgba(255,255,255,0.10); stroke-width: 6; }
+.hud-orb-fill {
+  fill: none; stroke: url(#orbGrad); stroke-width: 6; stroke-linecap: round;
+  stroke-dasharray: 283;
+  animation: orb-fill 1.6s cubic-bezier(0.4,0,0.2,1) forwards;
+  filter: drop-shadow(0 0 6px rgba(0,212,200,0.7));
+}
+@keyframes orb-fill { from { stroke-dashoffset: 283; } }
+.hud-orb-label {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.hud-orb-pct { font-size: 21px; font-weight: 800; color: #fff; }
+.hud-orb-cap {
+  font-family: var(--font-mono);
+  font-size: 8px; color: rgba(255,255,255,0.45);
+  letter-spacing: 0.6px; text-transform: uppercase;
+}
+
+.balance-minis { display: flex; gap: 26px; }
+.bal-mini-label {
+  font-family: var(--font-mono);
+  font-size: 10px; color: rgba(255,255,255,0.4);
+  margin-bottom: 6px; letter-spacing: 0.5px;
+}
+.bal-mini-val { font-size: 16px; font-weight: 700; color: #fff; }
+.bal-mini-val.neg { color: #f3a39d; }
+
+@media (max-width: 767px) {
+  .balance-hero-inner { flex-direction: column; align-items: flex-start; padding: 22px 20px; }
+  .balance-amount { font-size: 32px; }
+  .balance-right { width: 100%; justify-content: space-between; }
+  .balance-minis { gap: 16px; }
+  .hud-orb-wrap { width: 88px; height: 88px; }
+  .hud-orb-wrap svg { width: 88px; height: 88px; }
+}
