@@ -459,6 +459,49 @@
     <div class="date-chip" id="currentDate"></div>
   </div>
 
+  <!-- ── BALANCE HERO — HUD card with health ring orb ── -->
+  {% set health_pct = ((active_members / total_members * 100) | round | int) if total_members > 0 else 0 %}
+  <div class="balance-hero">
+    <div class="balance-hero-grid"></div>
+    <div class="balance-hero-inner">
+      <div class="balance-left">
+        <div class="balance-tag">Live · Total Balance</div>
+        <div class="balance-amount">₩{{ "{:,}".format(balance) }}</div>
+        <div class="balance-sub">Collections + Donations − Expenses</div>
+      </div>
+      <div class="balance-right">
+        <div class="balance-minis">
+          <div>
+            <div class="bal-mini-label">COLLECTIONS</div>
+            <div class="bal-mini-val">₩{{ "{:,}".format(collections) }}</div>
+          </div>
+          <div>
+            <div class="bal-mini-label">EXPENSES</div>
+            <div class="bal-mini-val neg">−₩{{ "{:,}".format(expenses) }}</div>
+          </div>
+        </div>
+        <div class="hud-orb-wrap">
+          <div class="hud-orb-glow"></div>
+          <svg width="108" height="108" viewBox="0 0 108 108">
+            <defs>
+              <linearGradient id="orbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00eadc"/>
+                <stop offset="100%" stop-color="#7c6df0"/>
+              </linearGradient>
+            </defs>
+            <circle class="hud-orb-track" cx="54" cy="54" r="45"/>
+            <circle class="hud-orb-fill" cx="54" cy="54" r="45"
+                    style="stroke-dashoffset: {{ 283 - (283 * health_pct / 100) | round | int }};"/>
+          </svg>
+          <div class="hud-orb-label">
+            <div class="hud-orb-pct">{{ health_pct }}%</div>
+            <div class="hud-orb-cap">Active Rate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="row g-3 mb-3">
     <div class="col-md-3 col-6">
       <div class="glass-card">
