@@ -310,10 +310,7 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
         </div>
       </div>
       <br>
-      <button class="btn-go" id="submitPaymentBtn"
-        onclick="this.disabled=true;this.textContent='⏳ Saving...';this.style.opacity='0.7';
-        setTimeout(()=>{this.disabled=false;this.textContent='Save Payment';this.style.opacity='1';},10000);
-        return true;">Save Payment</button>
+      <button class="btn-go" id="submitPaymentBtn" type="submit">Save Payment</button>
     </form>
   </div>
 
@@ -466,10 +463,22 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
 
   e.preventDefault();
 
+  const btn = document.getElementById('submitPaymentBtn');
   const memberId = document.getElementById('member_id').value.trim();
   const paymentType = document.getElementById('payment_type').value;
   const paymentMonth = document.getElementById('payment_month').value;
   const paymentYear = document.getElementById('payment_year').value;
+
+  // I-disable ang button para hindi ma-double submit
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving...';
+  btn.style.opacity = '0.7';
+
+  const resetBtn = () => {
+    btn.disabled = false;
+    btn.textContent = 'Save Payment';
+    btn.style.opacity = '1';
+  };
 
   if (!memberId) {
     this.submit();
@@ -489,14 +498,14 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
       if (data.duplicate) {
         document.getElementById('duplicateModalMessage').textContent = data.message;
         document.getElementById('duplicateModal').style.display = 'flex';
+        resetBtn(); // I-enable ulit ang button
       } else {
-        // Walang duplicate, ituloy ang form submission
+        // Walang duplicate — ituloy ang actual form submission
         document.getElementById('paymentForm').submit();
       }
     })
     .catch(() => {
-      // Kung nagka-error ang check (hal. network issue), ituloy pa rin
-      // ang submit — ang server-side validation ang huling depensa.
+      // Network error — ituloy pa rin, server ang mag-va-validate
       document.getElementById('paymentForm').submit();
     });
 });
