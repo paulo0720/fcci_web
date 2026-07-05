@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Editor — FCCI Dev</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --cyan:#00d4c8; --cyan-deep:#00a89e; --violet:#7c6df0; --gold:#f0a93f; --red:#ef5d5d; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Outfit', sans-serif;
+    background:
+      radial-gradient(ellipse 800px 500px at 15% 0%, rgba(0,212,200,0.10) 0%, transparent 55%),
+      linear-gradient(180deg, #0b2236, #091a29);
+    min-height:100vh; color:#e6eef4; padding:22px 18px 80px;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,200,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,200,0.04) 1px, transparent 1px);
+    background-size:52px 52px; pointer-events:none;
+  }
+  .wrap { max-width:1280px; margin:0 auto; position:relative; }
+
+  .head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+  .head-tag {
+    font-family:'JetBrains Mono', monospace; font-size:10px;
+    letter-spacing:2px; text-transform:uppercase; color:var(--cyan);
+    display:flex; align-items:center; gap:8px; margin-bottom:5px;
+  }
+  .head-tag::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--cyan); box-shadow:0 0 10px var(--cyan); }
+  h1 { font-size:22px; font-weight:800; color:#fff; }
+  .back { text-decoration:none; font-size:12px; color:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.2); padding:7px 14px; border-radius:20px; }
+
+  .table-pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .pill {
+    font-family:'JetBrains Mono', monospace; font-size:11.5px;
+    padding:8px 16px; border-radius:20px; cursor:pointer;
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+    color:rgba(255,255,255,0.6); transition:all 0.2s;
+  }
+  .pill.active { background:rgba(0,212,200,0.14); border-color:var(--cyan); color:var(--cyan); }
+
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
+  .search {
+    flex:1; min-width:200px; padding:10px 15px; border-radius:11px;
+    border:1px solid rgba(0,212,200,0.2); background:rgba(0,0,0,0.25);
+    color:#fff; font-family:'JetBrains Mono', monospace; font-size:12px; outline:none;
+  }
+  .search:focus { border-color:var(--cyan); }
+  .btn {
+    padding:10px 18px; border:none; border-radius:11px; cursor:pointer;
+    font-family:'Outfit', sans-serif; font-weight:700; font-size:12.5px;
+  }
+  .btn-add { background:rgba(124,109,240,0.15); border:1px solid rgba(124,109,240,0.4); color:#b0a5f5; }
+  .btn-save { background:linear-gradient(135deg, var(--cyan-deep), var(--cyan)); color:#04222a; box-shadow:0 6px 18px rgba(0,212,200,0.3); }
+  .btn-save:disabled { opacity:0.4; cursor:not-allowed; box-shadow:none; }
+  .btn-reload { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.7); }
+
+  .status-msg { font-size:12px; font-family:'JetBrains Mono', monospace; }
+  .status-msg.ok { color:var(--cyan); }
+  .status-msg.err { color:var(--red); }
+
+  .grid-wrap {
+    background:rgba(0,0,0,0.28); border:1px solid rgba(0,212,200,0.14);
+    border-radius:14px; overflow:auto; max-height:calc(100vh - 260px);
+  }
+  table { border-collapse:collapse; width:100%; font-size:12px; }
+  thead th {
+    position:sticky; top:0; z-index:2;
+    background:#0d2a3d;
+    font-family:'JetBrains Mono', monospace; font-size:10px;
+    text-transform:uppercase; letter-spacing:0.5px; color:var(--cyan);
+    text-align:left; padding:10px 12px; white-space:nowrap;
+    border-bottom:1px solid rgba(0,212,200,0.25);
+  }
+  td {
+    padding:0; border-bottom:1px solid rgba(255,255,255,0.05);
+    border-right:1px solid rgba(255,255,255,0.03);
+    font-family:'JetBrains Mono', monospace; font-size:11.5px;
+    color:rgba(255,255,255,0.78); white-space:nowrap;
+  }
+  td .cell {
+    padding:8px 12px; min-width:70px; max-width:340px;
+    overflow:hidden; text-overflow:ellipsis; outline:none;
+  }
+  td .cell[contenteditable="true"]:focus {
+    background:rgba(0,212,200,0.08); box-shadow:inset 0 0 0 1.5px var(--cyan);
+    white-space:normal; overflow:visible;
+  }
+  td.changed .cell { background:rgba(240,169,63,0.12); box-shadow:inset 0 0 0 1px rgba(240,169,63,0.5); }
+  td.id-col .cell { color:rgba(255,255,255,0.35); }
+  tr.to-delete td { background:rgba(239,93,93,0.10); text-decoration:line-through; opacity:0.6; }
+  tr.new-row td .cell { background:rgba(124,109,240,0.08); }
+
+  .row-x {
+    background:none; border:none; color:rgba(255,255,255,0.3);
+    cursor:pointer; font-size:13px; padding:6px 10px;
+  }
+  .row-x:hover { color:var(--red); }
+
+  .hint { font-size:11px; color:rgba(255,255,255,0.35); margin-top:10px; font-family:'JetBrains Mono', monospace; }
+  .loading { text-align:center; padding:40px; color:rgba(255,255,255,0.4); font-family:'JetBrains Mono', monospace; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <div class="head-tag">Developer · Database Editor</div>
+      <h1>⛁ DB Editor</h1>
+    </div>
+    <a href="/dev" class="back">← Bumalik sa Dev Panel</a>
+  </div>
+
+  <div class="table-pills" id="tablePills">
+    {% for t in tables %}
+    <span class="pill {{ 'active' if loop.first else '' }}" data-table="{{ t }}" onclick="switchTable(this)">{{ t }}</span>
+    {% endfor %}
+  </div>
+
+  <div class="toolbar">
+    <input type="text" class="search" id="searchBox" placeholder="🔍 I-filter ang rows (kahit anong column)..." oninput="filterRows()">
+    <button class="btn btn-add" onclick="addRow()">＋ Add Row</button>
+    <button class="btn btn-reload" onclick="loadTable()">⟳ Reload</button>
+    <button class="btn btn-save" id="saveBtn" onclick="saveChanges()" disabled>💾 Save Changes</button>
+    <span class="status-msg" id="statusMsg"></span>
+  </div>
+
+  <div class="grid-wrap" id="gridWrap">
+    <div class="loading">⏳ Loading...</div>
+  </div>
+
+  <div class="hint">
+    Paano gamitin: I-click ang cell para i-edit (pwede ring mag-paste). Ang mga binago ay magiging orange.
+    I-click ang ✕ para markahan ang row na ide-delete. Pindutin ang 💾 Save para i-apply lahat.
+    Ang ID column ay hindi pwedeng i-edit.
+  </div>
+
+</div>
+
+<script>
+let currentTable = document.querySelector('.pill.active').dataset.table;
+let columns = [];
+let pendingChanges = [];   // {id, column, value}
+let pendingDeletes = new Set();
+let newRows = [];          // array ng objects
+
+function switchTable(el) {
+  if (hasPending() && !confirm('May hindi pa na-save na changes. Ituloy at i-discard?')) return;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  currentTable = el.dataset.table;
+  loadTable();
+}
+
+function hasPending() {
+  return pendingChanges.length || pendingDeletes.size || newRows.length;
+}
+
+function resetPending() {
+  pendingChanges = [];
+  pendingDeletes = new Set();
+  newRows = [];
+  updateSaveBtn();
+}
+
+function updateSaveBtn() {
+  const btn = document.getElementById('saveBtn');
+  const total = pendingChanges.length + pendingDeletes.size + newRows.length;
+  btn.disabled = total === 0;
+  btn.textContent = total ? `💾 Save Changes (${total})` : '💾 Save Changes';
+}
+
+function setStatus(msg, ok=true) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status-msg ' + (ok ? 'ok' : 'err');
+  if (ok && msg) setTimeout(() => { el.textContent = ''; }, 4000);
+}
+
+function loadTable() {
+  resetPending();
+  document.getElementById('gridWrap').innerHTML = '<div class="loading">⏳ Loading ' + currentTable + '...</div>';
+  fetch('/dev_db_data?table=' + currentTable)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { setStatus('✗ ' + data.error, false); return; }
+      columns = data.columns;
+      renderGrid(data.rows);
+    })
+    .catch(e => setStatus('✗ ' + e, false));
+}
+
+function renderGrid(rows) {
+  let html = '<table><thead><tr><th></th>';
+  columns.forEach(c => html += '<th>' + c + '</th>');
+  html += '</tr></thead><tbody id="gridBody">';
+  rows.forEach(r => {
+    const rowId = r[columns.indexOf('id')];
+    html += '<tr data-id="' + rowId + '">';
+    html += '<td><button class="row-x" onclick="toggleDelete(this)" title="Delete row">✕</button></td>';
+    r.forEach((cell, i) => {
+      const isId = columns[i] === 'id';
+      html += '<td class="' + (isId ? 'id-col' : '') + '" data-col="' + columns[i] + '">' +
+              '<div class="cell" ' + (isId ? '' : 'contenteditable="true" oninput="cellChanged(this)"') + '>' +
+              escapeHtml(cell) + '</div></td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('gridWrap').innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function cellChanged(cellDiv) {
+  const td = cellDiv.closest('td');
+  const tr = cellDiv.closest('tr');
+  td.classList.add('changed');
+
+  if (tr.classList.contains('new-row')) return; // Bago pa lang — kasama na sa inserts
+
+  const id = tr.dataset.id;
+  const col = td.dataset.col;
+  const value = cellDiv.textContent;
+
+  // Isang entry lang per cell — palitan kung meron na
+  pendingChanges = pendingChanges.filter(c => !(c.id == id && c.column === col));
+  pendingChanges.push({ id: parseInt(id), column: col, value: value });
+  updateSaveBtn();
+}
+
+function toggleDelete(btn) {
+  const tr = btn.closest('tr');
+  if (tr.classList.contains('new-row')) {
+    // Bagong row lang — tanggalin agad
+    newRows = newRows.filter(r => r.__el !== tr);
+    tr.remove();
+    updateSaveBtn();
+    return;
+  }
+  const id = parseInt(tr.dataset.id);
+  if (pendingDeletes.has(id)) {
+    pendingDeletes.delete(id);
+    tr.classList.remove('to-delete');
+  } else {
+    pendingDeletes.add(id);
+    tr.classList.add('to-delete');
+  }
+  updateSaveBtn();
+}
+
+function addRow() {
+  const body = document.getElementById('gridBody');
+  if (!body) return;
+  const tr = document.createElement('tr');
+  tr.classList.add('new-row');
+  let html = '<td><button class="row-x" onclick="toggleDelete(this)">✕</button></td>';
+  columns.forEach(c => {
+    const isId = c === 'id';
+    html += '<td data-col="' + c + '"><div class="cell" ' +
+            (isId ? '' : 'contenteditable="true"') + '>' + (isId ? 'auto' : '') + '</div></td>';
+  });
+  tr.innerHTML = html;
+  body.insertBefore(tr, body.firstChild);
+  const rowObj = { __el: tr };
+  newRows.push(rowObj);
+  updateSaveBtn();
+}
+
+function collectNewRows() {
+  return newRows.map(r => {
+    const obj = {};
+    r.__el.querySelectorAll('td[data-col]').forEach(td => {
+      const col = td.dataset.col;
+      if (col === 'id') return;
+      obj[col] = td.querySelector('.cell').textContent.trim();
+    });
+    return obj;
+  }).filter(o => Object.values(o).some(v => v !== ''));
+}
+
+function saveChanges() {
+  const payload = {
+    table: currentTable,
+    updates: pendingChanges,
+    deletes: Array.from(pendingDeletes),
+    inserts: collectNewRows()
+  };
+
+  if (payload.deletes.length &&
+      !confirm(payload.deletes.length + ' row(s) ang made-delete nang PERMANENTE. Sigurado ka?')) {
+    return;
+  }
+
+  setStatus('⏳ Saving...');
+  fetch('/dev_db_save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { setStatus('✗ ' + data.error, false); return; }
+      const a = data.applied;
+      setStatus('✓ Updated: ' + a.updated + ' · Deleted: ' + a.deleted + ' · Inserted: ' + a.inserted);
+      loadTable();
+    })
+    .catch(e => setStatus('✗ ' + e, false));
+}
+
+function filterRows() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  document.querySelectorAll('#gridBody tr').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// Babala bago umalis kung may unsaved changes
+window.addEventListener('beforeunload', e => {
+  if (hasPending()) { e.preventDefault(); e.returnValue = ''; }
+});
+
+loadTable();
+</script>
+</body>
+</html>
