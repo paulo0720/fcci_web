@@ -5788,6 +5788,69 @@ def dev_health_check():
         HAVING COUNT(*) > 1
         """, ["member_id", "month", "year", "count"], "Walang double monthly payments", "duplicate_monthly")
 
+        # ── CLOUDINARY ORPHAN CHECK ──────────────────────────
+        # Photos sa Cloudinary na walang kaugnay na DB record.
+        # Iba ito sa DB orphan check — dito ang Cloudinary mismo
+        # ang tinitignan.
+        try:
+            import cloudinary.api as _cl_api
+
+            cl_photos = []
+            for prefix in ["fcci_member_photos", "fcci_proof_of_payment", "fcci_uploads"]:
+                ctok = None
+                while True:
+                    params = {"type": "upload", "prefix": prefix, "max_results": 100}
+                    if ctok:
+                        params["next_cursor"] = ctok
+                    res = _cl_api.resources(**params)
+                    cl_photos.extend(res.get("resources", []))
+                    ctok = res.get("next_cursor")
+                    if not ctok:
+                        break
+
+            # Kunin lahat ng photo URLs mula sa DB
+            cursor.execute("SAVEPOINT clcheck")
+            cursor.execute("""
+            SELECT photo_path FROM member_photos
+            WHERE photo_path IS NOT NULL AND photo_path != ''
+            """)
+            db_urls = [r[0] for r in cursor.fetchall()]
+            cursor.execute("""
+            SELECT proof_of_payment FROM members
+            WHERE proof_of_payment IS NOT NULL AND proof_of_payment != ''
+            """)
+            db_urls += [r[0] for r in cursor.fetchall()]
+            cursor.execute("RELEASE SAVEPOINT clcheck")
+
+            # I-match ang bawat Cloudinary photo
+            orphaned_cl = []
+            for p in cl_photos:
+                pid = p.get("public_id", "")
+                linked = any(pid in (url or "") for url in db_urls)
+                if not linked:
+                    orphaned_cl.append([pid, f"{round(p.get('bytes',0)/1024,1)} KB",
+                                        (p.get("created_at","") or "")[:10]])
+
+            if orphaned_cl:
+                checks.append({
+                    "name": "Orphaned Cloudinary Photos (walang DB record)",
+                    "ok": False, "count": len(orphaned_cl),
+                    "columns": ["public_id", "size", "created"],
+                    "fix": None,  # manual delete sa Photo Manager
+                    "rows": orphaned_cl[:20],
+                    "note": "I-delete sa 🖼 Photo Manager → Orphaned filter"
+                })
+            else:
+                checks.append({"name": "Orphaned Cloudinary Photos",
+                               "ok": True, "msg": "Lahat ng Cloudinary photos may DB record"})
+        except Exception as e:
+            try:
+                cursor.execute("ROLLBACK TO SAVEPOINT clcheck")
+            except Exception:
+                pass
+            checks.append({"name": "Orphaned Cloudinary Photos",
+                           "ok": True, "msg": f"(skipped — {str(e)[:60]})"})
+
         return_db(conn)
         issues = sum(1 for c in checks if not c["ok"])
         return jsonify({"checks": checks, "issues": issues})
