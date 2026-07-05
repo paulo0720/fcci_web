@@ -5682,6 +5682,145 @@ def dev_logout():
     return redirect("/dashboard")
 
 
+# ── DEV DATABASE EDITOR ─────────────────────────────────────
+# Editable table grid — parang spreadsheet. Dev-only.
+
+_DEV_TABLES = ["members", "payments", "member_photos", "attendance",
+               "donations", "expenses", "users", "pairing_sessions"]
+
+
+def _dev_auth_ok():
+    return "username" in session and session.get("is_developer")
+
+
+def _dev_table_columns(cursor, table):
+    """Kunin ang totoong columns ng table mula sa schema —
+    ginagamit para i-validate ang column names (anti-injection)."""
+    cursor.execute("""
+    SELECT column_name, data_type
+    FROM information_schema.columns
+    WHERE table_name = %s
+    ORDER BY ordinal_position
+    """, (table,))
+    return cursor.fetchall()
+
+
+@app.route("/dev_db")
+def dev_db():
+    if not _dev_auth_ok():
+        return redirect("/dev_login")
+    return render_template("dev_db.html", tables=_DEV_TABLES)
+
+
+@app.route("/dev_db_data")
+def dev_db_data():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    table = request.args.get("table", "")
+    if table not in _DEV_TABLES:
+        return jsonify({"error": "Invalid table"})
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cols_info = _dev_table_columns(cursor, table)
+        columns = [c[0] for c in cols_info]
+        col_types = {c[0]: c[1] for c in cols_info}
+
+        cursor.execute(f"SELECT * FROM {table} ORDER BY id DESC LIMIT 300")
+        rows = cursor.fetchall()
+        return_db(conn)
+
+        return jsonify({
+            "columns": columns,
+            "types": col_types,
+            "rows": [[("" if c is None else str(c)) for c in r] for r in rows]
+        })
+    except Exception as e:
+        try:
+            conn.rollback()
+            return_db(conn)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)[:300]})
+
+
+@app.route("/dev_db_save", methods=["POST"])
+def dev_db_save():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json(silent=True) or {}
+    table = data.get("table", "")
+    if table not in _DEV_TABLES:
+        return jsonify({"error": "Invalid table"})
+
+    updates = data.get("updates", [])
+    deletes = data.get("deletes", [])
+    inserts = data.get("inserts", [])
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cols_info = _dev_table_columns(cursor, table)
+        valid_cols = {c[0] for c in cols_info}
+        col_types = {c[0]: c[1] for c in cols_info}
+
+        def _coerce(col, val):
+            # '' sa numeric/date columns → NULL para walang cast error
+            if val == "" and col_types.get(col, "") in (
+                    "integer", "bigint", "numeric", "double precision",
+                    "real", "date", "timestamp without time zone"):
+                return None
+            return val
+
+        applied = {"updated": 0, "deleted": 0, "inserted": 0}
+
+        # ── UPDATES (per cell, by id) ──
+        for u in updates:
+            col = u.get("column", "")
+            if col not in valid_cols or col == "id":
+                continue
+            cursor.execute(
+                f'UPDATE {table} SET "{col}" = %s WHERE id = %s',
+                (_coerce(col, u.get("value", "")), u.get("id"))
+            )
+            applied["updated"] += cursor.rowcount
+
+        # ── DELETES (by id) ──
+        for row_id in deletes:
+            cursor.execute(f"DELETE FROM {table} WHERE id = %s", (row_id,))
+            applied["deleted"] += cursor.rowcount
+
+        # ── INSERTS ──
+        for ins in inserts:
+            cols = [c for c in ins.keys() if c in valid_cols and c != "id"]
+            if not cols:
+                continue
+            placeholders = ", ".join(["%s"] * len(cols))
+            col_list = ", ".join(f'"{c}"' for c in cols)
+            cursor.execute(
+                f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})",
+                tuple(_coerce(c, ins[c]) for c in cols)
+            )
+            applied["inserted"] += 1
+
+        conn.commit()
+        return_db(conn)
+        logger.info(f"[DEV DB] {session['username']} edited {table}: {applied}")
+        return jsonify({"ok": True, "applied": applied})
+
+    except Exception as e:
+        try:
+            conn.rollback()
+            return_db(conn)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)[:300]})
+
+
 if __name__ == "__main__":
 
     # ── TEST SUPABASE CONNECTION BAGO MAGSIMULA ──────────────
