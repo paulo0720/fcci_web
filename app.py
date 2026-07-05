@@ -339,8 +339,12 @@ def member_registration():
             conn = get_db()
             cursor = conn.cursor()
             try:
-                # SQL MAX para sa APP ID — mas mabilis, FOR UPDATE
-                # para atomic (walang race condition)
+                # Advisory lock — nagsi-serialize ng sabay-sabay na
+                # registrations. (Bawal ang FOR UPDATE kasama ng MAX()
+                # sa PostgreSQL, kaya ito ang tamang paraan.)
+                # Awtomatikong nare-release sa commit/rollback.
+                cursor.execute("SELECT pg_advisory_xact_lock(202600)")
+
                 cursor.execute("""
                 SELECT COALESCE(
                     MAX(CAST(SPLIT_PART(member_id, '-', 3) AS INTEGER)),
@@ -348,7 +352,6 @@ def member_registration():
                 )
                 FROM members
                 WHERE member_id LIKE 'APP-%%'
-                FOR UPDATE
                 """)
                 highest_num = cursor.fetchone()[0]
                 count       = highest_num + 1
