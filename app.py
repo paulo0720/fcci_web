@@ -5,7 +5,8 @@ from flask import (
     redirect,
     session,
     send_file,
-    jsonify
+    jsonify,
+    g
 )
 import shutil
 from werkzeug.utils import secure_filename
@@ -73,10 +74,58 @@ class _BufferLogHandler(logging.Handler):
 
 logging.getLogger().addHandler(_BufferLogHandler())
 
+# ── ERROR TRACKER ───────────────────────────────────────────
+# Nag-iipon ng huling 50 errors na may BUONG traceback —
+# para hindi na kailangang buksan ang Render logs
+ERROR_BUFFER = _deque(maxlen=50)
+
+# ── REQUEST TRACKER ─────────────────────────────────────────
+# Huling 100 requests: route, status, bilis (ms)
+REQUEST_BUFFER = _deque(maxlen=100)
+
+import time as _req_time
+
+
+@app.before_request
+def _track_request_start():
+    g._req_start = _req_time.time()
+
+
+@app.after_request
+def _track_request_end(response):
+    try:
+        path = request.path
+        if not path.startswith("/static") and path != "/favicon.ico":
+            duration = round(
+                (_req_time.time() - getattr(g, "_req_start", _req_time.time())) * 1000, 1
+            )
+            REQUEST_BUFFER.append({
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "method": request.method,
+                "path": path[:80],
+                "status": response.status_code,
+                "ms": duration
+            })
+    except Exception:
+        pass
+    return response
+
 
 @app.errorhandler(500)
 def internal_error(error):
-    logger.error(f"[500 ERROR] {error}\n{traceback.format_exc()}")
+    # I-record ang buong traceback sa ERROR_BUFFER para
+    # makita sa /dev panel nang may kumpletong detalye
+    tb = traceback.format_exc()
+    try:
+        ERROR_BUFFER.append({
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "route": f"{request.method} {request.path}",
+            "error": str(error)[:200],
+            "traceback": tb[-3000:]
+        })
+    except Exception:
+        pass
+    logger.error(f"[500 ERROR] {request.path} — {error}\n{tb}")
     return """
     <div style='font-family:Arial;padding:40px;text-align:center;'>
       <h2>⚠️ May nangyaring error</h2>
@@ -5626,11 +5675,142 @@ def dev_panel():
         db_latency=db_latency,
         counts=counts,
         logs=list(LOG_BUFFER)[::-1],
+        errors=list(ERROR_BUFFER)[::-1],
+        requests_log=list(REQUEST_BUFFER)[::-1],
         route_count=len(list(app.url_map.iter_rules())),
         python_version=_sys.version.split()[0],
         server_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         env_checks=env_checks
     )
+
+
+@app.route("/dev_health_check")
+def dev_health_check():
+    """Data Integrity Checker — hinahanap ang mga sirang data
+    na karaniwang pinagmumulan ng bugs sa FCCI system."""
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    checks = []
+
+    def add_check(name, rows, cols, ok_msg):
+        if rows:
+            checks.append({
+                "name": name, "ok": False,
+                "count": len(rows),
+                "columns": cols,
+                "rows": [[("" if c is None else str(c)) for c in r] for r in rows[:20]]
+            })
+        else:
+            checks.append({"name": name, "ok": True, "msg": ok_msg})
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # 1. Duplicate member IDs
+        cursor.execute("""
+        SELECT member_id, COUNT(*) FROM members
+        GROUP BY member_id HAVING COUNT(*) > 1
+        """)
+        add_check("Duplicate Member IDs", cursor.fetchall(),
+                  ["member_id", "count"], "Walang duplicate member IDs")
+
+        # 2. Duplicate receipt numbers
+        cursor.execute("""
+        SELECT receipt_no, COUNT(*) FROM payments
+        GROUP BY receipt_no HAVING COUNT(*) > 1
+        """)
+        add_check("Duplicate Receipt Numbers", cursor.fetchall(),
+                  ["receipt_no", "count"], "Walang duplicate receipts")
+
+        # 3. Orphaned payments (member wala na)
+        cursor.execute("""
+        SELECT p.id, p.receipt_no, p.member_id FROM payments p
+        LEFT JOIN members m ON p.member_id = m.member_id
+        WHERE m.member_id IS NULL
+        """)
+        add_check("Orphaned Payments (walang member)", cursor.fetchall(),
+                  ["id", "receipt_no", "member_id"], "Lahat ng payments may valid member")
+
+        # 4. Orphaned photos
+        cursor.execute("""
+        SELECT mp.id, mp.member_id FROM member_photos mp
+        LEFT JOIN members m ON mp.member_id = m.member_id
+        WHERE m.member_id IS NULL
+        """)
+        add_check("Orphaned Photos", cursor.fetchall(),
+                  ["id", "member_id"], "Lahat ng photos may valid member")
+
+        # 5. Active members na walang Registration Fee
+        cursor.execute("""
+        SELECT m.member_id, m.full_name FROM members m
+        WHERE m.status = 'Active'
+        AND NOT EXISTS (
+            SELECT 1 FROM payments p
+            WHERE p.member_id = m.member_id
+            AND p.payment_type = 'Registration Fee'
+        )
+        """)
+        add_check("Active pero walang Registration Fee", cursor.fetchall(),
+                  ["member_id", "full_name"], "Lahat ng Active may reg fee payment")
+
+        # 6. APP- members na Active ang status (inconsistent)
+        cursor.execute("""
+        SELECT member_id, full_name, status FROM members
+        WHERE member_id LIKE 'APP-%%' AND status = 'Active'
+        """)
+        add_check("APP- ID pero Active status", cursor.fetchall(),
+                  ["member_id", "full_name", "status"], "Walang APP- na Active")
+
+        # 7. FCCI- members na Applicant pa (inconsistent)
+        cursor.execute("""
+        SELECT member_id, full_name, status FROM members
+        WHERE member_id LIKE 'FCCI-%%' AND status = 'Applicant'
+        """)
+        add_check("FCCI- ID pero Applicant status", cursor.fetchall(),
+                  ["member_id", "full_name", "status"], "Walang FCCI- na Applicant")
+
+        # 8. Active na blangko ang member_since
+        cursor.execute("""
+        SELECT member_id, full_name FROM members
+        WHERE status = 'Active'
+        AND (member_since IS NULL OR member_since = '')
+        """)
+        add_check("Active pero walang member_since", cursor.fetchall(),
+                  ["member_id", "full_name"], "Lahat ng Active may member_since")
+
+        # 9. Duplicate Registration Fee per member
+        cursor.execute("""
+        SELECT member_id, COUNT(*) FROM payments
+        WHERE payment_type = 'Registration Fee'
+        GROUP BY member_id HAVING COUNT(*) > 1
+        """)
+        add_check("Duplicate Registration Fees", cursor.fetchall(),
+                  ["member_id", "count"], "Isang reg fee lang bawat member")
+
+        # 10. Duplicate Monthly Contribution (same member + month + year)
+        cursor.execute("""
+        SELECT member_id, payment_month, payment_year, COUNT(*)
+        FROM payments
+        WHERE payment_type = 'Monthly Contribution'
+        GROUP BY member_id, payment_month, payment_year
+        HAVING COUNT(*) > 1
+        """)
+        add_check("Duplicate Monthly Contributions", cursor.fetchall(),
+                  ["member_id", "month", "year", "count"], "Walang double monthly payments")
+
+        return_db(conn)
+        issues = sum(1 for c in checks if not c["ok"])
+        return jsonify({"checks": checks, "issues": issues})
+
+    except Exception as e:
+        try:
+            conn.rollback()
+            return_db(conn)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)[:300]})
 
 
 @app.route("/dev_sql", methods=["POST"])
