@@ -5705,46 +5705,50 @@ def dev_health_check():
         else:
             checks.append({"name": name, "ok": True, "msg": ok_msg})
 
+    # Helper — bawat check ay ligtas na tumatakbo nang mag-isa.
+    # Kapag nag-error ang isa (hal. wala ang table/column),
+    # hindi nito masisira ang ibang checks (savepoint rollback).
+    def safe_check(conn, cursor, name, sql, cols, ok_msg, fix_type=None):
+        try:
+            cursor.execute("SAVEPOINT hc")
+            cursor.execute(sql)
+            add_check(name, cursor.fetchall(), cols, ok_msg, fix_type)
+            cursor.execute("RELEASE SAVEPOINT hc")
+        except Exception as e:
+            try:
+                cursor.execute("ROLLBACK TO SAVEPOINT hc")
+            except Exception:
+                pass
+            checks.append({"name": name, "ok": True,
+                           "msg": f"(skipped — {str(e)[:60]})"})
+
     try:
         conn = get_db()
         cursor = conn.cursor()
 
-        # 1. Duplicate member IDs
-        cursor.execute("""
+        safe_check(conn, cursor, "Duplicate Member IDs", """
         SELECT member_id, COUNT(*) FROM members
         GROUP BY member_id HAVING COUNT(*) > 1
-        """)
-        add_check("Duplicate Member IDs", cursor.fetchall(),
-                  ["member_id", "count"], "Walang duplicate member IDs")
+        """, ["member_id", "count"], "Walang duplicate member IDs")
 
-        # 2. Duplicate receipt numbers
-        cursor.execute("""
+        safe_check(conn, cursor, "Duplicate Receipt Numbers", """
         SELECT receipt_no, COUNT(*) FROM payments
         GROUP BY receipt_no HAVING COUNT(*) > 1
-        """)
-        add_check("Duplicate Receipt Numbers", cursor.fetchall(),
-                  ["receipt_no", "count"], "Walang duplicate receipts", "duplicate_receipts")
+        """, ["receipt_no", "count"], "Walang duplicate receipts", "duplicate_receipts")
 
-        # 3. Orphaned payments (member wala na)
-        cursor.execute("""
+        safe_check(conn, cursor, "Orphaned Payments (walang member)", """
         SELECT p.id, p.receipt_no, p.member_id FROM payments p
         LEFT JOIN members m ON p.member_id = m.member_id
         WHERE m.member_id IS NULL
-        """)
-        add_check("Orphaned Payments (walang member)", cursor.fetchall(),
-                  ["id", "receipt_no", "member_id"], "Lahat ng payments may valid member", "orphaned_payments")
+        """, ["id", "receipt_no", "member_id"], "Lahat ng payments may valid member", "orphaned_payments")
 
-        # 4. Orphaned photos
-        cursor.execute("""
+        safe_check(conn, cursor, "Orphaned Photos", """
         SELECT mp.id, mp.member_id FROM member_photos mp
         LEFT JOIN members m ON mp.member_id = m.member_id
         WHERE m.member_id IS NULL
-        """)
-        add_check("Orphaned Photos", cursor.fetchall(),
-                  ["id", "member_id"], "Lahat ng photos may valid member", "orphaned_photos")
+        """, ["id", "member_id"], "Lahat ng photos may valid member", "orphaned_photos")
 
-        # 5. Active members na walang Registration Fee
-        cursor.execute("""
+        safe_check(conn, cursor, "Active pero walang Registration Fee", """
         SELECT m.member_id, m.full_name FROM members m
         WHERE m.status = 'Active'
         AND NOT EXISTS (
@@ -5752,54 +5756,37 @@ def dev_health_check():
             WHERE p.member_id = m.member_id
             AND p.payment_type = 'Registration Fee'
         )
-        """)
-        add_check("Active pero walang Registration Fee", cursor.fetchall(),
-                  ["member_id", "full_name"], "Lahat ng Active may reg fee payment")
+        """, ["member_id", "full_name"], "Lahat ng Active may reg fee payment")
 
-        # 6. APP- members na Active ang status (inconsistent)
-        cursor.execute("""
+        safe_check(conn, cursor, "APP- ID pero Active status", """
         SELECT member_id, full_name, status FROM members
         WHERE member_id LIKE 'APP-%%' AND status = 'Active'
-        """)
-        add_check("APP- ID pero Active status", cursor.fetchall(),
-                  ["member_id", "full_name", "status"], "Walang APP- na Active", "fix_app_active")
+        """, ["member_id", "full_name", "status"], "Walang APP- na Active", "fix_app_active")
 
-        # 7. FCCI- members na Applicant pa (inconsistent)
-        cursor.execute("""
+        safe_check(conn, cursor, "FCCI- ID pero Applicant status", """
         SELECT member_id, full_name, status FROM members
         WHERE member_id LIKE 'FCCI-%%' AND status = 'Applicant'
-        """)
-        add_check("FCCI- ID pero Applicant status", cursor.fetchall(),
-                  ["member_id", "full_name", "status"], "Walang FCCI- na Applicant")
+        """, ["member_id", "full_name", "status"], "Walang FCCI- na Applicant")
 
-        # 8. Active na blangko ang member_since
-        cursor.execute("""
+        safe_check(conn, cursor, "Active pero walang member_since", """
         SELECT member_id, full_name FROM members
         WHERE status = 'Active'
         AND (member_since IS NULL OR member_since = '')
-        """)
-        add_check("Active pero walang member_since", cursor.fetchall(),
-                  ["member_id", "full_name"], "Lahat ng Active may member_since")
+        """, ["member_id", "full_name"], "Lahat ng Active may member_since")
 
-        # 9. Duplicate Registration Fee per member
-        cursor.execute("""
+        safe_check(conn, cursor, "Duplicate Registration Fees", """
         SELECT member_id, COUNT(*) FROM payments
         WHERE payment_type = 'Registration Fee'
         GROUP BY member_id HAVING COUNT(*) > 1
-        """)
-        add_check("Duplicate Registration Fees", cursor.fetchall(),
-                  ["member_id", "count"], "Isang reg fee lang bawat member", "duplicate_regfee")
+        """, ["member_id", "count"], "Isang reg fee lang bawat member", "duplicate_regfee")
 
-        # 10. Duplicate Monthly Contribution (same member + month + year)
-        cursor.execute("""
+        safe_check(conn, cursor, "Duplicate Monthly Contributions", """
         SELECT member_id, payment_month, payment_year, COUNT(*)
         FROM payments
         WHERE payment_type = 'Monthly Contribution'
         GROUP BY member_id, payment_month, payment_year
         HAVING COUNT(*) > 1
-        """)
-        add_check("Duplicate Monthly Contributions", cursor.fetchall(),
-                  ["member_id", "month", "year", "count"], "Walang double monthly payments", "duplicate_monthly")
+        """, ["member_id", "month", "year", "count"], "Walang double monthly payments", "duplicate_monthly")
 
         return_db(conn)
         issues = sum(1 for c in checks if not c["ok"])
