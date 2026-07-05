@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FCCI Member Registration</title>
+<title>Registration Confirmation - FCCI</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
@@ -32,8 +32,8 @@
     mask-image:radial-gradient(circle at 50% 10%, rgba(0,0,0,0.5) 0%, transparent 65%);
     pointer-events:none; z-index:0;
   }
-  .reg-wrap { max-width:640px; margin:0 auto; padding:48px 20px; position:relative; z-index:1; }
-  .reg-header { text-align:center; margin-bottom:28px; }
+  .reg-wrap { max-width:520px; margin:0 auto; padding:48px 20px; position:relative; z-index:1; }
+  .reg-header { text-align:center; margin-bottom:24px; }
   .reg-logo-ring {
     width:80px; height:80px; border-radius:50%; margin:0 auto 14px; position:relative;
     display:flex; align-items:center; justify-content:center;
@@ -48,41 +48,87 @@
     70% { transform:scale(1.25); opacity:0; }
     100% { transform:scale(1.25); opacity:0; }
   }
-  .reg-logo-ring img { width:58px; height:58px; object-fit:contain; border-radius:50%; position:relative; z-index:1; box-shadow:0 2px 12px rgba(0,100,60,0.15); }
-  .reg-header h2 { font-family:'Space Grotesk', sans-serif; font-size:26px; font-weight:700; color:var(--emerald-deep); }
-  .reg-header p { font-size:13px; color:var(--text-dim); letter-spacing:0.5px; }
-  .reg-card { background:var(--glass); backdrop-filter:blur(20px); border:1px solid var(--glass-border); border-radius:22px; padding:34px 36px; box-shadow:0 8px 30px rgba(0,150,90,0.1); }
-  .form-group { margin-bottom:18px; }
-  .form-group label { display:block; font-size:12px; font-weight:600; color:var(--emerald-deep); letter-spacing:0.5px; text-transform:uppercase; margin-bottom:6px; }
-  .form-control, textarea.form-control {
-    background:rgba(255,255,255,0.8); border:1px solid var(--glass-border); border-radius:12px;
-    padding:12px 16px; font-size:14.5px; color:var(--text-main); width:100%;
-    transition:border-color 0.2s, box-shadow 0.2s;
-  }
-  .form-control::placeholder { color:#9bb8a8; }
-  .form-control:focus, textarea.form-control:focus { outline:none; border-color:var(--emerald); box-shadow:0 0 0 3px rgba(0,196,106,0.15); }
-  input[type="file"].form-control { padding:9px 14px; }
-  .btn-submit {
-    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none;
-    border-radius:12px; padding:13px 0; width:100%; font-weight:600; font-size:15px; letter-spacing:0.4px;
-    box-shadow:0 6px 20px rgba(0,168,92,0.3); transition:transform 0.2s, box-shadow 0.2s; cursor:pointer;
-  }
-  .btn-submit:hover { transform:translateY(-2px); box-shadow:0 10px 26px rgba(0,168,92,0.4); }
-  .row-fields { display:flex; gap:16px; }
-  .row-fields .form-group { flex:1; }
-  @media (max-width:560px) { .row-fields { flex-direction:column; gap:0; } }
+  .reg-logo-ring img { width:58px; height:58px; object-fit:contain; border-radius:50%; position:relative; z-index:1; }
+  .reg-header h2 { font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:700; color:var(--emerald-deep); }
 
-  /* Error/success alerts */
-  .alert-duplicate {
-    background:rgba(220,53,69,0.1); border:1px solid rgba(220,53,69,0.3);
-    border-radius:14px; padding:16px 20px; margin-bottom:20px;
-    color:#c0392b; font-size:13.5px; font-weight:500;
+  .slip-card {
+    background:var(--glass); backdrop-filter:blur(20px); border:1px solid var(--glass-border);
+    border-radius:22px; padding:30px 32px; box-shadow:0 8px 30px rgba(0,150,90,0.1); text-align:center;
   }
-  .alert-success-box {
+  .slip-check { font-size:48px; margin-bottom:6px; }
+  .slip-card h3 { font-family:'Space Grotesk', sans-serif; font-size:20px; color:var(--text-main); margin-bottom:6px; }
+  .applicant-id {
+    font-family:'Space Grotesk', sans-serif; font-size:20px; font-weight:700;
     background:rgba(0,196,106,0.1); border:1px solid rgba(0,196,106,0.3);
-    border-radius:14px; padding:16px 20px; margin-bottom:20px;
-    color:var(--emerald-deep); font-size:13.5px; font-weight:500; text-align:center;
+    border-radius:12px; padding:10px 20px; display:inline-block; margin:12px 0; color:var(--emerald-deep);
   }
+  .slip-card p { font-size:13.5px; color:var(--text-dim); margin-bottom:6px; }
+
+  .btn-download {
+    background:rgba(0,100,60,0.08); color:var(--emerald-deep); border:1px solid var(--glass-border);
+    border-radius:12px; padding:10px 22px; font-weight:600; font-size:14px; text-decoration:none;
+    display:inline-block; margin-top:6px;
+  }
+
+  .pay-section { margin-top:24px; padding-top:20px; border-top:1px dashed var(--glass-border); }
+  .pay-section h4 { font-family:'Space Grotesk', sans-serif; font-size:17px; color:var(--text-main); margin-bottom:6px; }
+  .amount { font-size:28px; font-weight:700; color:var(--emerald-deep); margin-bottom:14px; }
+
+  .btn-pay {
+    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none;
+    border-radius:12px; padding:12px 28px; font-weight:600; font-size:15px;
+    box-shadow:0 6px 20px rgba(0,168,92,0.3); cursor:pointer; width:100%; margin-bottom:10px;
+  }
+  .btn-later {
+    background:none; color:var(--text-dim); border:1px solid var(--glass-border);
+    border-radius:12px; padding:11px 28px; font-weight:600; font-size:14px;
+    text-decoration:none; display:block; width:100%; text-align:center;
+    transition:all 0.2s;
+  }
+  .btn-later:hover { background:rgba(0,100,60,0.05); color:var(--emerald-deep); }
+
+  .already-uploaded {
+    background:rgba(0,196,106,0.1); border:1px solid rgba(0,196,106,0.3);
+    border-radius:12px; padding:14px 18px; color:var(--emerald-deep); font-size:13.5px; margin-top:14px;
+  }
+  .btn-home {
+    display:block; text-align:center; margin-top:14px;
+    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff;
+    border-radius:12px; padding:12px 0; font-weight:600; font-size:14px; text-decoration:none;
+    box-shadow:0 4px 14px rgba(0,168,92,0.25);
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    display:none; position:fixed; inset:0; background:rgba(10,30,20,0.45);
+    backdrop-filter:blur(4px); z-index:100; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-overlay.show { display:flex; }
+  .modal-box {
+    background:#ffffff; border-radius:20px; padding:28px; max-width:420px; width:100%;
+    box-shadow:0 20px 50px rgba(0,50,30,0.25); position:relative;
+  }
+  .modal-box h4 { font-family:'Space Grotesk', sans-serif; color:var(--emerald-deep); margin-bottom:16px; text-align:center; }
+  .modal-close-x {
+    position:absolute; top:14px; right:18px; background:none; border:none;
+    font-size:20px; color:var(--text-dim); cursor:pointer; line-height:1;
+  }
+  .bank-details { background:rgba(0,196,106,0.08); border:1px solid rgba(0,196,106,0.25); border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+  .bank-row { display:flex; justify-content:space-between; padding:6px 0; font-size:13.5px; border-bottom:1px solid rgba(0,100,60,0.08); }
+  .bank-row:last-child { border-bottom:none; }
+  .bank-row .lbl { color:var(--text-dim); font-weight:600; }
+  .bank-row .val { color:var(--text-main); font-weight:700; }
+  .form-control { background:rgba(255,255,255,0.8); border:1px solid var(--glass-border); border-radius:12px; padding:10px 14px; font-size:14px; width:100%; margin-bottom:14px; }
+  .btn-submit-proof {
+    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none;
+    border-radius:12px; padding:12px 0; width:100%; font-weight:600; font-size:14.5px; cursor:pointer;
+  }
+  .btn-close-modal {
+    display:block; text-align:center; margin-top:10px; color:var(--text-dim);
+    font-size:13.5px; font-weight:600; cursor:pointer; background:none; border:none; width:100%;
+    padding:8px 0;
+  }
+  .btn-close-modal:hover { color:var(--emerald-deep); }
 </style>
 
   <!-- PWA -->
@@ -98,147 +144,85 @@
 <body>
 <div class="ambient-orb o1"></div>
 <div class="ambient-orb o2"></div>
+
 <div class="reg-wrap">
 
   <div class="reg-header">
     <div class="reg-logo-ring"><img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI"></div>
-    <h2>FCCI Online Registration</h2>
-    <p>Filipino Community Center International</p>
+    <h2>Registration Submitted!</h2>
   </div>
 
-  {% if submitted %}
-  <div class="alert-success-box">
-    ✅ Matagumpay na na-submit ang iyong proof of payment! Hintayin ang approval ng FCCI staff.
-    Pwede ka nang mag-register ng bagong member sa ibaba.
+  <div class="slip-card">
+    <div class="slip-check">✅</div>
+    <h3>Save Your Registration Slip</h3>
+    <p>Your Applicant ID:</p>
+    <div class="applicant-id">{{ member.member_id }}</div>
+    <p>{{ member.full_name }}</p>
+
+    <a href="/applicant_slip/{{ member.member_id }}" class="btn-download">⬇️ Download Slip (PDF)</a>
+
+    <div class="pay-section">
+      <h4>💳 Pay Your Registration Fee</h4>
+      <div class="amount">₩20,000</div>
+
+      {% if member.proof_uploaded %}
+      <div class="already-uploaded">
+        ✅ Na-submit na ang proof of payment! Hintayin ang approval ng FCCI staff.
+      </div>
+      <a href="/member_registration" class="btn-home">🏠 Return to Home</a>
+
+      {% else %}
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:14px;">
+        I-transfer ang ₩20,000 sa bank account sa ibaba, tapos i-upload ang iyong proof of payment.
+      </p>
+      <button type="button" class="btn-pay" onclick="document.getElementById('payModal').classList.add('show')">
+        💳 Pay Now
+      </button>
+      <a href="/member_registration" class="btn-later">⏰ Pay Later — Return to Home</a>
+      {% endif %}
+    </div>
   </div>
-  {% endif %}
-
-  {% if duplicate_error or error %}
-  <div class="alert-duplicate">
-    ⚠️ {{ error or duplicate_error }}
-  </div>
-  {% endif %}
-
-  <div class="reg-card">
-    <form method="POST" enctype="multipart/form-data">
-
-      <div class="form-group">
-        <label>Full Name</label>
-        <input type="text" name="full_name" class="form-control" placeholder="DELA CRUZ JUAN" required>
-      </div>
-
-      <div class="row-fields">
-        <div class="form-group">
-          <label>Contact Number</label>
-          <input type="text" name="contact" class="form-control" placeholder="09171234567" required>
-        </div>
-        <div class="form-group">
-          <label>Birthday</label>
-          <input type="date" name="birthday" class="form-control">
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" name="email" class="form-control" placeholder="juandelacruz@email.com">
-      </div>
-
-      <div class="form-group">
-        <label>Address</label>
-        <textarea name="address" class="form-control" rows="3" placeholder="123 Mabini Street, Brgy. San Jose, Quezon City"></textarea>
-      </div>
-
-      <div class="form-group">
-        <label>Member Since — Buwan ng Pagpasok sa FCCI</label>
-        <div style="display:flex;gap:10px;">
-          <select id="ms_month" class="form-control" required>
-            <option value="">-- Buwan --</option>
-            <option value="January">January</option>
-            <option value="February">February</option>
-            <option value="March">March</option>
-            <option value="April">April</option>
-            <option value="May">May</option>
-            <option value="June">June</option>
-            <option value="July">July</option>
-            <option value="August">August</option>
-            <option value="September">September</option>
-            <option value="October">October</option>
-            <option value="November">November</option>
-            <option value="December">December</option>
-          </select>
-          <select id="ms_year" class="form-control" required>
-            <option value="">-- Taon --</option>
-          </select>
-        </div>
-        <!-- Hidden input na siyang isesend sa server -->
-        <input type="hidden" name="member_since" id="member_since_value">
-        <p style="font-size:11.5px;color:var(--text-dim);margin-top:6px;">Ang buwan na ito ang magiging official na "Member Since" mo kapag na-approve ka na ng admin.</p>
-      </div>
-
-      <div class="form-group">
-        <label>Applicant Photo</label>
-        <input type="file" name="photo" class="form-control" accept="image/*">
-      </div>
-
-      <button type="submit" class="btn-submit" id="submitBtn" onclick="return handleSubmit(this)">Submit Registration</button>
-
-<script>
-function handleSubmit(btn) {
-  // I-validate muna ang member_since
-  if (!combineMemberSince()) return false;
-
-  // I-disable ang button para hindi ma-double-click
-  btn.disabled = true;
-  btn.textContent = '⏳ Submitting...';
-  btn.style.opacity = '0.7';
-
-  // Safety net — i-re-enable ang button pagkatapos ng 15 segundo
-  // kung hindi natapos ang submit (hal. network issue)
-  setTimeout(() => {
-    btn.disabled = false;
-    btn.textContent = 'Submit Registration';
-    btn.style.opacity = '1';
-  }, 15000);
-
-  return true;
-}
-</script>
-
-    </form>
-  </div>
-
-<script>
-// Auto-generate years: 2025 hanggang current year + 3
-(function() {
-  const yearSelect = document.getElementById('ms_year');
-  const currentYear = new Date().getFullYear();
-  for (let y = 2025; y <= currentYear + 3; y++) {
-    const opt = document.createElement('option');
-    opt.value = y;
-    opt.textContent = y;
-    if (y === currentYear) opt.selected = true;
-    yearSelect.appendChild(opt);
-  }
-
-  // I-set ang default month sa current month
-  const months = ["January","February","March","April","May","June",
-                  "July","August","September","October","November","December"];
-  document.getElementById('ms_month').value = months[new Date().getMonth()];
-})();
-
-function combineMemberSince() {
-  const month = document.getElementById('ms_month').value;
-  const year = document.getElementById('ms_year').value;
-  if (!month || !year) {
-    alert('Piliin ang buwan at taon ng Member Since.');
-    return false;
-  }
-  document.getElementById('member_since_value').value = month + ' ' + year;
-  return true;
-}
-</script>
 
 </div>
+
+<!-- PAY NOW MODAL -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal-box">
+    <button class="modal-close-x" onclick="closeModal()">✕</button>
+    <h4>💳 Registration Fee Payment</h4>
+
+    <div class="bank-details">
+      <div class="bank-row"><span class="lbl">Bank</span><span class="val">bank</span></div>
+      <div class="bank-row"><span class="lbl">Account Name</span><span class="val">FCCI KOREA</span></div>
+      <div class="bank-row"><span class="lbl">Account Number</span><span class="val">TO FOLLOW</span></div>
+      <div class="bank-row"><span class="lbl">Amount</span><span class="val">₩20,000</span></div>
+    </div>
+
+    <form method="POST" action="/upload_proof_of_payment" enctype="multipart/form-data">
+      <input type="hidden" name="member_id" value="{{ member.member_id }}">
+
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--emerald-deep);text-transform:uppercase;margin-bottom:6px;">
+        Upload Proof of Payment
+      </label>
+      <input type="file" name="proof_of_payment" class="form-control" accept="image/*" required>
+
+      <button type="submit" class="btn-submit-proof" onclick="const b=this;setTimeout(()=>{b.disabled=true;b.textContent='⏳ Uploading...';b.style.opacity='0.7';setTimeout(()=>{b.disabled=false;b.textContent='✅ Submit Proof of Payment';b.style.opacity='1';},15000);},0);return true;">✅ Submit Proof of Payment</button>
+    </form>
+
+    <button class="btn-close-modal" onclick="closeModal()">✕ Close — I'll pay later</button>
+  </div>
+</div>
+
+<script>
+function closeModal() {
+  document.getElementById('payModal').classList.remove('show');
+}
+// Close modal when clicking outside
+document.getElementById('payModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+
 
 <script>
 if ("serviceWorker" in navigator) {
@@ -247,163 +231,5 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
-<!-- ════════════════════════════════════════════════════════
-     FCCI AI ASSISTANT WIDGET (libre — keyword matching lang)
-     I-include ito sa lahat ng pages bago ang </body>
-════════════════════════════════════════════════════════ -->
-
-<button class="ai-launcher" id="aiLauncher" onclick="toggleAI()">
-  <div class="ai-launcher-ring"></div>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 2a3 3 0 0 0-3 3v1.17A6 6 0 0 0 4 12v2a2 2 0 0 0-1 1.73v2a2 2 0 0 0 2 2h.18a3 3 0 0 0 5.64 0h2.36a3 3 0 0 0 5.64 0H19a2 2 0 0 0 2-2v-2a2 2 0 0 0-1-1.73v-2a6 6 0 0 0-5-5.83V5a3 3 0 0 0-3-3z"/>
-    <circle cx="9" cy="13" r="1"/>
-    <circle cx="15" cy="13" r="1"/>
-  </svg>
-  <div class="ai-launcher-dot"></div>
-</button>
-
-<div class="ai-panel" id="aiPanel">
-  <div class="ai-panel-head">
-    <div class="ai-avatar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2a3 3 0 0 0-3 3v1.17A6 6 0 0 0 4 12v2a2 2 0 0 0-1 1.73v2a2 2 0 0 0 2 2h.18a3 3 0 0 0 5.64 0h2.36a3 3 0 0 0 5.64 0H19a2 2 0 0 0 2-2v-2a2 2 0 0 0-1-1.73v-2a6 6 0 0 0-5-5.83V5a3 3 0 0 0-3-3z"/>
-        <circle cx="9" cy="13" r="1"/>
-        <circle cx="15" cy="13" r="1"/>
-      </svg>
-    </div>
-    <div class="ai-panel-titles">
-      <div class="ai-panel-name">FCCI Assistant</div>
-      <div class="ai-panel-status"><span class="ai-status-dot"></span> Online · Tagalog &amp; English</div>
-    </div>
-    <button class="ai-panel-close" onclick="toggleAI()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-  </div>
-
-  <div class="ai-lang-toggle">
-    <button class="ai-lang-btn active" id="langTl" onclick="setLang('tl')">Tagalog</button>
-    <button class="ai-lang-btn" id="langEn" onclick="setLang('en')">English</button>
-  </div>
-
-  <div class="ai-messages" id="aiMessages">
-    <div class="ai-msg bot">
-      <div class="ai-msg-av">AI</div>
-      <div class="ai-msg-bubble">Kumusta! Ako ang FCCI Assistant. Tanungin mo ako tungkol sa members, payments, o kahit anong feature ng system. 😊</div>
-    </div>
-  </div>
-
-  <div class="ai-suggestions" id="aiSuggestions">
-    <span class="ai-chip" onclick="askSuggested(this)">Paano mag-add ng member?</span>
-    <span class="ai-chip" onclick="askSuggested(this)">Paano mag-approve ng applicant?</span>
-    <span class="ai-chip" onclick="askSuggested(this)">Paano mag-record ng payment?</span>
-  </div>
-
-  <div class="ai-input-row">
-    <input type="text" class="ai-input" id="aiInput" placeholder="Mag-tanong dito..." onkeydown="if(event.key==='Enter')sendAI()">
-    <button class="ai-send" onclick="sendAI()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-    </button>
-  </div>
-</div>
-
-<script>
-  let currentLang = 'tl';
-
-  function toggleAI() {
-    document.getElementById('aiPanel').classList.toggle('open');
-  }
-
-  function setLang(lang) {
-    currentLang = lang;
-    document.getElementById('langTl').classList.toggle('active', lang === 'tl');
-    document.getElementById('langEn').classList.toggle('active', lang === 'en');
-    const input = document.getElementById('aiInput');
-    input.placeholder = lang === 'tl' ? 'Mag-tanong dito...' : 'Ask me anything...';
-
-    const chips = document.querySelectorAll('.ai-chip');
-    const tlChips = ['Paano mag-add ng member?', 'Paano mag-approve ng applicant?', 'Paano mag-record ng payment?'];
-    const enChips = ['How do I add a member?', 'How do I approve an applicant?', 'How do I record a payment?'];
-    chips.forEach((c, i) => { if (tlChips[i]) c.textContent = lang === 'tl' ? tlChips[i] : enChips[i]; });
-  }
-
-  function askSuggested(el) {
-    const input = document.getElementById('aiInput');
-    input.value = el.textContent;
-    sendAI();
-  }
-
-  const FCCI_RESPONSES = {
-    tl: [
-      { match: ['add', 'member', 'dagdag', 'bagong miyembro'], reply: 'Para magdagdag ng bagong member: pumunta sa <strong>Members</strong> sa sidebar, i-click ang "Add Member" button, punan ang form (pangalan, contact, address, member since), at i-save. Awtomatikong gagawa ng APP- o FCCI- ID ang system.' },
-      { match: ['approve', 'applicant', 'aprubahan', 'aprob'], reply: 'Pumunta sa <strong>Reg. Approval</strong> sa sidebar. Makikita mo doon ang lahat ng applicants na may status na "Applicant". I-click ang "Approve" button para i-convert sila sa opisyal na FCCI member — awtomatikong gagawa ng FCCI ID, magse-set ng Registration Fee, at magpapadala ng welcome email.' },
-      { match: ['payment', 'bayad', 'magbayad', 'record payment'], reply: 'Pumunta sa <strong>Payments</strong> sa sidebar. I-type ang member ID o pangalan, piliin ang payment type (Monthly Contribution o Registration Fee), ilagay ang buwan at taon, tapos i-click ang "Save Payment".' },
-      { match: ['outstanding', 'balance', 'utang'], reply: 'Makikita mo ang mga miyembrong may outstanding balance sa <strong>Dashboard</strong>. Ang outstanding ay kinukwenta base sa bilang ng buwan na hindi pa nababayaran simula sa member since nila.' },
-      { match: ['export', 'report', 'i-download'], reply: 'Pumunta sa <strong>Export Center</strong> sa sidebar para mag-download ng reports.' },
-      { match: ['scan', 'qr'], reply: 'Sa Members o Payments page, i-click ang QR scanner icon para mag-pair ng phone camera at mabilis na ma-scan ang member ID.' },
-      { match: ['attendance', 'pumasok', 'present'], reply: 'Pumunta sa <strong>Attendance</strong> sa sidebar para mag-record ng attendance gamit ang QR scanner o manual entry.' },
-      { match: ['delete', 'tanggal', 'burahin'], reply: 'Sa Member Profile, may "Delete Member" button. Mag-iingat dahil permanente ito at matatanggal lahat ng kaugnay na records.' },
-      { match: ['edit', 'baguhin', 'palitan'], reply: 'Sa Member Profile, i-click ang "Edit Member" button para baguhin ang impormasyon tulad ng contact, address, o member since.' },
-      { match: ['withdraw', 'umalis', 'withdrawal'], reply: 'Pumunta sa <strong>Withdrawals</strong> sa sidebar para mag-process ng member withdrawal at makagawa ng withdrawal certificate.' },
-    ],
-    en: [
-      { match: ['add', 'member', 'new member'], reply: 'To add a new member: go to <strong>Members</strong> in the sidebar, click "Add Member", fill in the form (name, contact, address, member since), then save. The system will auto-generate an APP- or FCCI- ID.' },
-      { match: ['approve', 'applicant'], reply: 'Go to <strong>Reg. Approval</strong> in the sidebar. You\'ll see all applicants with "Applicant" status there. Click "Approve" to convert them to an official FCCI member — it auto-generates an FCCI ID, sets the Registration Fee, and sends a welcome email.' },
-      { match: ['payment', 'record payment'], reply: 'Go to <strong>Payments</strong> in the sidebar. Type the member ID or name, select payment type (Monthly Contribution or Registration Fee), enter the month and year, then click "Save Payment".' },
-      { match: ['outstanding', 'balance'], reply: 'You can find members with outstanding balances on the <strong>Dashboard</strong>. Outstanding is calculated based on the number of unpaid months since their member-since date.' },
-      { match: ['export', 'report'], reply: 'Go to <strong>Export Center</strong> in the sidebar to download reports.' },
-      { match: ['scan', 'qr'], reply: 'On the Members or Payments page, click the QR scanner icon to pair your phone camera for quick member ID scanning.' },
-      { match: ['attendance'], reply: 'Go to <strong>Attendance</strong> in the sidebar to record attendance using the QR scanner or manual entry.' },
-      { match: ['delete'], reply: 'On the Member Profile, there\'s a "Delete Member" button. Be careful as this is permanent and removes all related records.' },
-      { match: ['edit'], reply: 'On the Member Profile, click "Edit Member" to change information like contact, address, or member since.' },
-      { match: ['withdraw', 'withdrawal'], reply: 'Go to <strong>Withdrawals</strong> in the sidebar to process a member withdrawal and generate a withdrawal certificate.' },
-    ]
-  };
-
-  const AI_FALLBACK = {
-    tl: 'Pasensya na, hindi ko masyadong naintindihan iyan. Pwede mo bang i-rephrase, o piliin ang isa sa mga suggestion sa ibaba?',
-    en: "Sorry, I didn't quite catch that. Could you rephrase, or try one of the suggestions below?"
-  };
-
-  function findAIResponse(text, lang) {
-    const lower = text.toLowerCase();
-    const pool = FCCI_RESPONSES[lang];
-    for (const item of pool) {
-      if (item.match.some(k => lower.includes(k))) return item.reply;
-    }
-    return AI_FALLBACK[lang];
-  }
-
-  function appendAIMessage(role, text) {
-    const wrap = document.getElementById('aiMessages');
-    const msg = document.createElement('div');
-    msg.className = 'ai-msg ' + role;
-    msg.innerHTML = `<div class="ai-msg-av">${role === 'bot' ? 'AI' : 'You'}</div><div class="ai-msg-bubble">${text}</div>`;
-    wrap.appendChild(msg);
-    wrap.scrollTop = wrap.scrollHeight;
-    return msg;
-  }
-
-  function sendAI() {
-    const input = document.getElementById('aiInput');
-    const text = input.value.trim();
-    if (!text) return;
-    appendAIMessage('user', text);
-    input.value = '';
-
-    const wrap = document.getElementById('aiMessages');
-    const typing = document.createElement('div');
-    typing.className = 'ai-msg bot';
-    typing.innerHTML = '<div class="ai-msg-av">AI</div><div class="ai-msg-bubble"><div class="ai-typing"><span></span><span></span><span></span></div></div>';
-    wrap.appendChild(typing);
-    wrap.scrollTop = wrap.scrollHeight;
-
-    setTimeout(() => {
-      typing.remove();
-      const reply = findAIResponse(text, currentLang);
-      appendAIMessage('bot', reply);
-    }, 600 + Math.random() * 400);
-  }
-</script>
-
 </body>
 </html>
