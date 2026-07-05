@@ -127,6 +127,7 @@
       <span class="chip">PY {{ python_version }}</span>
       <a href="/dev_db" class="chip" style="text-decoration:none;color:var(--cyan);border-color:rgba(0,212,200,0.4);">⛁ DB Editor</a>
       <a href="/dev_photos" class="chip" style="text-decoration:none;color:var(--violet);border-color:rgba(124,109,240,0.4);">🖼 Photos</a>
+      <a href="/dev_backup" class="chip" style="text-decoration:none;color:var(--gold);border-color:rgba(240,169,63,0.4);">⬇ Backup</a>
       <a href="/dev_logout" class="exit">✕ Exit Dev Mode</a>
     </div>
   </div>
@@ -181,6 +182,16 @@
     <div id="sqlResult"></div>
   </div>
 
+  <div class="section-title">Member 360° Lookup</div>
+  <div class="card">
+    <div class="sql-actions" style="margin-top:0;">
+      <input type="text" class="search" id="lookupInput" placeholder="🔍 Member ID, pangalan, o contact..."
+             style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter')memberLookup()">
+      <button class="btn-run" onclick="memberLookup()">Search</button>
+    </div>
+    <div id="lookupResult"></div>
+  </div>
+
   <div class="section-title">Data Integrity Checker</div>
   <div class="card">
     <div class="sql-actions" style="margin-top:0;">
@@ -227,6 +238,13 @@
     {% endif %}
   </div>
 
+  <div class="section-title">System Config
+    <button class="btn-run" style="padding:5px 12px;font-size:11px;margin-left:10px;" onclick="loadConfig()">Load</button>
+  </div>
+  <div class="card" id="configCard">
+    <span class="empty">I-click ang "Load" para makita ang environment at packages.</span>
+  </div>
+
   <div class="section-title">Live Application Logs (pinakabago sa itaas)</div>
   <div class="logs">
     {% if logs %}
@@ -245,6 +263,114 @@
 </div>
 
 <script>
+function memberLookup() {
+  const q = document.getElementById('lookupInput').value.trim();
+  const out = document.getElementById('lookupResult');
+  if (!q) return;
+  out.innerHTML = '<div class="sql-note" style="margin-top:12px;">⏳ Searching...</div>';
+
+  fetch('/dev_member_lookup?q=' + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { out.innerHTML = '<div class="sql-error">✗ ' + data.error + '</div>'; return; }
+      if (!data.found) { out.innerHTML = '<div class="sql-note" style="margin-top:12px;">Walang nahanap na member.</div>'; return; }
+
+      const m = data.member;
+      const s = data.summary;
+      let html = '<div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;">';
+
+      // Photo
+      if (data.photos.length) {
+        html += '<img src="' + data.photos[0].replace("/upload/","/upload/w_130,h_130,c_fill,q_auto/") +
+                '" style="width:110px;height:110px;border-radius:14px;object-fit:cover;border:1px solid rgba(0,212,200,0.3);">';
+      }
+
+      // Profile fields
+      html += '<div style="flex:1;min-width:240px;">';
+      html += '<div style="font-size:19px;font-weight:800;color:#fff;">' + m.full_name + '</div>';
+      html += '<div style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--cyan);margin-bottom:10px;">' + m.member_id +
+              ' · <span style="color:' + (m.status==='Active'?'var(--cyan)':'var(--gold)') + ';">' + m.status + '</span></div>';
+      const fields = [['Contact',m.contact],['Email',m.email],['Address',m.address],
+                      ['Birthday',m.birthday],['Member Since',m.member_since],
+                      ['Registered',m.date_registered],['Reg Fee','₩'+m.registration_fee]];
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:12px;">';
+      fields.forEach(f => {
+        html += '<div><span style="color:rgba(255,255,255,0.4);">' + f[0] + ':</span> <span style="color:rgba(255,255,255,0.8);">' + (f[1]||'—') + '</span></div>';
+      });
+      html += '</div></div>';
+
+      // Summary chips
+      html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+      html += '<div class="stat-chip" style="background:rgba(0,212,200,0.1);">Total Paid: <b style="color:var(--cyan);">₩' + s.total_paid.toLocaleString() + '</b></div>';
+      html += '<div class="stat-chip">Payments: <b>' + s.payment_count + '</b></div>';
+      html += '<div class="stat-chip">Monthly: <b>' + s.monthly_count + '</b></div>';
+      html += '<div class="stat-chip">Reg Fee: <b style="color:' + (s.has_regfee?'var(--cyan)':'var(--red)') + ';">' + (s.has_regfee?'✓ Bayad':'✗ Wala') + '</b></div>';
+      html += '<div class="stat-chip">Attendance: <b>' + s.attendance_count + '</b></div>';
+      html += '</div>';
+      html += '</div>';
+
+      // Payments table
+      if (data.payments.length) {
+        html += '<div class="result-wrap" style="margin-top:16px;"><table><thead><tr>' +
+                '<th>Receipt</th><th>Type</th><th>Amount</th><th>Month</th><th>Year</th><th>Date</th>' +
+                '</tr></thead><tbody>';
+        data.payments.forEach(p => {
+          html += '<tr><td>' + p.receipt_no + '</td><td>' + p.type + '</td><td>₩' + p.amount +
+                  '</td><td>' + p.month + '</td><td>' + p.year + '</td><td>' + p.date + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+
+      out.innerHTML = html;
+    })
+    .catch(e => out.innerHTML = '<div class="sql-error">✗ ' + e + '</div>');
+}
+
+function loadConfig() {
+  const card = document.getElementById('configCard');
+  card.innerHTML = '<span class="empty">⏳ Loading...</span>';
+  fetch('/dev_config')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { card.innerHTML = '<div class="sql-error">✗ ' + data.error + '</div>'; return; }
+      let html = '<div style="font-family:JetBrains Mono,monospace;font-size:12px;">';
+      html += '<div style="margin-bottom:12px;"><span style="color:rgba(255,255,255,0.4);">Python:</span> <span style="color:var(--cyan);">' + data.python + '</span> · <span style="color:rgba(255,255,255,0.4);">Platform:</span> ' + data.platform + '</div>';
+
+      html += '<div style="color:var(--cyan);font-size:10px;letter-spacing:1px;margin:10px 0 6px;">ENVIRONMENT (masked)</div>';
+      for (const [k,v] of Object.entries(data.env_vars)) {
+        const isSet = v !== '(not set)';
+        html += '<div style="padding:3px 0;"><span style="color:rgba(255,255,255,0.5);">' + k + ':</span> <span style="color:' + (isSet?'rgba(255,255,255,0.8)':'var(--red)') + ';">' + v + '</span></div>';
+      }
+
+      html += '<div style="color:var(--cyan);font-size:10px;letter-spacing:1px;margin:14px 0 6px;">PACKAGES</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;">';
+      data.packages.forEach(p => {
+        html += '<div style="padding:2px 0;"><span style="color:rgba(255,255,255,0.5);">' + p.name + '</span> <span style="color:var(--cyan);">' + p.version + '</span></div>';
+      });
+      html += '</div></div>';
+      card.innerHTML = html;
+    })
+    .catch(e => card.innerHTML = '<div class="sql-error">✗ ' + e + '</div>');
+}
+
+function runAutoFix(fixType, btn) {
+  if (!confirm('Sigurado ka bang i-a-auto-fix ito? May mga records na made-delete o mababago.')) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Fixing...';
+  fetch('/dev_autofix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fix: fixType })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { alert('✗ ' + data.error); btn.disabled = false; btn.textContent = '🔧 Auto-Fix'; return; }
+      alert('✓ ' + data.result);
+      runHealthCheck();
+    })
+    .catch(e => { alert('✗ ' + e); btn.disabled = false; btn.textContent = '🔧 Auto-Fix'; });
+}
+
 function runHealthCheck() {
   const out = document.getElementById('healthResult');
   out.innerHTML = '<div class="sql-note" style="margin-top:12px;">⏳ Nagche-check ng data integrity...</div>';
@@ -268,7 +394,12 @@ function runHealthCheck() {
                   '<span style="color:var(--cyan);">✓</span> ' + c.name + ' — ' + c.msg + '</div>';
         } else {
           html += '<div style="font-size:12px;padding:10px 0;border-bottom:1px solid rgba(240,169,63,0.15);">' +
-                  '<div style="color:var(--gold);font-weight:700;">✗ ' + c.name + ' — ' + c.count + ' record(s)</div>';
+                  '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+                  '<span style="color:var(--gold);font-weight:700;">✗ ' + c.name + ' — ' + c.count + ' record(s)</span>';
+          if (c.fix) {
+            html += '<button class="btn-run" style="padding:5px 14px;font-size:11px;background:rgba(239,93,93,0.15);border:1px solid rgba(239,93,93,0.4);color:#f3a39d;" onclick="runAutoFix(\'' + c.fix + '\', this)">🔧 Auto-Fix</button>';
+          }
+          html += '</div>';
           html += '<div class="result-wrap" style="margin-top:8px;"><table><thead><tr>';
           c.columns.forEach(col => html += '<th>' + col + '</th>');
           html += '</tr></thead><tbody>';
