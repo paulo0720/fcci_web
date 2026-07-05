@@ -6001,6 +6001,241 @@ def dev_db_save():
         return jsonify({"error": str(e)[:300]})
 
 
+# ── DEV CLOUDINARY MANAGER ──────────────────────────────────
+# Makikita lahat ng photos sa Cloudinary, kung naka-link ba
+# sa member o orphan, may duplicate detection at bulk delete.
+
+@app.route("/dev_cloudinary")
+def dev_cloudinary():
+    if not _dev_auth_ok():
+        return redirect("/dev_login")
+    return render_template("dev_cloudinary.html")
+
+
+@app.route("/dev_cloudinary_data")
+def dev_cloudinary_data():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    try:
+        import cloudinary.api as cl_api
+
+        # ── Kunin lahat ng resources mula sa Cloudinary ──
+        resources = []
+        next_cursor = None
+        for _ in range(4):  # max ~2000 photos (4 pages x 500)
+            kwargs = {"max_results": 500, "type": "upload"}
+            if next_cursor:
+                kwargs["next_cursor"] = next_cursor
+            result = cl_api.resources(**kwargs)
+            resources.extend(result.get("resources", []))
+            next_cursor = result.get("next_cursor")
+            if not next_cursor:
+                break
+
+        # ── Kunin ang lahat ng photo references sa database ──
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT member_id, photo_path FROM member_photos WHERE photo_path IS NOT NULL AND photo_path != ''")
+        photo_refs = cursor.fetchall()
+
+        cursor.execute("SELECT member_id, proof_of_payment FROM members WHERE proof_of_payment IS NOT NULL AND proof_of_payment != ''")
+        proof_refs = cursor.fetchall()
+
+        return_db(conn)
+
+        # ── I-match ang bawat Cloudinary resource sa DB ──
+        items = []
+        for r in resources:
+            public_id = r.get("public_id", "")
+            secure_url = r.get("secure_url", "")
+
+            linked = []
+            for member_id, path in photo_refs:
+                if path and public_id in path:
+                    linked.append({"member_id": member_id, "type": "photo"})
+            for member_id, path in proof_refs:
+                if path and public_id in path:
+                    linked.append({"member_id": member_id, "type": "proof"})
+
+            items.append({
+                "public_id": public_id,
+                "url": secure_url,
+                "bytes": r.get("bytes", 0),
+                "width": r.get("width", 0),
+                "height": r.get("height", 0),
+                "format": r.get("format", ""),
+                "created": (r.get("created_at", "") or "")[:10],
+                "folder": public_id.rsplit("/", 1)[0] if "/" in public_id else "(root)",
+                "linked": linked
+            })
+
+        return jsonify({"items": items, "total": len(items)})
+
+    except Exception as e:
+        return jsonify({"error": str(e)[:300]})
+
+
+@app.route("/dev_cloudinary_delete", methods=["POST"])
+def dev_cloudinary_delete():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json(silent=True) or {}
+    public_ids = data.get("public_ids", [])
+
+    if not public_ids or not isinstance(public_ids, list):
+        return jsonify({"error": "Walang piniling photos"})
+
+    try:
+        import cloudinary.uploader as cl_up
+        deleted = 0
+        failed = []
+        for pid in public_ids[:50]:  # max 50 kada batch para ligtas
+            try:
+                result = cl_up.destroy(pid)
+                if result.get("result") == "ok":
+                    deleted += 1
+                else:
+                    failed.append(pid)
+            except Exception:
+                failed.append(pid)
+
+        logger.info(f"[DEV CLOUDINARY] {session['username']} deleted {deleted} photos")
+        return jsonify({"ok": True, "deleted": deleted, "failed": failed})
+
+    except Exception as e:
+        return jsonify({"error": str(e)[:300]})
+
+
+# ── DEV CLOUDINARY PHOTO MANAGER ────────────────────────────
+# Makikita lahat ng photos sa Cloudinary, kung naka-konekta ba
+# sa member o orphaned, may duplicate detection, at delete.
+
+@app.route("/dev_photos")
+def dev_photos():
+    if not _dev_auth_ok():
+        return redirect("/dev_login")
+    return render_template("dev_photos.html")
+
+
+@app.route("/dev_photos_data")
+def dev_photos_data():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    try:
+        import cloudinary.api as _cl_api
+
+        # ── Kunin lahat ng photos mula sa dalawang FCCI folders ──
+        resources = []
+        for prefix in ["fcci_member_photos", "fcci_proof_of_payment", "fcci_uploads"]:
+            cursor_token = None
+            while True:
+                params = {"type": "upload", "prefix": prefix, "max_results": 100}
+                if cursor_token:
+                    params["next_cursor"] = cursor_token
+                result = _cl_api.resources(**params)
+                resources.extend(result.get("resources", []))
+                cursor_token = result.get("next_cursor")
+                if not cursor_token:
+                    break
+
+        # ── Kunin ang DB references para malaman kung connected ──
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        SELECT member_id, photo_path FROM member_photos
+        WHERE photo_path IS NOT NULL AND photo_path != ''
+        """)
+        photo_refs = cursor.fetchall()
+
+        cursor.execute("""
+        SELECT member_id, proof_of_payment FROM members
+        WHERE proof_of_payment IS NOT NULL AND proof_of_payment != ''
+        """)
+        proof_refs = cursor.fetchall()
+        return_db(conn)
+
+        # ── I-match ang bawat Cloudinary photo sa DB records ──
+        def find_links(public_id):
+            links = []
+            for mid, url in photo_refs:
+                if url and public_id in url:
+                    links.append({"member_id": mid, "kind": "profile"})
+            for mid, url in proof_refs:
+                if url and public_id in url:
+                    links.append({"member_id": mid, "kind": "proof"})
+            return links
+
+        # ── Duplicate detection — group by file size (bytes) ──
+        from collections import Counter as _Counter
+        size_counts = _Counter(r.get("bytes", 0) for r in resources)
+
+        photos = []
+        for r in resources:
+            public_id = r.get("public_id", "")
+            links = find_links(public_id)
+            photos.append({
+                "public_id": public_id,
+                "url": r.get("secure_url", ""),
+                "bytes": r.get("bytes", 0),
+                "kb": round(r.get("bytes", 0) / 1024, 1),
+                "format": r.get("format", ""),
+                "created": (r.get("created_at", "") or "")[:10],
+                "folder": public_id.rsplit("/", 1)[0] if "/" in public_id else "",
+                "links": links,
+                "connected": len(links) > 0,
+                "dup_count": size_counts.get(r.get("bytes", 0), 1)
+            })
+
+        # Pinakabago muna
+        photos.sort(key=lambda p: p["created"], reverse=True)
+
+        return jsonify({
+            "photos": photos,
+            "total": len(photos),
+            "orphaned": sum(1 for p in photos if not p["connected"]),
+            "duplicates": sum(1 for p in photos if p["dup_count"] > 1)
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)[:300]})
+
+
+@app.route("/dev_photo_delete", methods=["POST"])
+def dev_photo_delete():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json(silent=True) or {}
+    public_ids = data.get("public_ids", [])
+    if not public_ids:
+        return jsonify({"error": "Walang piniling photos"})
+
+    try:
+        import cloudinary.uploader as _cl_up
+        deleted = 0
+        errors = []
+        for pid in public_ids[:50]:  # max 50 kada batch
+            try:
+                result = _cl_up.destroy(pid)
+                if result.get("result") == "ok":
+                    deleted += 1
+                else:
+                    errors.append(f"{pid}: {result.get('result')}")
+            except Exception as e:
+                errors.append(f"{pid}: {str(e)[:60]}")
+
+        logger.info(f"[DEV PHOTOS] {session['username']} deleted {deleted} photo(s)")
+        return jsonify({"ok": True, "deleted": deleted, "errors": errors})
+
+    except Exception as e:
+        return jsonify({"error": str(e)[:300]})
+
+
 if __name__ == "__main__":
 
     # ── TEST SUPABASE CONNECTION BAGO MAGSIMULA ──────────────
