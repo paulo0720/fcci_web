@@ -206,7 +206,7 @@
       </label>
       <input type="file" name="proof_of_payment" class="form-control" accept="image/*" required>
 
-      <button type="submit" class="btn-submit-proof" onclick="this.disabled=true;this.textContent='⏳ Uploading...';this.style.opacity='0.7';setTimeout(()=>{this.disabled=false;this.textContent='✅ Submit Proof of Payment';this.style.opacity='1';},15000);return true;">✅ Submit Proof of Payment</button>
+      <button type="submit" class="btn-submit-proof" onclick="const b=this;setTimeout(()=>{b.disabled=true;b.textContent='⏳ Uploading...';b.style.opacity='0.7';setTimeout(()=>{b.disabled=false;b.textContent='✅ Submit Proof of Payment';b.style.opacity='1';},15000);},0);return true;">✅ Submit Proof of Payment</button>
     </form>
 
     <button class="btn-close-modal" onclick="closeModal()">✕ Close — I'll pay later</button>
