@@ -180,6 +180,52 @@
     <div id="sqlResult"></div>
   </div>
 
+  <div class="section-title">Data Integrity Checker</div>
+  <div class="card">
+    <div class="sql-actions" style="margin-top:0;">
+      <button class="btn-run" onclick="runHealthCheck()">🩺 Run Health Check</button>
+      <span class="sql-note">Hinahanap ang duplicates, orphaned records, at inconsistent data.</span>
+    </div>
+    <div id="healthResult"></div>
+  </div>
+
+  {% if errors %}
+  <div class="section-title">⚠ Recent Errors ({{ errors|length }}) — may buong traceback</div>
+  <div class="logs" style="max-height:400px;">
+    {% for err in errors %}
+    <div style="margin-bottom:14px;border-bottom:1px solid rgba(239,93,93,0.15);padding-bottom:12px;">
+      <div class="log-line">
+        <span class="log-time">{{ err.time }}</span>
+        <span class="log-level ERROR">{{ err.route }}</span>
+        <span class="log-msg" style="color:#f3a39d;">{{ err.error }}</span>
+      </div>
+      <details style="margin-top:6px;">
+        <summary style="cursor:pointer;font-size:10.5px;color:rgba(255,255,255,0.4);">📋 Ipakita ang buong traceback</summary>
+        <pre style="margin-top:8px;padding:12px;background:rgba(0,0,0,0.4);border-radius:8px;font-size:10px;color:#f3a39d;overflow-x:auto;white-space:pre-wrap;">{{ err.traceback }}</pre>
+      </details>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="section-title">⚠ Recent Errors</div>
+  <div class="card"><span class="empty">✓ Walang errors mula nang mag-restart ang server.</span></div>
+  {% endif %}
+
+  <div class="section-title">Recent Requests ({{ requests_log|length }})</div>
+  <div class="logs" style="max-height:300px;">
+    {% if requests_log %}
+      {% for r in requests_log %}
+      <div class="log-line">
+        <span class="log-time">{{ r.time }}</span>
+        <span class="log-level {{ 'ERROR' if r.status >= 500 else ('WARNING' if r.status >= 400 else 'INFO') }}">{{ r.status }}</span>
+        <span class="log-msg">{{ r.method }} {{ r.path }} <span style="color:{{ '#ef5d5d' if r.ms > 2000 else ('#f0a93f' if r.ms > 800 else 'rgba(255,255,255,0.35)') }};">· {{ r.ms }}ms</span></span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">Wala pang requests.</div>
+    {% endif %}
+  </div>
+
   <div class="section-title">Live Application Logs (pinakabago sa itaas)</div>
   <div class="logs">
     {% if logs %}
@@ -198,6 +244,49 @@
 </div>
 
 <script>
+function runHealthCheck() {
+  const out = document.getElementById('healthResult');
+  out.innerHTML = '<div class="sql-note" style="margin-top:12px;">⏳ Nagche-check ng data integrity...</div>';
+
+  fetch('/dev_health_check')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        out.innerHTML = '<div class="sql-error">✗ ' + data.error + '</div>';
+        return;
+      }
+      let html = '<div style="margin-top:14px;">';
+      html += '<div style="font-family:JetBrains Mono,monospace;font-size:12px;margin-bottom:12px;color:' +
+              (data.issues === 0 ? 'var(--cyan)' : 'var(--gold)') + ';">' +
+              (data.issues === 0 ? '✓ LAHAT MALINIS — walang data issues!' : '⚠ ' + data.issues + ' issue(s) ang nakita') +
+              '</div>';
+
+      data.checks.forEach(c => {
+        if (c.ok) {
+          html += '<div style="font-size:12px;padding:7px 0;color:rgba(255,255,255,0.55);border-bottom:1px solid rgba(255,255,255,0.04);">' +
+                  '<span style="color:var(--cyan);">✓</span> ' + c.name + ' — ' + c.msg + '</div>';
+        } else {
+          html += '<div style="font-size:12px;padding:10px 0;border-bottom:1px solid rgba(240,169,63,0.15);">' +
+                  '<div style="color:var(--gold);font-weight:700;">✗ ' + c.name + ' — ' + c.count + ' record(s)</div>';
+          html += '<div class="result-wrap" style="margin-top:8px;"><table><thead><tr>';
+          c.columns.forEach(col => html += '<th>' + col + '</th>');
+          html += '</tr></thead><tbody>';
+          c.rows.forEach(r => {
+            html += '<tr>';
+            r.forEach(cell => html += '<td>' + String(cell).replace(/</g,'&lt;') + '</td>');
+            html += '</tr>';
+          });
+          html += '</tbody></table></div></div>';
+        }
+      });
+      html += '</div>';
+      out.innerHTML = html;
+    })
+    .catch(e => {
+      out.innerHTML = '<div class="sql-error">✗ Network error: ' + e + '</div>';
+    });
+}
+
 function runSQL() {
   const q = document.getElementById('sqlInput').value.trim();
   const out = document.getElementById('sqlResult');
