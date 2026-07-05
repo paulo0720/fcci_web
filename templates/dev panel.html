@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dev Panel — FCCI</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan:#00d4c8; --cyan-deep:#00a89e; --violet:#7c6df0;
+    --gold:#f0a93f; --red:#ef5d5d;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Outfit', sans-serif;
+    background:
+      radial-gradient(ellipse 800px 500px at 15% 0%, rgba(0,212,200,0.10) 0%, transparent 55%),
+      radial-gradient(ellipse 600px 500px at 95% 100%, rgba(124,109,240,0.08) 0%, transparent 50%),
+      linear-gradient(180deg, #0b2236, #091a29);
+    min-height:100vh; color:#e6eef4; padding:26px 20px 60px;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,200,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,200,0.04) 1px, transparent 1px);
+    background-size:52px 52px; pointer-events:none;
+  }
+  .wrap { max-width:1080px; margin:0 auto; position:relative; }
+
+  .head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
+  .head-tag {
+    font-family:'JetBrains Mono', monospace; font-size:10px;
+    letter-spacing:2px; text-transform:uppercase; color:var(--cyan);
+    display:flex; align-items:center; gap:8px; margin-bottom:6px;
+  }
+  .head-tag::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--cyan); box-shadow:0 0 10px var(--cyan); animation:blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+  h1 { font-size:24px; font-weight:800; color:#fff; }
+  .head-right { display:flex; gap:10px; align-items:center; }
+  .chip {
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    background:rgba(255,255,255,0.06); border:1px solid rgba(0,212,200,0.2);
+    padding:7px 14px; border-radius:20px; color:rgba(255,255,255,0.7);
+  }
+  .exit { text-decoration:none; font-size:12px; color:var(--red); border:1px solid rgba(239,93,93,0.35); padding:7px 14px; border-radius:20px; }
+
+  .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:18px; }
+  @media (max-width:800px) { .grid { grid-template-columns:repeat(2, 1fr); } }
+
+  .card {
+    background:rgba(255,255,255,0.05); backdrop-filter:blur(16px);
+    border:1px solid rgba(0,212,200,0.16); border-radius:16px; padding:18px;
+  }
+  .c-label { font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:1px; text-transform:uppercase; color:rgba(255,255,255,0.4); margin-bottom:7px; }
+  .c-val { font-size:20px; font-weight:800; color:#fff; }
+  .c-val.ok { color:var(--cyan); }
+  .c-val.err { color:var(--red); font-size:12px; }
+
+  .section-title {
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,255,255,0.5);
+    margin:24px 0 12px; display:flex; align-items:center; gap:8px;
+  }
+  .section-title::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+
+  .tables-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+  @media (max-width:800px) { .tables-grid { grid-template-columns:repeat(2, 1fr); } }
+  .t-card { background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:13px 16px; }
+  .t-name { font-family:'JetBrains Mono', monospace; font-size:10.5px; color:rgba(255,255,255,0.45); }
+  .t-count { font-size:19px; font-weight:800; color:var(--cyan); margin-top:3px; }
+
+  .env-row { display:flex; flex-wrap:wrap; gap:8px; }
+  .env-pill {
+    font-family:'JetBrains Mono', monospace; font-size:10.5px;
+    padding:6px 12px; border-radius:16px;
+    background:rgba(0,212,200,0.08); border:1px solid rgba(0,212,200,0.25); color:var(--cyan);
+  }
+  .env-pill.missing { background:rgba(239,93,93,0.08); border-color:rgba(239,93,93,0.3); color:var(--red); }
+
+  textarea {
+    width:100%; min-height:80px; background:rgba(0,0,0,0.3);
+    border:1px solid rgba(0,212,200,0.2); border-radius:12px;
+    color:#d8f7f4; font-family:'JetBrains Mono', monospace; font-size:12.5px;
+    padding:14px; outline:none; resize:vertical;
+  }
+  textarea:focus { border-color:var(--cyan); }
+  .sql-actions { display:flex; gap:10px; margin-top:10px; align-items:center; }
+  .btn-run {
+    background:linear-gradient(135deg, var(--cyan-deep), var(--cyan));
+    color:#04222a; font-weight:800; border:none; border-radius:10px;
+    padding:10px 22px; cursor:pointer; font-family:'Outfit', sans-serif; font-size:13px;
+  }
+  .sql-note { font-size:11px; color:rgba(255,255,255,0.35); }
+
+  .result-wrap { overflow-x:auto; margin-top:14px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { font-family:'JetBrains Mono', monospace; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:var(--cyan); text-align:left; padding:8px 10px; border-bottom:1px solid rgba(0,212,200,0.2); white-space:nowrap; }
+  td { padding:7px 10px; border-bottom:1px solid rgba(255,255,255,0.05); color:rgba(255,255,255,0.75); font-family:'JetBrains Mono', monospace; font-size:11px; white-space:nowrap; }
+  .sql-error { margin-top:12px; background:rgba(239,93,93,0.1); border:1px solid rgba(239,93,93,0.3); color:#f3a39d; padding:11px 14px; border-radius:10px; font-size:12px; font-family:'JetBrains Mono', monospace; }
+
+  .logs {
+    background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px; padding:14px; max-height:340px; overflow-y:auto;
+    font-family:'JetBrains Mono', monospace; font-size:11px; line-height:1.7;
+  }
+  .log-line { display:flex; gap:10px; }
+  .log-time { color:rgba(255,255,255,0.3); flex-shrink:0; }
+  .log-level { flex-shrink:0; width:52px; }
+  .log-level.INFO { color:var(--cyan); }
+  .log-level.WARNING { color:var(--gold); }
+  .log-level.ERROR { color:var(--red); }
+  .log-msg { color:rgba(255,255,255,0.65); word-break:break-all; white-space:pre-wrap; }
+  .empty { color:rgba(255,255,255,0.3); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <div class="head-tag">FCCI System · Developer Mode</div>
+      <h1>◈ Dev Panel</h1>
+    </div>
+    <div class="head-right">
+      <span class="chip">{{ server_time }}</span>
+      <span class="chip">PY {{ python_version }}</span>
+      <a href="/dev_logout" class="exit">✕ Exit Dev Mode</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="c-label">Database</div>
+      {% if db_status == 'ONLINE' %}
+      <div class="c-val ok">● {{ db_status }}</div>
+      {% else %}
+      <div class="c-val err">{{ db_status }}</div>
+      {% endif %}
+    </div>
+    <div class="card">
+      <div class="c-label">DB Latency</div>
+      <div class="c-val">{{ db_latency }}<span style="font-size:12px;color:rgba(255,255,255,0.4);"> ms</span></div>
+    </div>
+    <div class="card">
+      <div class="c-label">Routes</div>
+      <div class="c-val">{{ route_count }}</div>
+    </div>
+    <div class="card">
+      <div class="c-label">Log Entries</div>
+      <div class="c-val">{{ logs|length }}</div>
+    </div>
+  </div>
+
+  <div class="section-title">Environment Variables</div>
+  <div class="env-row">
+    {% for k, present in env_checks.items() %}
+    <span class="env-pill {{ '' if present else 'missing' }}">{{ '✓' if present else '✗' }} {{ k }}</span>
+    {% endfor %}
+  </div>
+
+  <div class="section-title">Table Row Counts</div>
+  <div class="tables-grid">
+    {% for t, c in counts.items() %}
+    <div class="t-card">
+      <div class="t-name">{{ t }}</div>
+      <div class="t-count">{{ c }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="section-title">SQL Runner (SELECT only · auto LIMIT 100)</div>
+  <div class="card">
+    <textarea id="sqlInput" placeholder="SELECT member_id, full_name, status FROM members ORDER BY id DESC"></textarea>
+    <div class="sql-actions">
+      <button class="btn-run" onclick="runSQL()">▶ Run Query</button>
+      <span class="sql-note">Read-only. Para sa UPDATE/DELETE, gamitin ang Supabase SQL Editor.</span>
+    </div>
+    <div id="sqlResult"></div>
+  </div>
+
+  <div class="section-title">Live Application Logs (pinakabago sa itaas)</div>
+  <div class="logs">
+    {% if logs %}
+      {% for log in logs %}
+      <div class="log-line">
+        <span class="log-time">{{ log.time }}</span>
+        <span class="log-level {{ log.level }}">{{ log.level }}</span>
+        <span class="log-msg">{{ log.msg }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">Wala pang logs mula nang mag-restart ang server.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+function runSQL() {
+  const q = document.getElementById('sqlInput').value.trim();
+  const out = document.getElementById('sqlResult');
+  if (!q) return;
+  out.innerHTML = '<div class="sql-note" style="margin-top:12px;">⏳ Running...</div>';
+
+  const fd = new FormData();
+  fd.append('query', q);
+
+  fetch('/dev_sql', { method:'POST', body:fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        out.innerHTML = '<div class="sql-error">✗ ' + data.error + '</div>';
+        return;
+      }
+      if (!data.rows.length) {
+        out.innerHTML = '<div class="sql-note" style="margin-top:12px;">Walang rows na naibalik.</div>';
+        return;
+      }
+      let html = '<div class="result-wrap"><table><thead><tr>';
+      data.columns.forEach(c => html += '<th>' + c + '</th>');
+      html += '</tr></thead><tbody>';
+      data.rows.forEach(r => {
+        html += '<tr>';
+        r.forEach(c => html += '<td>' + c.replace(/</g,'&lt;') + '</td>');
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      html += '<div class="sql-note" style="margin-top:8px;">' + data.rows.length + ' row(s)</div>';
+      out.innerHTML = html;
+    })
+    .catch(e => {
+      out.innerHTML = '<div class="sql-error">✗ Network error: ' + e + '</div>';
+    });
+}
+</script>
+</body>
+</html>

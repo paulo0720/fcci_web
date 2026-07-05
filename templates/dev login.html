@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Developer Access — FCCI</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #00d4c8; --cyan-deep: #00a89e; --violet: #7c6df0;
+    --ink: #0b1d2e; --muted: #6b7e8f;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Outfit', sans-serif;
+    background:
+      radial-gradient(ellipse 800px 500px at 20% 0%, rgba(0,212,200,0.12) 0%, transparent 55%),
+      radial-gradient(ellipse 600px 500px at 90% 100%, rgba(124,109,240,0.10) 0%, transparent 50%),
+      linear-gradient(180deg, #0b2236, #0a1c2c);
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:20px;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,200,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,200,0.05) 1px, transparent 1px);
+    background-size:48px 48px; pointer-events:none;
+  }
+  .dev-card {
+    position:relative; width:100%; max-width:400px;
+    background:rgba(255,255,255,0.05); backdrop-filter:blur(20px);
+    border:1px solid rgba(0,212,200,0.25); border-radius:20px;
+    padding:36px 32px; box-shadow:0 20px 60px rgba(0,0,0,0.4);
+  }
+  .dev-tag {
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--cyan); margin-bottom:8px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .dev-tag::before {
+    content:''; width:7px; height:7px; border-radius:50%;
+    background:var(--cyan); box-shadow:0 0 10px var(--cyan);
+    animation:blink 2s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+  h1 { color:#fff; font-size:22px; font-weight:800; margin-bottom:6px; }
+  .sub { color:rgba(255,255,255,0.4); font-size:13px; margin-bottom:26px; }
+  label {
+    display:block; font-family:'JetBrains Mono', monospace;
+    font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    color:rgba(255,255,255,0.5); margin-bottom:8px;
+  }
+  input {
+    width:100%; padding:13px 16px; border-radius:12px;
+    border:1px solid rgba(0,212,200,0.25);
+    background:rgba(0,0,0,0.25); color:#fff;
+    font-family:'JetBrains Mono', monospace; font-size:14px;
+    outline:none; margin-bottom:18px;
+  }
+  input:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,212,200,0.15); }
+  button {
+    width:100%; padding:13px 0; border:none; border-radius:12px;
+    background:linear-gradient(135deg, var(--cyan-deep), var(--cyan));
+    color:#04222a; font-weight:800; font-size:14px; cursor:pointer;
+    font-family:'Outfit', sans-serif; letter-spacing:0.5px;
+    box-shadow:0 8px 24px rgba(0,212,200,0.3);
+  }
+  .error {
+    background:rgba(239,93,93,0.12); border:1px solid rgba(239,93,93,0.35);
+    color:#f3a39d; padding:11px 14px; border-radius:10px;
+    font-size:12.5px; margin-bottom:16px;
+  }
+  .back { display:block; text-align:center; margin-top:16px;
+    color:rgba(255,255,255,0.35); font-size:12px; text-decoration:none; }
+</style>
+</head>
+<body>
+  <div class="dev-card">
+    <div class="dev-tag">Restricted · Developer Only</div>
+    <h1>Developer Access</h1>
+    <p class="sub">Ilagay ang developer key para ma-access ang system panel.</p>
+
+    {% if error %}
+    <div class="error">⚠ {{ error }}</div>
+    {% endif %}
+
+    <form method="POST">
+      <label>Developer Username</label>
+      <input type="text" name="dev_user" placeholder="username" autofocus autocomplete="off">
+      <label>Developer Password</label>
+      <input type="password" name="dev_key" placeholder="••••••••••••" autocomplete="off">
+      <button type="submit">◈ Authenticate</button>
+    </form>
+
+    <a href="/dashboard" class="back">← Bumalik sa Dashboard</a>
+  </div>
+</body>
+</html>
