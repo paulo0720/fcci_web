@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo Manager — FCCI Dev</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --cyan:#00d4c8; --cyan-deep:#00a89e; --violet:#7c6df0; --gold:#f0a93f; --red:#ef5d5d; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Outfit', sans-serif;
+    background:
+      radial-gradient(ellipse 800px 500px at 15% 0%, rgba(0,212,200,0.10) 0%, transparent 55%),
+      linear-gradient(180deg, #0b2236, #091a29);
+    min-height:100vh; color:#e6eef4; padding:22px 18px 90px;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,200,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,200,0.04) 1px, transparent 1px);
+    background-size:52px 52px; pointer-events:none;
+  }
+  .wrap { max-width:1280px; margin:0 auto; position:relative; }
+
+  .head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+  .head-tag {
+    font-family:'JetBrains Mono', monospace; font-size:10px;
+    letter-spacing:2px; text-transform:uppercase; color:var(--cyan);
+    display:flex; align-items:center; gap:8px; margin-bottom:5px;
+  }
+  .head-tag::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--cyan); box-shadow:0 0 10px var(--cyan); }
+  h1 { font-size:22px; font-weight:800; color:#fff; }
+  .back { text-decoration:none; font-size:12px; color:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.2); padding:7px 14px; border-radius:20px; }
+
+  .stats-row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+  .stat-chip {
+    font-family:'JetBrains Mono', monospace; font-size:11.5px;
+    padding:8px 16px; border-radius:20px;
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+    color:rgba(255,255,255,0.7);
+  }
+  .stat-chip b { color:var(--cyan); }
+
+  .filter-pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .pill {
+    font-family:'JetBrains Mono', monospace; font-size:11.5px;
+    padding:8px 16px; border-radius:20px; cursor:pointer;
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+    color:rgba(255,255,255,0.6); transition:all 0.2s;
+  }
+  .pill.active { background:rgba(0,212,200,0.14); border-color:var(--cyan); color:var(--cyan); }
+
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px; }
+  .btn {
+    padding:10px 18px; border:none; border-radius:11px; cursor:pointer;
+    font-family:'Outfit', sans-serif; font-weight:700; font-size:12.5px;
+  }
+  .btn-del { background:rgba(239,93,93,0.15); border:1px solid rgba(239,93,93,0.4); color:#f3a39d; }
+  .btn-del:disabled { opacity:0.35; cursor:not-allowed; }
+  .btn-reload { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.7); }
+  .status-msg { font-size:12px; font-family:'JetBrains Mono', monospace; }
+  .status-msg.ok { color:var(--cyan); }
+  .status-msg.err { color:var(--red); }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
+  .photo-card {
+    background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px; overflow:hidden; position:relative;
+    transition:border-color 0.2s;
+  }
+  .photo-card.selected { border-color:var(--red); box-shadow:0 0 0 1.5px var(--red); }
+  .photo-card img { width:100%; height:150px; object-fit:cover; display:block; cursor:pointer; background:#081520; }
+  .photo-info { padding:10px 12px; }
+  .photo-id { font-family:'JetBrains Mono', monospace; font-size:9.5px; color:rgba(255,255,255,0.4); word-break:break-all; margin-bottom:6px; }
+  .photo-meta { font-family:'JetBrains Mono', monospace; font-size:10px; color:rgba(255,255,255,0.35); margin-bottom:8px; }
+  .badges { display:flex; flex-wrap:wrap; gap:5px; }
+  .badge {
+    font-family:'JetBrains Mono', monospace; font-size:9.5px; font-weight:600;
+    padding:3px 9px; border-radius:12px;
+  }
+  .badge.linked { background:rgba(0,212,200,0.12); border:1px solid rgba(0,212,200,0.3); color:var(--cyan); }
+  .badge.orphan { background:rgba(239,93,93,0.12); border:1px solid rgba(239,93,93,0.35); color:#f3a39d; }
+  .badge.dup { background:rgba(240,169,63,0.12); border:1px solid rgba(240,169,63,0.35); color:var(--gold); }
+  .badge.proof { background:rgba(124,109,240,0.12); border:1px solid rgba(124,109,240,0.35); color:#b0a5f5; }
+
+  .sel-check {
+    position:absolute; top:8px; left:8px; z-index:2;
+    width:22px; height:22px; cursor:pointer; accent-color:var(--red);
+  }
+
+  .loading { text-align:center; padding:60px; color:rgba(255,255,255,0.4); font-family:'JetBrains Mono', monospace; font-size:12px; }
+
+  /* Lightbox preview */
+  .lightbox {
+    display:none; position:fixed; inset:0; z-index:100;
+    background:rgba(0,0,0,0.85); align-items:center; justify-content:center;
+    padding:30px; cursor:zoom-out;
+  }
+  .lightbox.open { display:flex; }
+  .lightbox img { max-width:90vw; max-height:85vh; border-radius:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <div class="head-tag">Developer · Cloudinary Photos</div>
+      <h1>🖼 Photo Manager</h1>
+    </div>
+    <a href="/dev" class="back">← Bumalik sa Dev Panel</a>
+  </div>
+
+  <div class="stats-row" id="statsRow">
+    <span class="stat-chip">⏳ Loading...</span>
+  </div>
+
+  <div class="filter-pills">
+    <span class="pill active" data-filter="all" onclick="setFilter(this)">Lahat</span>
+    <span class="pill" data-filter="connected" onclick="setFilter(this)">✓ Connected</span>
+    <span class="pill" data-filter="orphaned" onclick="setFilter(this)">✗ Orphaned</span>
+    <span class="pill" data-filter="duplicates" onclick="setFilter(this)">⧉ Possible Duplicates</span>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn btn-del" id="delBtn" onclick="deleteSelected()" disabled>🗑 Delete Selected</button>
+    <button class="btn btn-reload" onclick="loadPhotos()">⟳ Reload</button>
+    <span class="status-msg" id="statusMsg"></span>
+  </div>
+
+  <div class="grid" id="photoGrid">
+    <div class="loading">⏳ Kinukuha ang photos mula sa Cloudinary...</div>
+  </div>
+
+</div>
+
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+let allPhotos = [];
+let currentFilter = 'all';
+let selected = new Set();
+
+function loadPhotos() {
+  selected = new Set();
+  updateDelBtn();
+  document.getElementById('photoGrid').innerHTML = '<div class="loading">⏳ Kinukuha ang photos mula sa Cloudinary...</div>';
+  fetch('/dev_photos_data')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { setStatus('✗ ' + data.error, false); return; }
+      allPhotos = data.photos;
+      document.getElementById('statsRow').innerHTML =
+        '<span class="stat-chip">Total: <b>' + data.total + '</b></span>' +
+        '<span class="stat-chip">Orphaned: <b style="color:#f3a39d;">' + data.orphaned + '</b></span>' +
+        '<span class="stat-chip">Possible dups: <b style="color:var(--gold);">' + data.duplicates + '</b></span>';
+      renderGrid();
+    })
+    .catch(e => setStatus('✗ ' + e, false));
+}
+
+function thumbUrl(url) {
+  // Cloudinary transformation para sa maliit na thumbnail (mabilis mag-load)
+  return url.replace('/upload/', '/upload/w_400,h_300,c_fill,q_auto,f_auto/');
+}
+
+function renderGrid() {
+  let photos = allPhotos;
+  if (currentFilter === 'connected') photos = photos.filter(p => p.connected);
+  if (currentFilter === 'orphaned') photos = photos.filter(p => !p.connected);
+  if (currentFilter === 'duplicates') photos = photos.filter(p => p.dup_count > 1);
+
+  if (!photos.length) {
+    document.getElementById('photoGrid').innerHTML = '<div class="loading">Walang photos sa filter na ito.</div>';
+    return;
+  }
+
+  let html = '';
+  photos.forEach(p => {
+    const isSel = selected.has(p.public_id);
+    let badges = '';
+    if (p.connected) {
+      p.links.forEach(l => {
+        badges += '<span class="badge ' + (l.kind === 'proof' ? 'proof' : 'linked') + '">' +
+                  (l.kind === 'proof' ? '📄 ' : '👤 ') + l.member_id + '</span>';
+      });
+    } else {
+      badges += '<span class="badge orphan">✗ ORPHANED</span>';
+    }
+    if (p.dup_count > 1) {
+      badges += '<span class="badge dup">⧉ DUP×' + p.dup_count + '</span>';
+    }
+
+    html += '<div class="photo-card ' + (isSel ? 'selected' : '') + '" data-pid="' + p.public_id + '">' +
+      '<input type="checkbox" class="sel-check" ' + (isSel ? 'checked' : '') +
+      ' onchange="toggleSelect(\'' + p.public_id.replace(/'/g, "\\'") + '\', this)">' +
+      '<img src="' + thumbUrl(p.url) + '" loading="lazy" onclick="openLightbox(\'' + p.url + '\')">' +
+      '<div class="photo-info">' +
+      '<div class="photo-id">' + p.public_id + '</div>' +
+      '<div class="photo-meta">' + p.kb + ' KB · ' + p.format + ' · ' + p.created + '</div>' +
+      '<div class="badges">' + badges + '</div>' +
+      '</div></div>';
+  });
+  document.getElementById('photoGrid').innerHTML = html;
+}
+
+function setFilter(el) {
+  document.querySelectorAll('.filter-pills .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = el.dataset.filter;
+  renderGrid();
+}
+
+function toggleSelect(pid, cb) {
+  if (cb.checked) selected.add(pid); else selected.delete(pid);
+  cb.closest('.photo-card').classList.toggle('selected', cb.checked);
+  updateDelBtn();
+}
+
+function updateDelBtn() {
+  const btn = document.getElementById('delBtn');
+  btn.disabled = selected.size === 0;
+  btn.textContent = selected.size ? '🗑 Delete Selected (' + selected.size + ')' : '🗑 Delete Selected';
+}
+
+function deleteSelected() {
+  const pids = Array.from(selected);
+  // I-check kung may connected sa mga pipe-delete
+  const connectedSel = allPhotos.filter(p => selected.has(p.public_id) && p.connected);
+  let msg = pids.length + ' photo(s) ang made-delete nang PERMANENTE sa Cloudinary.';
+  if (connectedSel.length) {
+    msg += '\n\n⚠ BABALA: ' + connectedSel.length + ' sa mga ito ay NAKA-KONEKTA sa member records — mawawala ang kanilang photo sa app!';
+  }
+  msg += '\n\nSigurado ka?';
+  if (!confirm(msg)) return;
+
+  setStatus('⏳ Deleting...');
+  fetch('/dev_photo_delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ public_ids: pids })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { setStatus('✗ ' + data.error, false); return; }
+      setStatus('✓ ' + data.deleted + ' photo(s) deleted' +
+                (data.errors.length ? ' · ' + data.errors.length + ' error(s)' : ''));
+      loadPhotos();
+    })
+    .catch(e => setStatus('✗ ' + e, false));
+}
+
+function openLightbox(url) {
+  document.getElementById('lightboxImg').src = url;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function setStatus(msg, ok=true) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status-msg ' + (ok ? 'ok' : 'err');
+  if (ok && msg && !msg.startsWith('⏳')) setTimeout(() => { el.textContent = ''; }, 5000);
+}
+
+loadPhotos();
+</script>
+</body>
+</html>
