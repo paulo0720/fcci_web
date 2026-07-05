@@ -398,6 +398,8 @@ function runHealthCheck() {
                   '<span style="color:var(--gold);font-weight:700;">✗ ' + c.name + ' — ' + c.count + ' record(s)</span>';
           if (c.fix) {
             html += '<button class="btn-run" style="padding:5px 14px;font-size:11px;background:rgba(239,93,93,0.15);border:1px solid rgba(239,93,93,0.4);color:#f3a39d;" onclick="runAutoFix(\'' + c.fix + '\', this)">🔧 Auto-Fix</button>';
+          } else if (c.note) {
+            html += '<span style="font-size:10.5px;color:rgba(255,255,255,0.4);font-family:JetBrains Mono,monospace;">→ ' + c.note + '</span>';
           }
           html += '</div>';
           html += '<div class="result-wrap" style="margin-top:8px;"><table><thead><tr>';
