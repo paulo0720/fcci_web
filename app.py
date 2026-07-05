@@ -5693,12 +5693,13 @@ def dev_health_check():
 
     checks = []
 
-    def add_check(name, rows, cols, ok_msg):
+    def add_check(name, rows, cols, ok_msg, fix_type=None):
         if rows:
             checks.append({
                 "name": name, "ok": False,
                 "count": len(rows),
                 "columns": cols,
+                "fix": fix_type,
                 "rows": [[("" if c is None else str(c)) for c in r] for r in rows[:20]]
             })
         else:
@@ -5722,7 +5723,7 @@ def dev_health_check():
         GROUP BY receipt_no HAVING COUNT(*) > 1
         """)
         add_check("Duplicate Receipt Numbers", cursor.fetchall(),
-                  ["receipt_no", "count"], "Walang duplicate receipts")
+                  ["receipt_no", "count"], "Walang duplicate receipts", "duplicate_receipts")
 
         # 3. Orphaned payments (member wala na)
         cursor.execute("""
@@ -5731,7 +5732,7 @@ def dev_health_check():
         WHERE m.member_id IS NULL
         """)
         add_check("Orphaned Payments (walang member)", cursor.fetchall(),
-                  ["id", "receipt_no", "member_id"], "Lahat ng payments may valid member")
+                  ["id", "receipt_no", "member_id"], "Lahat ng payments may valid member", "orphaned_payments")
 
         # 4. Orphaned photos
         cursor.execute("""
@@ -5740,7 +5741,7 @@ def dev_health_check():
         WHERE m.member_id IS NULL
         """)
         add_check("Orphaned Photos", cursor.fetchall(),
-                  ["id", "member_id"], "Lahat ng photos may valid member")
+                  ["id", "member_id"], "Lahat ng photos may valid member", "orphaned_photos")
 
         # 5. Active members na walang Registration Fee
         cursor.execute("""
@@ -5761,7 +5762,7 @@ def dev_health_check():
         WHERE member_id LIKE 'APP-%%' AND status = 'Active'
         """)
         add_check("APP- ID pero Active status", cursor.fetchall(),
-                  ["member_id", "full_name", "status"], "Walang APP- na Active")
+                  ["member_id", "full_name", "status"], "Walang APP- na Active", "fix_app_active")
 
         # 7. FCCI- members na Applicant pa (inconsistent)
         cursor.execute("""
@@ -5787,7 +5788,7 @@ def dev_health_check():
         GROUP BY member_id HAVING COUNT(*) > 1
         """)
         add_check("Duplicate Registration Fees", cursor.fetchall(),
-                  ["member_id", "count"], "Isang reg fee lang bawat member")
+                  ["member_id", "count"], "Isang reg fee lang bawat member", "duplicate_regfee")
 
         # 10. Duplicate Monthly Contribution (same member + month + year)
         cursor.execute("""
@@ -5798,7 +5799,7 @@ def dev_health_check():
         HAVING COUNT(*) > 1
         """)
         add_check("Duplicate Monthly Contributions", cursor.fetchall(),
-                  ["member_id", "month", "year", "count"], "Walang double monthly payments")
+                  ["member_id", "month", "year", "count"], "Walang double monthly payments", "duplicate_monthly")
 
         return_db(conn)
         issues = sum(1 for c in checks if not c["ok"])
@@ -6234,6 +6235,259 @@ def dev_photo_delete():
 
     except Exception as e:
         return jsonify({"error": str(e)[:300]})
+
+
+# ── DEV AUTO-FIX ────────────────────────────────────────────
+@app.route("/dev_autofix", methods=["POST"])
+def dev_autofix():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    fix_type = (request.get_json(silent=True) or {}).get("fix", "")
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        result = ""
+
+        if fix_type == "orphaned_payments":
+            cursor.execute("""
+            DELETE FROM payments WHERE member_id NOT IN
+            (SELECT member_id FROM members)
+            """)
+            result = f"Na-delete: {cursor.rowcount} orphaned payment(s)"
+
+        elif fix_type == "orphaned_photos":
+            cursor.execute("""
+            DELETE FROM member_photos WHERE member_id NOT IN
+            (SELECT member_id FROM members)
+            """)
+            result = f"Na-delete: {cursor.rowcount} orphaned photo(s)"
+
+        elif fix_type == "duplicate_receipts":
+            # Panatilihin ang pinakamababang id per receipt_no
+            cursor.execute("""
+            DELETE FROM payments WHERE id NOT IN (
+                SELECT MIN(id) FROM payments GROUP BY receipt_no
+            )
+            """)
+            result = f"Na-delete: {cursor.rowcount} duplicate receipt(s)"
+
+        elif fix_type == "duplicate_monthly":
+            # Panatilihin ang pinakaunang bayad per member+month+year
+            cursor.execute("""
+            DELETE FROM payments WHERE id NOT IN (
+                SELECT MIN(id) FROM payments
+                WHERE payment_type = 'Monthly Contribution'
+                GROUP BY member_id, payment_month, payment_year
+            )
+            AND payment_type = 'Monthly Contribution'
+            """)
+            result = f"Na-delete: {cursor.rowcount} duplicate monthly payment(s)"
+
+        elif fix_type == "duplicate_regfee":
+            cursor.execute("""
+            DELETE FROM payments WHERE id NOT IN (
+                SELECT MIN(id) FROM payments
+                WHERE payment_type = 'Registration Fee'
+                GROUP BY member_id
+            )
+            AND payment_type = 'Registration Fee'
+            """)
+            result = f"Na-delete: {cursor.rowcount} duplicate reg fee(s)"
+
+        elif fix_type == "fix_app_active":
+            # APP- na Active → gawing Applicant
+            cursor.execute("""
+            UPDATE members SET status = 'Applicant'
+            WHERE member_id LIKE 'APP-%%' AND status = 'Active'
+            """)
+            result = f"Na-fix: {cursor.rowcount} APP- member(s) → Applicant"
+
+        else:
+            return_db(conn)
+            return jsonify({"error": "Hindi kilalang fix type"})
+
+        conn.commit()
+        return_db(conn)
+        logger.info(f"[DEV AUTOFIX] {session['username']} ran '{fix_type}': {result}")
+        return jsonify({"ok": True, "result": result})
+
+    except Exception as e:
+        try:
+            conn.rollback(); return_db(conn)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)[:300]})
+
+
+# ── DEV MEMBER 360° LOOKUP ──────────────────────────────────
+@app.route("/dev_member_lookup")
+def dev_member_lookup():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"error": "Walang search query"})
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        SELECT id, member_id, full_name, contact, address,
+               registration_fee, member_since, email, birthday,
+               date_registered, status, proof_of_payment
+        FROM members
+        WHERE member_id ILIKE %s OR full_name ILIKE %s OR contact ILIKE %s
+        LIMIT 1
+        """, (f"%{q}%", f"%{q}%", f"%{q}%"))
+        m = cursor.fetchone()
+
+        if not m:
+            return_db(conn)
+            return jsonify({"found": False})
+
+        member_id = m[1]
+
+        cursor.execute("""
+        SELECT receipt_no, payment_type, amount, payment_month,
+               payment_year, payment_date
+        FROM payments WHERE member_id = %s ORDER BY id DESC
+        """, (member_id,))
+        payments = cursor.fetchall()
+
+        cursor.execute("""
+        SELECT photo_path FROM member_photos WHERE member_id = %s
+        """, (member_id,))
+        photos = [r[0] for r in cursor.fetchall()]
+
+        att_count = 0
+        try:
+            cursor.execute("SELECT COUNT(*) FROM attendance WHERE member_id = %s", (member_id,))
+            att_count = cursor.fetchone()[0]
+        except Exception:
+            conn.rollback()
+
+        return_db(conn)
+
+        total_paid = sum(p[2] for p in payments if p[2])
+        has_regfee = any(p[1] == "Registration Fee" for p in payments)
+        mc_count = sum(1 for p in payments if p[1] == "Monthly Contribution")
+
+        return jsonify({
+            "found": True,
+            "member": {
+                "id": m[0], "member_id": m[1], "full_name": m[2],
+                "contact": m[3], "address": m[4], "registration_fee": m[5],
+                "member_since": m[6], "email": m[7], "birthday": m[8],
+                "date_registered": m[9], "status": m[10],
+                "proof_of_payment": m[11] or ""
+            },
+            "payments": [
+                {"receipt_no": p[0], "type": p[1], "amount": p[2],
+                 "month": p[3], "year": str(p[4]), "date": str(p[5])}
+                for p in payments
+            ],
+            "photos": photos,
+            "summary": {
+                "total_paid": total_paid,
+                "payment_count": len(payments),
+                "has_regfee": has_regfee,
+                "monthly_count": mc_count,
+                "attendance_count": att_count
+            }
+        })
+
+    except Exception as e:
+        try:
+            return_db(conn)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)[:300]})
+
+
+# ── DEV BACKUP / SNAPSHOT ───────────────────────────────────
+@app.route("/dev_backup")
+def dev_backup():
+    if not _dev_auth_ok():
+        return redirect("/dev_login")
+
+    import json as _json
+    from flask import Response as _Response
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        snapshot = {"generated": datetime.now().isoformat(), "tables": {}}
+
+        for table in ["members", "payments", "member_photos",
+                      "attendance", "donations", "expenses"]:
+            try:
+                cursor.execute(f"SELECT * FROM {table}")
+                cols = [d[0] for d in cursor.description]
+                rows = cursor.fetchall()
+                snapshot["tables"][table] = {
+                    "columns": cols,
+                    "rows": [[("" if c is None else str(c)) for c in r] for r in rows]
+                }
+            except Exception:
+                conn.rollback()
+                snapshot["tables"][table] = {"error": "skipped"}
+
+        return_db(conn)
+        fname = f"fcci_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        logger.info(f"[DEV BACKUP] {session['username']} downloaded snapshot")
+        return _Response(
+            _json.dumps(snapshot, indent=2, ensure_ascii=False),
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment; filename={fname}"}
+        )
+    except Exception as e:
+        return f"Backup error: {str(e)[:200]}", 500
+
+
+# ── DEV CONFIG / ENVIRONMENT VIEWER ─────────────────────────
+@app.route("/dev_config")
+def dev_config():
+    if not _dev_auth_ok():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    import sys as _sys
+    import platform as _platform
+
+    def mask(val):
+        if not val:
+            return "(not set)"
+        if len(val) <= 8:
+            return "••••"
+        return val[:4] + "••••" + val[-4:]
+
+    env_vars = {}
+    for k in ["DATABASE_URL", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY",
+              "CLOUDINARY_API_SECRET", "RESEND_API_KEY", "GMAIL_ADDRESS",
+              "GMAIL_APP_PASSWORD"]:
+        env_vars[k] = mask(os.environ.get(k, ""))
+
+    packages = []
+    try:
+        import importlib.metadata as _im
+        for pkg in ["flask", "psycopg2-binary", "cloudinary", "qrcode",
+                    "reportlab", "gunicorn", "python-dotenv", "openpyxl",
+                    "opencv-python-headless", "Pillow"]:
+            try:
+                packages.append({"name": pkg, "version": _im.version(pkg)})
+            except Exception:
+                packages.append({"name": pkg, "version": "—"})
+    except Exception:
+        pass
+
+    return jsonify({
+        "python": _sys.version.split()[0],
+        "platform": _platform.system() + " " + _platform.release(),
+        "env_vars": env_vars,
+        "packages": packages
+    })
 
 
 if __name__ == "__main__":
