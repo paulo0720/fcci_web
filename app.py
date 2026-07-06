@@ -1362,6 +1362,92 @@ def payments():
     )
 
 
+@app.route("/print_receipt/<int:payment_id>")
+def print_receipt(payment_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    from reportlab.lib.pagesizes import A5
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    import io
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT p.receipt_no, p.member_id, p.payment_type, p.amount,
+           p.payment_month, p.payment_year, p.payment_date, m.full_name
+    FROM payments p
+    LEFT JOIN members m ON p.member_id = m.member_id
+    WHERE p.id = %s
+    """, (payment_id,))
+    row = cursor.fetchone()
+    return_db(conn)
+
+    if not row:
+        return "Payment not found", 404
+
+    receipt_no, member_id, ptype, amount, pmonth, pyear, pdate, full_name = row
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A5,
+                            topMargin=15*mm, bottomMargin=15*mm,
+                            leftMargin=15*mm, rightMargin=15*mm)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle("t", parent=styles["Title"],
+                                 fontSize=18, textColor=colors.HexColor("#00562a"),
+                                 alignment=TA_CENTER, spaceAfter=4)
+    sub_style = ParagraphStyle("s", parent=styles["Normal"],
+                               fontSize=9, textColor=colors.HexColor("#5c8270"),
+                               alignment=TA_CENTER, spaceAfter=2)
+    rcpt_style = ParagraphStyle("r", parent=styles["Normal"],
+                                fontSize=10, textColor=colors.HexColor("#0c2418"),
+                                alignment=TA_CENTER, spaceAfter=14)
+
+    content = []
+    content.append(Paragraph("FCCI", title_style))
+    content.append(Paragraph("Filipino Community Center International", sub_style))
+    content.append(Paragraph("Official Payment Receipt", sub_style))
+    content.append(Spacer(1, 10))
+    content.append(Paragraph(f"Receipt No: <b>{receipt_no}</b>", rcpt_style))
+
+    data = [
+        ["Member ID", member_id or "—"],
+        ["Name", full_name or "—"],
+        ["Payment Type", ptype or "—"],
+        ["Period", f"{pmonth} {pyear}" if pmonth else "—"],
+        ["Amount", f"₩{amount:,}" if amount else "₩0"],
+        ["Date Paid", str(pdate) if pdate else "—"],
+    ]
+    table = Table(data, colWidths=[45*mm, 75*mm])
+    table.setStyle(TableStyle([
+        ("FONTSIZE", (0,0), (-1,-1), 10),
+        ("TEXTCOLOR", (0,0), (0,-1), colors.HexColor("#5c8270")),
+        ("TEXTCOLOR", (1,0), (1,-1), colors.HexColor("#0c2418")),
+        ("FONTNAME", (1,0), (1,-1), "Helvetica-Bold"),
+        ("TOPPADDING", (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("LINEBELOW", (0,0), (-1,-2), 0.5, colors.HexColor("#e0f0e5")),
+    ]))
+    content.append(table)
+    content.append(Spacer(1, 20))
+
+    foot_style = ParagraphStyle("f", parent=styles["Normal"],
+                                fontSize=8, textColor=colors.HexColor("#9ab5a8"),
+                                alignment=TA_CENTER)
+    content.append(Paragraph("United in Faith, Serving with Love", foot_style))
+    content.append(Paragraph("Salamat sa iyong kontribusyon!", foot_style))
+
+    doc.build(content)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/pdf",
+                     download_name=f"Receipt_{receipt_no}.pdf")
+
+
 @app.route("/delete_payment/<int:payment_id>")
 def delete_payment(payment_id):
 
