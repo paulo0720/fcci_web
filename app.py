@@ -1362,6 +1362,204 @@ def payments():
     )
 
 
+@app.route("/approval_certificate/<member_id>")
+def approval_certificate(member_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    from reportlab.lib.pagesizes import A5
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle, Image)
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    import io, tempfile, os as _os
+
+    # ── Kunin ang member + registration fee payment ──
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT member_id, full_name, contact, member_since, status, email
+    FROM members WHERE member_id = %s
+    """, (member_id,))
+    m = cursor.fetchone()
+
+    if not m:
+        return_db(conn)
+        return "Member not found", 404
+
+    cursor.execute("""
+    SELECT receipt_no, amount, payment_date, payment_month, payment_year
+    FROM payments
+    WHERE member_id = %s AND payment_type = 'Registration Fee'
+    ORDER BY id DESC LIMIT 1
+    """, (member_id,))
+    pay = cursor.fetchone()
+    return_db(conn)
+
+    m_id, full_name, contact, member_since, status, email = m
+
+    # ── Generate QR code (naglalaman ng member ID) ──
+    qr_path = None
+    try:
+        qr_img = qrcode.make(m_id)
+        qr_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        qr_img.save(qr_tmp.name)
+        qr_path = qr_tmp.name
+    except Exception as e:
+        print(f"[CERT] QR error: {e}")
+
+    # ── Kunin ang member photo ──
+    photo_path = download_photo_for_pdf(m_id)
+
+    # ── Buuin ang PDF ──
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A5,
+                            topMargin=12*mm, bottomMargin=10*mm,
+                            leftMargin=12*mm, rightMargin=12*mm)
+    styles = getSampleStyleSheet()
+    content = []
+
+    # Header
+    head_title = ParagraphStyle("ht", fontSize=20, textColor=colors.white,
+                                fontName="Helvetica-Bold", alignment=TA_LEFT, leading=22)
+    head_sub = ParagraphStyle("hs", fontSize=7, textColor=colors.HexColor("#8fb8c9"),
+                              alignment=TA_LEFT, leading=10)
+    header_tbl = Table([[
+        Paragraph("FCCI", head_title),
+        Paragraph("◈ OFFICIAL", ParagraphStyle("bd", fontSize=8,
+                  textColor=colors.HexColor("#00d4c8"), alignment=2))
+    ], [
+        Paragraph("FILIPINO COMMUNITY CENTER INTERNATIONAL", head_sub), ""
+    ]], colWidths=[95*mm, 30*mm])
+    header_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#0b2236")),
+        ("TOPPADDING", (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ("LEFTPADDING", (0,0), (-1,-1), 16),
+        ("RIGHTPADDING", (0,0), (-1,-1), 16),
+        ("SPAN", (1,0), (1,1)),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+    ]))
+    content.append(header_tbl)
+    content.append(Spacer(1, 12))
+
+    # Approved title
+    content.append(Paragraph("Membership Approved",
+        ParagraphStyle("at", fontSize=15, textColor=colors.HexColor("#0b1d2e"),
+                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=2)))
+    content.append(Paragraph("Ito ang iyong temporary membership card habang hinihintay ang opisyal na ID.",
+        ParagraphStyle("ats", fontSize=8.5, textColor=colors.HexColor("#5c8270"),
+                       alignment=TA_CENTER, spaceAfter=12)))
+
+    # ── TEMPORARY ID CARD (photo + details + QR) ──
+    lbl = ParagraphStyle("lbl", fontSize=7.5, textColor=colors.HexColor("#8a6000"),
+                         fontName="Helvetica-Bold")
+    name_st = ParagraphStyle("nm", fontSize=15, textColor=colors.HexColor("#0b1d2e"),
+                             fontName="Helvetica-Bold", leading=17)
+    idnum_st = ParagraphStyle("idn", fontSize=13, textColor=colors.HexColor("#00a89e"),
+                              fontName="Helvetica-Bold", leading=18)
+    meta_st = ParagraphStyle("mt", fontSize=8.5, textColor=colors.HexColor("#5c8270"), leading=13)
+
+    # Photo cell
+    if photo_path and _os.path.exists(photo_path):
+        photo_cell = Image(photo_path, width=26*mm, height=26*mm)
+    else:
+        photo_cell = Paragraph("NO<br/>PHOTO", ParagraphStyle("np", fontSize=8,
+            textColor=colors.HexColor("#9ab5a8"), alignment=TA_CENTER))
+
+    # QR cell
+    if qr_path and _os.path.exists(qr_path):
+        qr_cell = Image(qr_path, width=22*mm, height=22*mm)
+    else:
+        qr_cell = Paragraph("", styles["Normal"])
+
+    details = [
+        Paragraph("⏳ TEMPORARY ID", lbl),
+        Paragraph(full_name or "—", name_st),
+        Paragraph(m_id, idnum_st),
+        Paragraph(f"<b>Status:</b> {status}<br/><b>Member Since:</b> {member_since or '—'}<br/><b>Contact:</b> {contact or '—'}", meta_st),
+    ]
+    details_tbl = Table([[d] for d in details], colWidths=[62*mm])
+    details_tbl.setStyle(TableStyle([
+        ("TOPPADDING", (0,0), (-1,-1), 2),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 2),
+        ("LEFTPADDING", (0,0), (-1,-1), 0),
+    ]))
+
+    id_card = Table([[photo_cell, details_tbl, qr_cell]],
+                    colWidths=[28*mm, 64*mm, 24*mm])
+    id_card.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#f4fbf7")),
+        ("BOX", (0,0), (-1,-1), 1, colors.HexColor("#c5e8dc")),
+        ("LINEABOVE", (0,0), (-1,0), 4, colors.HexColor("#00d4c8")),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 14),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 14),
+        ("LEFTPADDING", (0,0), (-1,-1), 12),
+        ("RIGHTPADDING", (0,0), (-1,-1), 10),
+    ]))
+    content.append(id_card)
+    content.append(Spacer(1, 6))
+    content.append(Paragraph("↑ I-scan ang QR code para sa mabilis na verification",
+        ParagraphStyle("qn", fontSize=7, textColor=colors.HexColor("#9ab5a8"),
+                       alignment=TA_CENTER, spaceAfter=14)))
+
+    # ── RECEIPT SECTION ──
+    content.append(Paragraph("REGISTRATION FEE RECEIPT",
+        ParagraphStyle("rl", fontSize=8, textColor=colors.HexColor("#00a89e"),
+                       fontName="Helvetica-Bold", spaceAfter=8)))
+
+    if pay:
+        rcpt_no, amount, pdate, pmonth, pyear = pay
+        receipt_data = [
+            ["Receipt No.", rcpt_no or "—"],
+            ["Payment Type", "Registration Fee"],
+            ["Date Paid", str(pdate) if pdate else "—"],
+            ["Amount Paid", f"₩{amount:,}" if amount else "₩0"],
+        ]
+    else:
+        receipt_data = [["Receipt", "Walang registration fee record"]]
+
+    receipt_tbl = Table(receipt_data, colWidths=[50*mm, 66*mm])
+    receipt_tbl.setStyle(TableStyle([
+        ("FONTSIZE", (0,0), (-1,-1), 10),
+        ("TEXTCOLOR", (0,0), (0,-1), colors.HexColor("#5c8270")),
+        ("TEXTCOLOR", (1,0), (1,-1), colors.HexColor("#0c2418")),
+        ("FONTNAME", (1,0), (1,-1), "Helvetica-Bold"),
+        ("FONTSIZE", (1,-1), (1,-1), 14),
+        ("TEXTCOLOR", (1,-1), (1,-1), colors.HexColor("#00a89e")),
+        ("TOPPADDING", (0,0), (-1,-1), 7),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+        ("LINEBELOW", (0,0), (-1,-2), 0.5, colors.HexColor("#e0f0e5")),
+    ]))
+    content.append(receipt_tbl)
+    content.append(Spacer(1, 16))
+
+    # Footer
+    foot = ParagraphStyle("ft", fontSize=8, textColor=colors.HexColor("#9ab5a8"),
+                          alignment=TA_CENTER, leading=12)
+    content.append(Paragraph("<b>United in Faith, Serving with Love</b>", foot))
+    content.append(Paragraph("Ipakita ang temporary ID na ito sa opisina para makuha ang opisyal na membership card.", foot))
+    content.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} · Valid as proof of membership",
+        ParagraphStyle("fn", fontSize=6.5, textColor=colors.HexColor("#b5c9be"), alignment=TA_CENTER)))
+
+    doc.build(content)
+    buf.seek(0)
+
+    # Cleanup temp files
+    for tmp in [qr_path, photo_path]:
+        if tmp and _os.path.exists(tmp):
+            try:
+                _os.remove(tmp)
+            except Exception:
+                pass
+
+    return send_file(buf, mimetype="application/pdf",
+                     download_name=f"Approval_{m_id}.pdf")
+
+
 @app.route("/print_receipt/<int:payment_id>")
 def print_receipt(payment_id):
     if "username" not in session:
@@ -4198,7 +4396,27 @@ def approve_applicant(member_id):
         except Exception as e:
             print(f"[EMAIL] Failed to send welcome email to {email}: {e}")
 
-    return redirect("/registration_approval")
+    # I-redirect sa success page na may auto-download ng
+    # approval certificate (temp ID + receipt + QR)
+    return redirect(f"/approval_success/{new_member_id}")
+
+
+@app.route("/approval_success/<member_id>")
+def approval_success(member_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT full_name FROM members WHERE member_id = %s
+    """, (member_id,))
+    row = cursor.fetchone()
+    return_db(conn)
+
+    full_name = row[0] if row else ""
+    return render_template("approval_success.html",
+                           member_id=member_id, full_name=full_name)
 
 @app.route(
 "/reject_applicant/<member_id>"
