@@ -113,6 +113,7 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
 .btn-id { background:rgba(150,90,255,0.12); color:#7a3fd0; }
 .btn-edit { background:rgba(255,170,0,0.14); color:#c97300; }
 .btn-delete { background:rgba(220,53,69,0.12); color:#c0392b; }
+.btn-print { background:rgba(0,168,92,0.12); color:#00562a; }
 .pill { font-size:12.5px; font-weight:600; padding:4px 12px; border-radius:20px; border:1px solid rgba(0,196,106,0.3); background:rgba(0,196,106,0.12); color:var(--emerald-deep); }
 
 
@@ -354,6 +355,7 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
           <td>₩{{ "{:,}".format(p[4]) }}</td>
           <td>{{ p[5] }}</td>
           <td>
+            <a href="/print_receipt/{{ p[0] }}" target="_blank" class="btn-action btn-print">🧾 Print</a>
             <a href="/delete_payment/{{ p[0] }}" class="btn-action btn-delete" onclick="return confirm('Delete this payment record? This action cannot be undone.')">🗑️ Delete</a>
           </td>
         </tr>
@@ -397,7 +399,7 @@ function searchMemberPayments(name) {
               <td>${p.payment_month || ''} ${p.payment_year || ''}</td>
               <td>₩${p.amount.toLocaleString()}</td>
               <td>${p.payment_date}</td>
-              <td><a href="/delete_payment/${p.id}" class="btn-action btn-delete" onclick="return confirm('Delete this payment record? This action cannot be undone.')">🗑️ Delete</a></td>
+              <td><a href="/print_receipt/${p.id}" target="_blank" class="btn-action btn-print">🧾 Print</a> <a href="/delete_payment/${p.id}" class="btn-action btn-delete" onclick="return confirm('Delete this payment record? This action cannot be undone.')">🗑️ Delete</a></td>
             </tr>
           `).join('');
           resultsBox.style.display = 'block';
