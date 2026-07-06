@@ -288,6 +288,99 @@ def download_photo_for_pdf(member_id):
     return None
 
 
+# ════════════════════════════════════════════════════════════
+#  SHARED PDF HELPERS — modern design, logo, watermark, Korean
+# ════════════════════════════════════════════════════════════
+
+_KOREAN_FONT_READY = False
+
+def _ensure_korean_font():
+    """I-register ang Korean-compatible font (isang beses lang).
+    Ginagamit para tama ang render ng Hangul (한글) sa PDF."""
+    global _KOREAN_FONT_READY
+    if _KOREAN_FONT_READY:
+        return "HYGothic-Medium"
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+        pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
+        pdfmetrics.registerFont(UnicodeCIDFont("HYSMyeongJo-Medium"))
+        _KOREAN_FONT_READY = True
+        return "HYGothic-Medium"
+    except Exception as e:
+        print(f"[PDF] Korean font error: {e}")
+        return "Helvetica"
+
+
+def _pdf_logo_path():
+    """Hanapin ang FCCI logo file para sa PDF."""
+    for p in ["static/fcci_logo.jpeg", "logo/fcci_logo.jpeg"]:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _modern_pdf_header(doc_type_label):
+    """Gumawa ng modern na HUD-style header table na may logo.
+    Ibinabalik ang isang Table flowable."""
+    from reportlab.platypus import Table, TableStyle, Paragraph, Image
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.lib.enums import TA_LEFT, TA_RIGHT
+
+    logo_path = _pdf_logo_path()
+    title_st = ParagraphStyle("phTitle", fontSize=21, textColor=colors.white,
+                              fontName="Helvetica-Bold", alignment=TA_LEFT, leading=23)
+    sub_st = ParagraphStyle("phSub", fontSize=7, textColor=colors.HexColor("#8fb8c9"),
+                            alignment=TA_LEFT, leading=10)
+    type_st = ParagraphStyle("phType", fontSize=8, textColor=colors.HexColor("#00d4c8"),
+                             alignment=TA_RIGHT, fontName="Helvetica-Bold")
+
+    text_cell = [Paragraph("FCCI", title_st),
+                 Paragraph("FILIPINO COMMUNITY CENTER INTERNATIONAL", sub_st)]
+
+    if logo_path:
+        logo = Image(logo_path, width=16*mm, height=16*mm)
+        row = [[logo, text_cell, Paragraph(f"◈ {doc_type_label}", type_st)]]
+        col_widths = [20*mm, 116*mm, 34*mm]
+    else:
+        row = [[text_cell, Paragraph(f"◈ {doc_type_label}", type_st)]]
+        col_widths = [136*mm, 34*mm]
+
+    header = Table(row, colWidths=col_widths)
+    header.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#0b2236")),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 12),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+        ("LEFTPADDING", (0,0), (0,0), 14),
+        ("RIGHTPADDING", (-1,0), (-1,0), 14),
+    ]))
+    return header
+
+
+def _watermark_canvas(canvas, doc):
+    """Callback na nagdo-draw ng faded logo sa gitna ng bawat page
+    (background watermark). Tinatawag ng SimpleDocTemplate.build()."""
+    logo_path = _pdf_logo_path()
+    if not logo_path:
+        return
+    try:
+        from reportlab.lib.units import mm
+        canvas.saveState()
+        canvas.setFillAlpha(0.055)      # napaka-faint
+        w, h = doc.pagesize
+        size = 110 * mm
+        canvas.drawImage(logo_path,
+                         (w - size) / 2, (h - size) / 2,
+                         width=size, height=size,
+                         preserveAspectRatio=True, mask="auto")
+        canvas.restoreState()
+    except Exception as e:
+        print(f"[PDF] Watermark error: {e}")
+
+
 @app.route("/")
 def home():
     return redirect("/login")
@@ -1421,28 +1514,8 @@ def approval_certificate(member_id):
     styles = getSampleStyleSheet()
     content = []
 
-    # Header
-    head_title = ParagraphStyle("ht", fontSize=20, textColor=colors.white,
-                                fontName="Helvetica-Bold", alignment=TA_LEFT, leading=22)
-    head_sub = ParagraphStyle("hs", fontSize=7, textColor=colors.HexColor("#8fb8c9"),
-                              alignment=TA_LEFT, leading=10)
-    header_tbl = Table([[
-        Paragraph("FCCI", head_title),
-        Paragraph("◈ OFFICIAL", ParagraphStyle("bd", fontSize=8,
-                  textColor=colors.HexColor("#00d4c8"), alignment=2))
-    ], [
-        Paragraph("FILIPINO COMMUNITY CENTER INTERNATIONAL", head_sub), ""
-    ]], colWidths=[95*mm, 30*mm])
-    header_tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#0b2236")),
-        ("TOPPADDING", (0,0), (-1,-1), 10),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
-        ("LEFTPADDING", (0,0), (-1,-1), 16),
-        ("RIGHTPADDING", (0,0), (-1,-1), 16),
-        ("SPAN", (1,0), (1,1)),
-        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-    ]))
-    content.append(header_tbl)
+    # Modern header na may logo (shared helper)
+    content.append(_modern_pdf_header("OFFICIAL"))
     content.append(Spacer(1, 12))
 
     # Approved title
@@ -1545,7 +1618,7 @@ def approval_certificate(member_id):
     content.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} · Valid as proof of membership",
         ParagraphStyle("fn", fontSize=6.5, textColor=colors.HexColor("#b5c9be"), alignment=TA_CENTER)))
 
-    doc.build(content)
+    doc.build(content, onFirstPage=_watermark_canvas, onLaterPages=_watermark_canvas)
     buf.seek(0)
 
     # Cleanup temp files
@@ -1607,6 +1680,16 @@ def print_receipt(payment_id):
                                 alignment=TA_CENTER, spaceAfter=14)
 
     content = []
+
+    # Logo sa taas (centered)
+    _logo = _pdf_logo_path()
+    if _logo:
+        from reportlab.platypus import Image as _Img
+        content.append(Table([[_Img(_logo, width=18*mm, height=18*mm)]],
+                       colWidths=[120*mm],
+                       style=TableStyle([("ALIGN",(0,0),(-1,-1),"CENTER")])))
+        content.append(Spacer(1, 6))
+
     content.append(Paragraph("FCCI", title_style))
     content.append(Paragraph("Filipino Community Center International", sub_style))
     content.append(Paragraph("Official Payment Receipt", sub_style))
@@ -1640,7 +1723,7 @@ def print_receipt(payment_id):
     content.append(Paragraph("United in Faith, Serving with Love", foot_style))
     content.append(Paragraph("Salamat sa iyong kontribusyon!", foot_style))
 
-    doc.build(content)
+    doc.build(content, onFirstPage=_watermark_canvas, onLaterPages=_watermark_canvas)
     buf.seek(0)
     return send_file(buf, mimetype="application/pdf",
                      download_name=f"Receipt_{receipt_no}.pdf")
@@ -2173,138 +2256,106 @@ def donation_certificate(donation_id):
     if not donation:
         return "Donation Not Found"
 
-    os.makedirs(
-        "exports",
-        exist_ok=True
-    )
+    import io as _io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle)
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
 
-    filename = (
-        f"exports/"
-        f"Donation_Certificate_{donation_id}.pdf"
-    )
+    kfont = _ensure_korean_font()
+    donor_name, d_contact, d_amount, d_purpose, d_date = donation
 
-    pdf = SimpleDocTemplate(
-        filename
-    )
-
-    styles = getSampleStyleSheet()
-
+    buf = _io.BytesIO()
+    pdf = SimpleDocTemplate(buf, pagesize=A4,
+                            topMargin=14*mm, bottomMargin=14*mm,
+                            leftMargin=16*mm, rightMargin=16*mm)
     content = []
+    content.append(_modern_pdf_header("CERTIFICATE"))
+    content.append(Spacer(1, 22))
 
-    logo_path = "logo/fcci_logo.jpeg"
+    content.append(Paragraph("Certificate of Donation",
+        ParagraphStyle("t", fontSize=20, textColor=colors.HexColor("#0b1d2e"),
+                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=3)))
+    content.append(Paragraph("With sincere gratitude",
+        ParagraphStyle("s", fontSize=10, textColor=colors.HexColor("#5c8270"),
+                       alignment=TA_CENTER, spaceAfter=18)))
 
-    if os.path.exists(
-        logo_path
-    ):
+    content.append(Paragraph("Kinikilala ng FCCI ang mapagbigay na kontribusyon ni",
+        ParagraphStyle("b", fontSize=11, textColor=colors.HexColor("#3a5045"),
+                       alignment=TA_CENTER, spaceAfter=6)))
+    content.append(Paragraph(str(donor_name or "-"),
+        ParagraphStyle("nm", fontSize=22, textColor=colors.HexColor("#0b1d2e"),
+                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=16)))
 
-        content.append(
-            Image(
-                logo_path,
-                width=100,
-                height=100
-            )
-        )
+    # Amount hero
+    amt_tbl = Table([[Paragraph("DONATION AMOUNT",
+                        ParagraphStyle("al", fontSize=9, textColor=colors.HexColor("#5c8270"),
+                                       alignment=TA_CENTER))],
+                     [Paragraph(f"\u20a9{d_amount:,}" if d_amount else "\u20a90",
+                        ParagraphStyle("aa", fontSize=30, textColor=colors.HexColor("#00a89e"),
+                                       fontName="Helvetica-Bold", alignment=TA_CENTER))]],
+                    colWidths=[120*mm])
+    amt_tbl.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#f4fbf7")),
+        ("BOX",(0,0),(-1,-1),1,colors.HexColor("#c5e8dc")),
+        ("TOPPADDING",(0,0),(0,0),16),("BOTTOMPADDING",(0,1),(0,1),16),
+        ("ALIGN",(0,0),(-1,-1),"CENTER"),
+    ]))
+    content.append(Table([[amt_tbl]], colWidths=[178*mm],
+                   style=TableStyle([("ALIGN",(0,0),(-1,-1),"CENTER")])))
+    content.append(Spacer(1, 18))
 
-    content.append(
-        Spacer(1,10)
-    )
+    # Details — purpose gamit Korean font
+    kr_style = ParagraphStyle("kr", fontSize=10.5, fontName=kfont,
+                              textColor=colors.HexColor("#0c2418"))
+    lbl_style = ParagraphStyle("l", fontSize=10.5, textColor=colors.HexColor("#5c8270"))
+    def frow(lbl, val, mono=False, korean=False):
+        if korean:
+            vc = Paragraph(str(val), kr_style)
+        else:
+            fn = "Courier-Bold" if mono else "Helvetica-Bold"
+            vc = Paragraph(f'<font name="{fn}" color="#0c2418">{val}</font>',
+                           ParagraphStyle("v", fontSize=10.5))
+        return [Paragraph(lbl, lbl_style), vc]
 
-    content.append(
-        Paragraph(
-            "FILIPINO COMMUNITY CENTER INTERNATIONAL",
-            styles["Title"]
-        )
-    )
+    det = Table([
+        frow("Receipt No.", f"DON-2026-{donation_id:06d}", mono=True),
+        frow("Contact", d_contact or "-", mono=True),
+        frow("Purpose", d_purpose or "-", korean=True),
+        frow("Date", str(d_date) if d_date else "-"),
+    ], colWidths=[50*mm, 128*mm])
+    det.setStyle(TableStyle([
+        ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8),
+        ("LINEBELOW",(0,0),(-1,-1),0.5,colors.HexColor("#eef3f2")),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+    ]))
+    content.append(det)
+    content.append(Spacer(1, 28))
 
-    content.append(
-        Spacer(1,20)
-    )
+    # Signature lines
+    sig = Table([
+        [Paragraph("_______________________", ParagraphStyle("sl",fontSize=10,alignment=TA_CENTER)),
+         Paragraph("_______________________", ParagraphStyle("sl2",fontSize=10,alignment=TA_CENTER))],
+        [Paragraph("Authorized Signature", ParagraphStyle("sn",fontSize=8,textColor=colors.HexColor("#5c8270"),alignment=TA_CENTER)),
+         Paragraph("Treasurer", ParagraphStyle("sn2",fontSize=8,textColor=colors.HexColor("#5c8270"),alignment=TA_CENTER))],
+    ], colWidths=[89*mm, 89*mm])
+    content.append(sig)
+    content.append(Spacer(1, 20))
 
-    content.append(
-        Paragraph(
-            "CERTIFICATE OF APPRECIATION",
-            styles["Title"]
-        )
-    )
+    content.append(Paragraph("United in Faith, Serving with Love",
+        ParagraphStyle("f", fontSize=8, textColor=colors.HexColor("#9ab5a8"),
+                       alignment=TA_CENTER)))
+    content.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        ParagraphStyle("g", fontSize=7, textColor=colors.HexColor("#b5c9be"),
+                       alignment=TA_CENTER)))
 
-    content.append(
-        Spacer(1,30)
-    )
-
-    content.append(
-        Paragraph(
-            f"""
-            This certificate is proudly presented to
-
-            <b>{donation[0]}</b>
-
-            In recognition and appreciation of your
-            generous donation and support to FCCI.
-            """,
-            styles["BodyText"]
-        )
-    )
-
-    content.append(
-        Spacer(1,20)
-    )
-
-    content.append(
-        Paragraph(
-            f"Donation Amount: ₩{donation[2]:,}",
-            styles["BodyText"]
-        )
-    )
-
-    content.append(
-        Paragraph(
-            f"Purpose: {donation[3]}",
-            styles["BodyText"]
-        )
-    )
-
-    content.append(
-        Paragraph(
-            f"Date: {donation[4]}",
-            styles["BodyText"]
-        )
-    )
-
-    content.append(
-        Spacer(1,50)
-    )
-
-    content.append(
-        Paragraph(
-            "TO GOD BE THE GLORY!",
-            styles["Heading2"]
-        )
-    )
-
-    content.append(
-        Spacer(1,40)
-    )
-
-    content.append(
-        Paragraph(
-            "________________________",
-            styles["BodyText"]
-        )
-    )
-
-    content.append(
-        Paragraph(
-            "FCCI President",
-            styles["BodyText"]
-        )
-    )
-
-    pdf.build(content)
-
-    return send_file(
-        filename,
-        as_attachment=True
-    )
+    pdf.build(content, onFirstPage=_watermark_canvas, onLaterPages=_watermark_canvas)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"Donation_Certificate_{donation_id}.pdf")
 
 
 @app.route("/export_expenses")
@@ -3225,209 +3276,84 @@ def withdrawal_certificate(member_id):
 
     return_db(conn)
 
-    os.makedirs(
-        "exports",
-        exist_ok=True
-    )
+    import io as _io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle)
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
 
-    filename = (
-        f"exports/"
-        f"Withdrawal_{member_id}.pdf"
-    )
-
-    doc = SimpleDocTemplate(
-        filename
-    )
-
-    styles = getSampleStyleSheet()
-
+    kfont = _ensure_korean_font()
+    buf = _io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            topMargin=14*mm, bottomMargin=14*mm,
+                            leftMargin=16*mm, rightMargin=16*mm)
     story = []
+    story.append(_modern_pdf_header("CERTIFICATE"))
+    story.append(Spacer(1, 22))
 
-    logo_path = (
-        "logo/fcci_logo.jpeg"
-    )
+    story.append(Paragraph("Certificate of Withdrawal",
+        ParagraphStyle("t", fontSize=20, textColor=colors.HexColor("#0b1d2e"),
+                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=3)))
+    story.append(Paragraph("Membership Status Change",
+        ParagraphStyle("s", fontSize=10, textColor=colors.HexColor("#5c8270"),
+                       alignment=TA_CENTER, spaceAfter=18)))
 
-    if os.path.exists(
-        logo_path
-    ):
-        logo = Image(
-            logo_path,
-            width=100,
-            height=100
-        )
-        story.append(logo)
+    story.append(Paragraph("Pinatutunayan na ang miyembrong si",
+        ParagraphStyle("b", fontSize=11, textColor=colors.HexColor("#3a5045"),
+                       alignment=TA_CENTER, spaceAfter=6)))
+    story.append(Paragraph(str(member[2] or "-"),
+        ParagraphStyle("nm", fontSize=22, textColor=colors.HexColor("#0b1d2e"),
+                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=6)))
+    story.append(Paragraph("ay opisyal nang umalis sa pagiging miyembro ng FCCI.",
+        ParagraphStyle("b2", fontSize=11, textColor=colors.HexColor("#3a5045"),
+                       alignment=TA_CENTER, spaceAfter=18)))
 
-    story.append(
-        Paragraph(
-            "<b>FILIPINO COMMUNITY CENTER INTERNATIONAL</b>",
-            styles["Title"]
-        )
-    )
+    lbl_style = ParagraphStyle("l", fontSize=10.5, textColor=colors.HexColor("#5c8270"))
+    def frow(lbl, val, mono=False, color="#0c2418"):
+        fn = "Courier-Bold" if mono else "Helvetica-Bold"
+        return [Paragraph(lbl, lbl_style),
+                Paragraph(f'<font name="{fn}" color="{color}">{val}</font>',
+                          ParagraphStyle("v", fontSize=10.5))]
 
-    story.append(
-        Paragraph(
-            "Membership Withdrawal Certificate",
-            styles["Heading2"]
-        )
-    )
+    det = Table([
+        frow("Member ID", member[1], mono=True, color="#00a89e"),
+        frow("Member Since", member[6] or "-"),
+        frow("Withdrawal Date", datetime.now().strftime("%Y-%m-%d")),
+        frow("Total Contributions", f"\u20a9{total_contributions:,}"),
+        frow("Refund (75%)", f"\u20a9{refund_amount:,}", color="#00a89e"),
+        frow("Community Share (25%)", f"\u20a9{community_share:,}"),
+    ], colWidths=[55*mm, 123*mm])
+    det.setStyle(TableStyle([
+        ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8),
+        ("LINEBELOW",(0,0),(-1,-1),0.5,colors.HexColor("#eef3f2")),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+    ]))
+    story.append(det)
+    story.append(Spacer(1, 30))
 
-    story.append(
-        Spacer(1,20)
-    )
+    sig = Table([
+        [Paragraph("_______________________", ParagraphStyle("sl",fontSize=10,alignment=TA_CENTER)),
+         Paragraph("_______________________", ParagraphStyle("sl2",fontSize=10,alignment=TA_CENTER))],
+        [Paragraph("Member Signature", ParagraphStyle("sn",fontSize=8,textColor=colors.HexColor("#5c8270"),alignment=TA_CENTER)),
+         Paragraph("FCCI Officer", ParagraphStyle("sn2",fontSize=8,textColor=colors.HexColor("#5c8270"),alignment=TA_CENTER))],
+    ], colWidths=[89*mm, 89*mm])
+    story.append(sig)
+    story.append(Spacer(1, 20))
 
+    story.append(Paragraph("United in Faith, Serving with Love",
+        ParagraphStyle("f", fontSize=8, textColor=colors.HexColor("#9ab5a8"),
+                       alignment=TA_CENTER)))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        ParagraphStyle("g", fontSize=7, textColor=colors.HexColor("#b5c9be"),
+                       alignment=TA_CENTER)))
 
-    photo_path = download_photo_for_pdf(member[1])
-
-    if photo_path:
-
-        story.append(
-            Image(
-                photo_path,
-                width=120,
-                height=120
-            )
-        )
-
-        story.append(
-            Spacer(1,10)
-        )
-
-    data = [
-
-        [
-            "Member ID",
-            member[1]
-        ],
-
-        [
-            "Full Name",
-            member[2]
-        ],
-
-        [
-            "Contact",
-            member[3]
-        ],
-
-        [
-            "Email",
-            member[7]
-        ],
-
-        [
-            "Address",
-            member[4]
-        ],
-
-        [
-            "Withdrawal Date",
-            datetime.now().strftime(
-                "%Y-%m-%d"
-            )
-        ],
-
-        [
-            "Total Contributions",
-            f"₩{total_contributions:,}"
-        ],
-
-        [
-            "Refund (75%)",
-            f"₩{refund_amount:,}"
-        ],
-
-        [
-            "Community Share (25%)",
-            f"₩{community_share:,}"
-        ]
-
-    ]
-
-    table = Table(
-        data,
-        colWidths=[
-            180,
-            280
-        ]
-    )
-
-    table.setStyle(
-        TableStyle([
-            (
-                "GRID",
-                (0,0),
-                (-1,-1),
-                1,
-                colors.black
-            ),
-            (
-                "BACKGROUND",
-                (0,0),
-                (0,-1),
-                colors.lightgrey
-            )
-        ])
-    )
-
-    story.append(
-        table
-    )
-
-    story.append(
-        Spacer(1,40)
-    )
-
-    story.append(
-        Paragraph(
-            "This certifies that the above member voluntarily withdrew from FCCI membership.",
-            styles["Normal"]
-        )
-    )
-
-    story.append(
-        Spacer(1,50)
-    )
-
-    signature_table = Table(
-        
-        [
-
-            [
-                "Member Signature",
-                "President Signature"
-            ],
-
-            [
-                "",
-                ""
-            ],
-
-            [
-                "__________________",
-                "__________________"
-            ]
-
-        ],
-
-        colWidths=[
-            250,
-            250
-        ]
-
-    )
-
-    story.append(
-        signature_table
-    )
-
-    doc.build(
-        story
-    )
-
-    return send_file(
-        filename,
-        as_attachment=True
-    )
+    doc.build(story, onFirstPage=_watermark_canvas, onLaterPages=_watermark_canvas)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"Withdrawal_{member_id}.pdf")
 
 @app.route(
 "/member_profile_pdf/<member_id>"
@@ -3489,165 +3415,119 @@ def member_profile_pdf(member_id):
 
     return_db(conn)
 
-    os.makedirs(
-        "exports",
-        exist_ok=True
-    )
+    import io as _io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle, Image)
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
-    filename = (
-        f"exports/"
-        f"{member_id}_Profile.pdf"
-    )
-
-    pdf = SimpleDocTemplate(
-        filename
-    )
-
-    styles = getSampleStyleSheet()
-
+    kfont = _ensure_korean_font()
+    buf = _io.BytesIO()
+    pdf = SimpleDocTemplate(buf, pagesize=A4,
+                            topMargin=14*mm, bottomMargin=14*mm,
+                            leftMargin=16*mm, rightMargin=16*mm)
     content = []
 
-    logo_path = (
-        "logo/fcci_logo.jpeg"
-    )
+    # Modern header na may logo
+    content.append(_modern_pdf_header("MEMBER PROFILE"))
+    content.append(Spacer(1, 16))
 
-    if os.path.exists(
-        logo_path
-    ):
-
-        logo = Image(
-            logo_path,
-            width=70,
-            height=70
-        )
-
-        header = Table(
-            [[
-                Paragraph(
-                    "FCCI MEMBER PROFILE",
-                    styles["Title"]
-                ),
-                logo
-            ]],
-            colWidths=[400,80]
-        )
-
-        content.append(
-            header
-        )
-
-    content.append(
-        Spacer(1,20)
-    )
-
+    # Member photo (centered)
     photo_path = download_photo_for_pdf(member[1])
-
     if photo_path:
+        content.append(Table([[Image(photo_path, width=32*mm, height=32*mm)]],
+                             colWidths=[178*mm],
+                             style=TableStyle([("ALIGN",(0,0),(-1,-1),"CENTER")])))
+        content.append(Spacer(1, 10))
 
-        img = Image(
-            photo_path,
-            width=120,
-            height=120
-        )
+    content.append(Paragraph("Member Profile",
+        ParagraphStyle("t", fontSize=17, textColor=colors.HexColor("#0b1d2e"),
+                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=2)))
+    content.append(Paragraph("Official Member Record",
+        ParagraphStyle("s", fontSize=9, textColor=colors.HexColor("#5c8270"),
+                       alignment=TA_CENTER, spaceAfter=16)))
 
-        content.append(img)
+    last_attendance = attendance[0] if attendance else "No Record"
 
-        content.append(
-            Spacer(1,10)
-        )
+    # Field rows — gumagamit ng Korean font para sa address (baka may Hangul)
+    kr_style = ParagraphStyle("kr", fontSize=10, fontName=kfont,
+                              textColor=colors.HexColor("#0c2418"))
+    def field(lbl, val, mono=False, korean=False, color="#0c2418"):
+        if korean:
+            val_cell = Paragraph(str(val), kr_style)
+        else:
+            fn = "Courier-Bold" if mono else "Helvetica-Bold"
+            val_cell = Paragraph(f'<font name="{fn}" color="{color}">{val}</font>',
+                                 ParagraphStyle("v", fontSize=10.5))
+        return [Paragraph(f'<font color="#5c8270">{lbl}</font>',
+                          ParagraphStyle("l", fontSize=10.5)), val_cell]
 
-    last_attendance = (
-        attendance[0]
-        if attendance
-        else "No Record"
-    )
+    info_data = [
+        field("Member ID", member[1], mono=True, color="#00a89e"),
+        field("Full Name", member[2] or "-"),
+        field("Contact", member[3] or "-", mono=True),
+        field("Address", member[4] or "-", korean=True),
+        field("Email", member[7] or "-"),
+        field("Birthday", member[6] or "-"),
+        field("Member Since", member[6] if False else (member[6] or "-")),
+        field("Total Payments", f"\u20a9{total_payment:,}", color="#00a89e"),
+        field("Last Attendance", str(last_attendance)),
+        field("Status", member[10] or "-", color="#00a89e"),
+    ]
+    info_tbl = Table(info_data, colWidths=[50*mm, 128*mm])
+    info_tbl.setStyle(TableStyle([
+        ("TOPPADDING",(0,0),(-1,-1),8), ("BOTTOMPADDING",(0,0),(-1,-1),8),
+        ("LINEBELOW",(0,0),(-1,-1),0.5,colors.HexColor("#eef3f2")),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+    ]))
+    content.append(info_tbl)
+    content.append(Spacer(1, 18))
 
-    content.append(
-        Paragraph(
-            f"Member ID: {member[1]}",
-            styles["Normal"]
-        )
-    )
+    # PAYMENT HISTORY table
+    content.append(Paragraph("PAYMENT HISTORY",
+        ParagraphStyle("ph", fontSize=9, textColor=colors.HexColor("#00a89e"),
+                       fontName="Helvetica-Bold", spaceAfter=8)))
 
-    content.append(
-        Paragraph(
-            f"Name: {member[2]}",
-            styles["Normal"]
-        )
-    )
+    if payments:
+        ph_data = [["Date", "Type", "Amount"]]
+        for p in payments:
+            ph_data.append([str(p[0]), str(p[1]), f"\u20a9{p[2]:,}"])
+        ph_tbl = Table(ph_data, colWidths=[50*mm, 78*mm, 50*mm])
+        ph_tbl.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#0b2236")),
+            ("TEXTCOLOR",(0,0),(-1,0),colors.white),
+            ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+            ("FONTSIZE",(0,0),(-1,-1),9.5),
+            ("TEXTCOLOR",(2,1),(2,-1),colors.HexColor("#00a89e")),
+            ("FONTNAME",(2,1),(2,-1),"Courier-Bold"),
+            ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),12),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#f6fbf9")]),
+            ("LINEBELOW",(0,0),(-1,-1),0.5,colors.HexColor("#e0f0e5")),
+        ]))
+        content.append(ph_tbl)
+    else:
+        content.append(Paragraph("Walang payment records pa.",
+            ParagraphStyle("np", fontSize=10, textColor=colors.HexColor("#9ab5a8"))))
 
-    content.append(
-        Paragraph(
-            f"Contact: {member[3]}",
-            styles["Normal"]
-        )
-    )
+    content.append(Spacer(1, 20))
+    content.append(Paragraph("United in Faith, Serving with Love",
+        ParagraphStyle("f", fontSize=8, textColor=colors.HexColor("#9ab5a8"),
+                       alignment=TA_CENTER)))
+    content.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        ParagraphStyle("g", fontSize=7, textColor=colors.HexColor("#b5c9be"),
+                       alignment=TA_CENTER)))
 
-    content.append(
-        Paragraph(
-            f"Birthday: {member[6]}",
-            styles["Normal"]
-        )
-    )
-
-    content.append(
-        Paragraph(
-            f"Email: {member[7]}",
-            styles["Normal"]
-        )
-    )
-
-    content.append(
-        Paragraph(
-            f"Address: {member[4]}",
-            styles["Normal"]
-        )
-    )
-
-    content.append(
-        Paragraph(
-            f"Total Payments: ₩{total_payment:,}",
-            styles["Normal"]
-        )
-    )
-
-    content.append(
-        Paragraph(
-            f"Last Attendance: {last_attendance}",
-            styles["Normal"]
-        )
-    )
-
-    content.append(
-        Spacer(1,20)
-    )
-
-    content.append(
-        Paragraph(
-            "PAYMENT HISTORY",
-            styles["Heading2"]
-        )
-    )
-
-    for payment in payments:
-
-        content.append(
-            Paragraph(
-                f"{payment[0]} | "
-                f"{payment[1]} | "
-                f"₩{payment[2]:,}",
-                styles["Normal"]
-            )
-        )
-
-    pdf.build(
-        content
-    )
-
-    return send_file(
-        filename,
-        as_attachment=True
-    )
+    pdf.build(content, onFirstPage=_watermark_canvas, onLaterPages=_watermark_canvas)
+    buf.seek(0)
+    if photo_path and os.path.exists(photo_path):
+        try: os.remove(photo_path)
+        except Exception: pass
+    return send_file(buf, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"{member_id}_Profile.pdf")
 
 @app.route("/dashboard_outstanding")
 def dashboard_outstanding():
