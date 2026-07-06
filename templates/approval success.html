@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Approved! — FCCI</title>
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#00562a">
+  <link rel="apple-touch-icon" href="/static/fcci_logo.jpeg">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --cyan:#00d4c8; --cyan-deep:#00a89e; --violet:#7c6df0; --ink:#0b1d2e; --muted:#6b7e8f; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Outfit', sans-serif;
+    background:
+      radial-gradient(ellipse 800px 500px at 20% 0%, rgba(0,212,200,0.14) 0%, transparent 55%),
+      radial-gradient(ellipse 600px 500px at 90% 100%, rgba(124,109,240,0.10) 0%, transparent 50%),
+      linear-gradient(180deg,#ffffff,#f4f8fb);
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .card {
+    max-width:440px; width:100%; background:rgba(255,255,255,0.8);
+    backdrop-filter:blur(20px); border:1px solid rgba(0,212,200,0.2);
+    border-radius:24px; padding:44px 34px; text-align:center;
+    box-shadow:0 20px 60px rgba(0,60,80,0.12);
+  }
+  .check-ring {
+    width:88px; height:88px; margin:0 auto 22px; border-radius:50%;
+    background:linear-gradient(135deg,var(--cyan),var(--violet));
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 30px rgba(0,212,200,0.4);
+    animation:pop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pop { from { transform:scale(0); } to { transform:scale(1); } }
+  .check-ring svg { width:44px; height:44px; stroke:#fff; stroke-width:3; fill:none; }
+  h1 { font-size:24px; font-weight:800; color:var(--ink); margin-bottom:6px; }
+  .sub { font-size:14px; color:var(--muted); margin-bottom:22px; }
+  .id-box {
+    background:rgba(0,212,200,0.08); border:1px solid rgba(0,212,200,0.3);
+    border-radius:14px; padding:16px; margin-bottom:24px;
+  }
+  .id-box .lbl { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+  .id-box .val { font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:var(--cyan-deep); margin-top:4px; }
+  .id-box .nm { font-size:14px; color:var(--ink); margin-top:6px; font-weight:600; }
+  .btn {
+    display:block; width:100%; padding:15px 0; border-radius:14px;
+    font-size:15px; font-weight:700; text-decoration:none; margin-bottom:12px;
+    border:none; cursor:pointer; font-family:'Outfit',sans-serif;
+  }
+  .btn-dl { background:linear-gradient(135deg,var(--cyan-deep),var(--cyan)); color:#04222a; box-shadow:0 8px 24px rgba(0,212,200,0.3); }
+  .btn-back { background:rgba(0,0,0,0.04); color:var(--muted); border:1px solid rgba(0,0,0,0.08); }
+  .dl-note { font-size:12px; color:var(--muted); margin-bottom:20px; font-family:'JetBrains Mono',monospace; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="check-ring">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h1>Member Approved! 🎉</h1>
+    <p class="sub">Opisyal nang miyembro ng FCCI si <b>{{ full_name }}</b></p>
+
+    <div class="id-box">
+      <div class="lbl">Bagong Member ID</div>
+      <div class="val">{{ member_id }}</div>
+      <div class="nm">{{ full_name }}</div>
+    </div>
+
+    <p class="dl-note" id="dlNote">⏳ Ini-download ang certificate...</p>
+
+    <a href="/approval_certificate/{{ member_id }}" target="_blank" class="btn btn-dl" id="dlBtn">
+      🪪 I-download ang Approval Certificate
+    </a>
+    <a href="/registration_approval" class="btn btn-back">← Bumalik sa Approval Page</a>
+  </div>
+
+<script>
+  // Auto-download ang certificate pagkatapos ng 800ms
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = '/approval_certificate/{{ member_id }}';
+      document.body.appendChild(iframe);
+      document.getElementById('dlNote').textContent = '✓ Certificate downloaded! (o i-click ang button sa ibaba)';
+    }, 800);
+  });
+</script>
+</body>
+</html>
