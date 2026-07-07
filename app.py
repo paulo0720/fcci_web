@@ -5591,7 +5591,8 @@ def member_login():
         remaining = int(session["login_lockout_until"] - now_ts)
         return render_template(
             "member_login.html",
-            error=f"Napakaraming maling pagsubok. Subukan ulit pagkatapos ng {remaining} segundo."
+            error=f"Napakaraming maling pagsubok. Subukan ulit pagkatapos ng {remaining} segundo.",
+            open_events=_get_open_events()
         )
 
     if request.method == "POST":
@@ -5618,7 +5619,8 @@ def member_login():
                 session["login_attempts"] = 0
             return render_template(
                 "member_login.html",
-                error="Member ID na hindi natagpuan. Pakitiyak na tama ang inilagay mo."
+                error="Member ID na hindi natagpuan. Pakitiyak na tama ang inilagay mo.",
+                open_events=_get_open_events()
             )
 
         stored_birthday = member[2]
@@ -5633,17 +5635,20 @@ def member_login():
                 session["login_attempts"] = 0
                 return render_template(
                     "member_login.html",
-                    error="Napakaraming maling pagsubok. Sandali lang at subukan ulit."
+                    error="Napakaraming maling pagsubok. Sandali lang at subukan ulit.",
+                    open_events=_get_open_events()
                 )
             return render_template(
                 "member_login.html",
-                error="Maling Member ID o Birthday. Subukan ulit."
+                error="Maling Member ID o Birthday. Subukan ulit.",
+                open_events=_get_open_events()
             )
 
         if status != "Active":
             return render_template(
                 "member_login.html",
-                error=f"Hindi mo pa magagamit ang portal na ito. Ang status mo ay '{status}'. Pakibayaran muna ang Registration Fee sa FCCI office para ma-activate ang account mo."
+                error=f"Hindi mo pa magagamit ang portal na ito. Ang status mo ay '{status}'. Pakibayaran muna ang Registration Fee sa FCCI office para ma-activate ang account mo.",
+                open_events=_get_open_events()
             )
 
         # Successful login
@@ -5653,7 +5658,7 @@ def member_login():
 
         return redirect("/feed")
 
-    return render_template("member_login.html")
+    return render_template("member_login.html", open_events=_get_open_events())
 
 
 def normalize_birthday(raw_value):
@@ -5689,6 +5694,115 @@ def require_member_login():
     if not session.get("member_logged_in"):
         return False
     return True
+
+EVENT_TYPES = [
+    "Basketball",
+    "Volleyball",
+    "Feeding Program",
+    "General Assembly",
+    "Fun Run",
+    "Fiesta / Celebration",
+    "Other",
+]
+
+# Event types na "team-based" (may Team Name + list ng members).
+# Ang lahat ng iba pang types ay "RSVP-based" (simpleng sign-up lang).
+EVENT_TEAM_TYPES = {"Basketball", "Volleyball"}
+
+EVENT_TYPE_ICONS = {
+    "Basketball": "🏀",
+    "Volleyball": "🏐",
+    "Feeding Program": "🍲",
+    "General Assembly": "📋",
+    "Fun Run": "🏃",
+    "Fiesta / Celebration": "🎉",
+    "Other": "📌",
+}
+
+
+def _event_is_team_mode(event_type):
+    return event_type in EVENT_TEAM_TYPES
+
+
+def _get_event_registrations(cursor, post_id):
+    """Ibinabalik ang lahat ng registrations ng isang event, kasama
+    ang team members (kung team-based) bilang listahan ng pangalan."""
+    cursor.execute("""
+        SELECT id, member_id, is_guest, team_name, captain_name,
+               contact, companions, notes, status, registered_date, registered_time
+        FROM event_registrations
+        WHERE post_id = %s
+        ORDER BY id ASC
+    """, (post_id,))
+    rows = cursor.fetchall()
+
+    regs = []
+    for r in rows:
+        reg_id = r[0]
+        cursor.execute("""
+            SELECT member_name FROM event_registration_members
+            WHERE registration_id = %s ORDER BY id ASC
+        """, (reg_id,))
+        members = [m[0] for m in cursor.fetchall()]
+
+        regs.append({
+            "id": reg_id,
+            "member_id": r[1],
+            "is_guest": r[2],
+            "team_name": r[3],
+            "captain_name": r[4],
+            "contact": r[5],
+            "companions": r[6],
+            "notes": r[7],
+            "status": r[8],
+            "registered_date": r[9],
+            "registered_time": r[10],
+            "members": members,
+        })
+    return regs
+
+
+def _get_open_events():
+    """Ibinabalik ang listahan ng mga event na bukas pa ang registration —
+    ginagamit ito sa public widget sa member_login page (kahit hindi naka-login)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, event_type, event_title, content, event_date, event_location, max_slots
+        FROM feed_posts
+        WHERE is_event = TRUE AND registration_closed = FALSE
+        ORDER BY id DESC
+        LIMIT 5
+    """)
+    rows = cursor.fetchall()
+
+    events = []
+    for r in rows:
+        post_id = r[0]
+        cursor.execute("""
+            SELECT COUNT(*) FROM event_registrations
+            WHERE post_id = %s AND status = 'Confirmed'
+        """, (post_id,))
+        join_count = cursor.fetchone()[0]
+        max_slots = r[6]
+
+        events.append({
+            "id": post_id,
+            "type": r[1],
+            "icon": EVENT_TYPE_ICONS.get(r[1], "📌"),
+            "title": r[2] or r[1],
+            "description": r[3],
+            "date": r[4],
+            "location": r[5],
+            "max_slots": max_slots,
+            "slots_remaining": (max_slots - join_count) if max_slots else None,
+            "join_count": join_count,
+            "team_mode": _event_is_team_mode(r[1]),
+        })
+
+    return_db(conn)
+    return events
+
 
 @app.route("/feed", methods=["GET", "POST"])
 def feed():
@@ -5732,7 +5846,9 @@ def feed():
 
     # GET request: kunin lahat ng posts, pinned muna, tapos pinaka-bago
     cursor.execute("""
-    SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time
+    SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time,
+           is_event, event_type, event_title, event_date, event_location,
+           max_slots, registration_closed
     FROM feed_posts
     ORDER BY is_pinned DESC, id DESC
     """)
@@ -5758,6 +5874,59 @@ def feed():
         """, (post_id,))
         comments = cursor.fetchall()
 
+        is_event = post[8]
+        event_info = None
+
+        if is_event:
+            event_type = post[9]
+            team_mode = _event_is_team_mode(event_type)
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM event_registrations
+                WHERE post_id = %s AND status != 'Cancelled'
+            """, (post_id,))
+            join_count = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT id, team_name, captain_name, contact, companions, status
+                FROM event_registrations
+                WHERE post_id = %s AND member_id = %s
+            """, (post_id, session["member_id"]))
+            my_reg_row = cursor.fetchone()
+            my_registration = None
+            if my_reg_row:
+                cursor.execute("""
+                    SELECT member_name FROM event_registration_members
+                    WHERE registration_id = %s ORDER BY id ASC
+                """, (my_reg_row[0],))
+                my_registration = {
+                    "id": my_reg_row[0],
+                    "team_name": my_reg_row[1],
+                    "captain_name": my_reg_row[2],
+                    "contact": my_reg_row[3],
+                    "companions": my_reg_row[4],
+                    "status": my_reg_row[5],
+                    "members": [m[0] for m in cursor.fetchall()],
+                }
+
+            max_slots = post[13]
+            slots_remaining = (max_slots - join_count) if max_slots else None
+
+            event_info = {
+                "type": event_type,
+                "icon": EVENT_TYPE_ICONS.get(event_type, "📌"),
+                "team_mode": team_mode,
+                "title": post[10],
+                "date": post[11],
+                "location": post[12],
+                "max_slots": max_slots,
+                "slots_remaining": slots_remaining,
+                "registration_closed": post[14],
+                "join_count": join_count,
+                "join_label": "teams joined" if team_mode else "confirmed",
+                "my_registration": my_registration,
+            }
+
         posts_with_meta.append({
             "id": post[0],
             "member_id": post[1],
@@ -5769,7 +5938,9 @@ def feed():
             "post_time": post[7],
             "like_count": like_count,
             "liked_by_me": liked_by_me,
-            "comments": comments
+            "comments": comments,
+            "is_event": is_event,
+            "event": event_info,
         })
 
     return_db(conn)
@@ -5890,6 +6061,194 @@ def feed_pin_post(post_id):
 
     # Ibalik sa pinanggalingang page (admin feed view o member feed)
     return redirect(request.referrer or "/feed")
+
+
+# ── JOIN EVENT (member, naka-login) ────────────────────────
+@app.route("/feed/event/<int:post_id>/join", methods=["POST"])
+def feed_event_join(post_id):
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT event_type, max_slots, registration_closed FROM feed_posts
+        WHERE id = %s AND is_event = TRUE
+    """, (post_id,))
+    event_row = cursor.fetchone()
+
+    if not event_row:
+        return_db(conn)
+        return redirect("/feed")
+
+    event_type, max_slots, closed = event_row
+
+    if closed:
+        return_db(conn)
+        return redirect("/feed")
+
+    # Isang registration lang bawat member kada event
+    cursor.execute("""
+        SELECT id FROM event_registrations WHERE post_id = %s AND member_id = %s
+    """, (post_id, session["member_id"]))
+    if cursor.fetchone():
+        return_db(conn)
+        return redirect("/feed")
+
+    now = datetime.now()
+    team_mode = _event_is_team_mode(event_type)
+
+    if team_mode:
+        team_name = request.form.get("team_name", "").strip() or "Unnamed Team"
+        captain_name = request.form.get("captain_name", "").strip() or session["member_name"]
+        contact = request.form.get("contact", "").strip()
+        member_names = [
+            m.strip() for m in request.form.getlist("members[]") if m.strip()
+        ]
+        companions = len(member_names)
+    else:
+        team_name = None
+        captain_name = request.form.get("rsvp_name", "").strip() or session["member_name"]
+        contact = request.form.get("contact", "").strip()
+        companions = int(request.form.get("companions", 1) or 1)
+        member_names = []
+
+    notes = request.form.get("notes", "").strip()
+
+    # I-check kung puno na (kung may max_slots) — kung puno, Waitlisted
+    status = "Confirmed"
+    if max_slots:
+        cursor.execute("""
+            SELECT COUNT(*) FROM event_registrations
+            WHERE post_id = %s AND status = 'Confirmed'
+        """, (post_id,))
+        current_count = cursor.fetchone()[0]
+        if current_count >= max_slots:
+            status = "Waitlisted"
+
+    cursor.execute("""
+        INSERT INTO event_registrations
+        (post_id, member_id, is_guest, team_name, captain_name, contact,
+         companions, notes, status, registered_date, registered_time)
+        VALUES (%s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+    """, (
+        post_id, session["member_id"], team_name, captain_name, contact,
+        companions, notes, status,
+        now.strftime("%B %d, %Y"), now.strftime("%I:%M %p")
+    ))
+    reg_id = cursor.fetchone()[0]
+
+    for m_name in member_names:
+        cursor.execute("""
+            INSERT INTO event_registration_members (registration_id, member_name)
+            VALUES (%s, %s)
+        """, (reg_id, m_name))
+
+    conn.commit()
+    return_db(conn)
+
+    return redirect("/feed")
+
+
+# ── CANCEL MY EVENT REGISTRATION ───────────────────────────
+@app.route("/feed/event/<int:post_id>/cancel")
+def feed_event_cancel(post_id):
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        DELETE FROM event_registrations WHERE post_id = %s AND member_id = %s
+    """, (post_id, session["member_id"]))
+
+    conn.commit()
+    return_db(conn)
+
+    return redirect("/feed")
+
+
+# ── GUEST JOIN (walang account/login — mula sa login page widget) ──
+@app.route("/guest_event/<int:post_id>/join", methods=["POST"])
+def guest_event_join(post_id):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT event_type, max_slots, registration_closed FROM feed_posts
+        WHERE id = %s AND is_event = TRUE
+    """, (post_id,))
+    event_row = cursor.fetchone()
+
+    if not event_row:
+        return_db(conn)
+        return redirect("/member_login")
+
+    event_type, max_slots, closed = event_row
+
+    if closed:
+        return_db(conn)
+        return redirect("/member_login")
+
+    now = datetime.now()
+    team_mode = _event_is_team_mode(event_type)
+
+    if team_mode:
+        team_name = request.form.get("team_name", "").strip() or "Unnamed Team"
+        captain_name = request.form.get("captain_name", "").strip() or "Guest"
+        contact = request.form.get("contact", "").strip()
+        member_names = [
+            m.strip() for m in request.form.getlist("members[]") if m.strip()
+        ]
+        companions = len(member_names)
+    else:
+        team_name = None
+        captain_name = request.form.get("rsvp_name", "").strip() or "Guest"
+        contact = request.form.get("contact", "").strip()
+        companions = int(request.form.get("companions", 1) or 1)
+        member_names = []
+
+    notes = request.form.get("notes", "").strip()
+
+    status = "Confirmed"
+    if max_slots:
+        cursor.execute("""
+            SELECT COUNT(*) FROM event_registrations
+            WHERE post_id = %s AND status = 'Confirmed'
+        """, (post_id,))
+        current_count = cursor.fetchone()[0]
+        if current_count >= max_slots:
+            status = "Waitlisted"
+
+    cursor.execute("""
+        INSERT INTO event_registrations
+        (post_id, member_id, is_guest, team_name, captain_name, contact,
+         companions, notes, status, registered_date, registered_time)
+        VALUES (%s, NULL, TRUE, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+    """, (
+        post_id, team_name, captain_name, contact,
+        companions, notes, status,
+        now.strftime("%B %d, %Y"), now.strftime("%I:%M %p")
+    ))
+    reg_id = cursor.fetchone()[0]
+
+    for m_name in member_names:
+        cursor.execute("""
+            INSERT INTO event_registration_members (registration_id, member_name)
+            VALUES (%s, %s)
+        """, (reg_id, m_name))
+
+    conn.commit()
+    return_db(conn)
+
+    return render_template("guest_event_success.html", team_name=team_name, captain_name=captain_name)
 
 
 # ── MEMBER'S OWN PROFILE VIEW (sa loob ng portal) ──────────
@@ -6019,7 +6378,8 @@ def admin_feed():
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time
+    SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time,
+           is_event, event_type, event_title, event_date, event_location
     FROM feed_posts
     ORDER BY is_pinned DESC, id DESC
     """)
@@ -6027,7 +6387,10 @@ def admin_feed():
 
     return_db(conn)
 
-    return render_template("admin_feed.html", posts=posts, username=session["username"])
+    return render_template(
+        "admin_feed.html", posts=posts, username=session["username"],
+        event_type_icons=EVENT_TYPE_ICONS
+    )
 
 
 
@@ -6049,21 +6412,37 @@ def admin_feed_post():
     photo_filename = None
     if photo_file and photo_file.filename != "":
         photo_filename = upload_photo(photo_file, folder="fcci_feed")
-    if content_text or photo_filename:
+
+    is_event = request.form.get("is_event") == "on"
+    event_type = request.form.get("event_type", "").strip() if is_event else None
+    event_title = request.form.get("event_title", "").strip() if is_event else None
+    event_date = request.form.get("event_date", "").strip() if is_event else None
+    event_location = request.form.get("event_location", "").strip() if is_event else None
+    max_slots_raw = request.form.get("max_slots", "").strip() if is_event else ""
+    max_slots = int(max_slots_raw) if max_slots_raw.isdigit() else None
+
+    if content_text or photo_filename or is_event:
         conn = get_db()
         cursor = conn.cursor()
         now = datetime.now()
         cursor.execute("""
         INSERT INTO feed_posts
-        (member_id, full_name, content, photo_path, is_pinned, post_date, post_time)
-        VALUES (%s, %s, %s, %s, FALSE, %s, %s)
+        (member_id, full_name, content, photo_path, is_pinned, post_date, post_time,
+         is_event, event_type, event_title, event_date, event_location, max_slots, registration_closed)
+        VALUES (%s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
         """, (
             "ADMIN",
             session["username"],
             content_text,
             photo_filename,
             now.strftime("%B %d, %Y"),
-            now.strftime("%I:%M %p")
+            now.strftime("%I:%M %p"),
+            is_event,
+            event_type,
+            event_title,
+            event_date,
+            event_location,
+            max_slots,
         ))
         conn.commit()
         return_db(conn)
@@ -6080,6 +6459,209 @@ def admin_feed_delete(post_id):
     conn.commit()
     return_db(conn)
     return redirect("/admin_feed")
+
+
+# ════════════════════════════════════════════════════════════
+#  EVENT MANAGEMENT (admin) — tabs per event, manage/print/export
+# ════════════════════════════════════════════════════════════
+
+@app.route("/admin_events")
+def admin_events():
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, event_type, event_title, content, event_date, event_location,
+               max_slots, registration_closed
+        FROM feed_posts
+        WHERE is_event = TRUE
+        ORDER BY id DESC
+    """)
+    rows = cursor.fetchall()
+
+    events = []
+    for r in rows:
+        post_id = r[0]
+        event_type = r[1]
+        team_mode = _event_is_team_mode(event_type)
+        regs = _get_event_registrations(cursor, post_id)
+
+        confirmed = [x for x in regs if x["status"] == "Confirmed"]
+        waitlisted = [x for x in regs if x["status"] == "Waitlisted"]
+
+        if team_mode:
+            total_people = sum(len(x["members"]) for x in regs)
+        else:
+            total_people = sum((x["companions"] or 1) for x in regs)
+
+        max_slots = r[6]
+        events.append({
+            "id": post_id,
+            "type": event_type,
+            "icon": EVENT_TYPE_ICONS.get(event_type, "📌"),
+            "title": r[2] or event_type,
+            "description": r[3],
+            "date": r[4],
+            "location": r[5],
+            "max_slots": max_slots,
+            "slots_remaining": (max_slots - len(confirmed)) if max_slots else None,
+            "registration_closed": r[7],
+            "team_mode": team_mode,
+            "registrations": regs,
+            "confirmed_count": len(confirmed),
+            "waitlisted_count": len(waitlisted),
+            "total_people": total_people,
+        })
+
+    return_db(conn)
+
+    return render_template("admin_events.html", events=events, username=session["username"])
+
+
+@app.route("/admin_events/<int:post_id>/toggle_close")
+def admin_events_toggle_close(post_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT registration_closed FROM feed_posts WHERE id = %s", (post_id,))
+    row = cursor.fetchone()
+    if row:
+        cursor.execute(
+            "UPDATE feed_posts SET registration_closed = %s WHERE id = %s",
+            (not row[0], post_id)
+        )
+        conn.commit()
+    return_db(conn)
+
+    return redirect("/admin_events")
+
+
+@app.route("/admin_events/<int:post_id>/remove/<int:reg_id>")
+def admin_events_remove_registration(post_id, reg_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM event_registrations WHERE id = %s AND post_id = %s", (reg_id, post_id))
+    conn.commit()
+    return_db(conn)
+
+    return redirect("/admin_events")
+
+
+def _get_single_event(cursor, post_id):
+    cursor.execute("""
+        SELECT id, event_type, event_title, content, event_date, event_location, max_slots
+        FROM feed_posts WHERE id = %s AND is_event = TRUE
+    """, (post_id,))
+    r = cursor.fetchone()
+    if not r:
+        return None
+    event_type = r[1]
+    team_mode = _event_is_team_mode(event_type)
+    regs = _get_event_registrations(cursor, post_id)
+    confirmed = [x for x in regs if x["status"] == "Confirmed"]
+    waitlisted = [x for x in regs if x["status"] == "Waitlisted"]
+    if team_mode:
+        total_people = sum(len(x["members"]) for x in regs)
+    else:
+        total_people = sum((x["companions"] or 1) for x in regs)
+
+    return {
+        "id": r[0],
+        "type": event_type,
+        "icon": EVENT_TYPE_ICONS.get(event_type, "📌"),
+        "title": r[2] or event_type,
+        "description": r[3],
+        "date": r[4],
+        "location": r[5],
+        "max_slots": r[6],
+        "team_mode": team_mode,
+        "registrations": regs,
+        "confirmed_count": len(confirmed),
+        "waitlisted_count": len(waitlisted),
+        "total_people": total_people,
+    }
+
+
+@app.route("/admin_events/<int:post_id>/print/team")
+def admin_events_print_team(post_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    event = _get_single_event(cursor, post_id)
+    return_db(conn)
+
+    if not event:
+        return "Event Not Found"
+
+    return render_template("event_print_team.html", event=event,
+                           generated=datetime.now().strftime("%B %d, %Y %I:%M %p"))
+
+
+@app.route("/admin_events/<int:post_id>/print/summary")
+def admin_events_print_summary(post_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    event = _get_single_event(cursor, post_id)
+    return_db(conn)
+
+    if not event:
+        return "Event Not Found"
+
+    return render_template("event_print_summary.html", event=event,
+                           generated=datetime.now().strftime("%B %d, %Y %I:%M %p"))
+
+
+@app.route("/admin_events/<int:post_id>/export")
+def admin_events_export(post_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    event = _get_single_event(cursor, post_id)
+    return_db(conn)
+
+    if not event:
+        return "Event Not Found"
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Registrations"
+
+    if event["team_mode"]:
+        ws.append(["Team Name", "Captain", "Contact", "Status", "Members"])
+        for r in event["registrations"]:
+            ws.append([
+                r["team_name"], r["captain_name"], r["contact"], r["status"],
+                ", ".join(r["members"])
+            ])
+    else:
+        ws.append(["Name", "Companions", "Contact", "Notes", "Status"])
+        for r in event["registrations"]:
+            ws.append([
+                r["captain_name"], r["companions"], r["contact"], r["notes"], r["status"]
+            ])
+
+    export_dir = "exports"
+    os.makedirs(export_dir, exist_ok=True)
+    filename = os.path.join(export_dir, f"event_{post_id}_registrations.xlsx")
+    wb.save(filename)
+
+    return send_file(filename, as_attachment=True)
+
 
 # ════════════════════════════════════════════════════════════
 #  DEVELOPER PANEL (hidden — /dev)
