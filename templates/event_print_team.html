@@ -23,6 +23,14 @@
   }
   .no-print button.secondary { background:#eee; color:#333; }
   @media print { .no-print { display:none; } body { padding:0; } }
+  @media (max-width: 600px) {
+    body { padding:24px 16px; }
+    h1 { font-size:18px; }
+    table { font-size:11px; }
+    th, td { padding:6px 5px; }
+    .no-print { text-align:stretch; display:flex; gap:8px; }
+    .no-print button { flex:1; margin-left:0; }
+  }
 </style>
 </head>
 <body>
