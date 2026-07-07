@@ -381,6 +381,245 @@ def _watermark_canvas(canvas, doc):
         print(f"[PDF] Watermark error: {e}")
 
 
+def _cert_star(c, cx, cy, r_out, r_in, fill):
+    import math
+    c.saveState()
+    p = c.beginPath()
+    for i in range(10):
+        ang = math.pi/2 + i*math.pi/5
+        r = r_out if i % 2 == 0 else r_in
+        x = cx + r*math.cos(ang); y = cy + r*math.sin(ang)
+        (p.moveTo if i == 0 else p.lineTo)(x, y)
+    p.close()
+    c.setFillColor(fill)
+    c.drawPath(p, fill=1, stroke=0)
+    c.restoreState()
+
+
+def _cert_diamond(c, cx, cy, r, fill):
+    c.saveState()
+    p = c.beginPath()
+    p.moveTo(cx, cy+r); p.lineTo(cx+r, cy); p.lineTo(cx, cy-r); p.lineTo(cx-r, cy)
+    p.close()
+    c.setFillColor(fill)
+    c.drawPath(p, fill=1, stroke=0)
+    c.restoreState()
+
+
+def _cert_seal(c, cx, cy, r, gold, gold_light, logo_path):
+    import math
+    from reportlab.lib import colors
+    from reportlab.lib.utils import ImageReader
+    c.saveState()
+    n = 22
+    p = c.beginPath()
+    for i in range(n*2):
+        ang = 2*math.pi*i/(n*2)
+        rad = r if i % 2 == 0 else r*0.9
+        x = cx + rad*math.cos(ang); y = cy + rad*math.sin(ang)
+        (p.moveTo if i == 0 else p.lineTo)(x, y)
+    p.close()
+    c.setFillColor(gold)
+    c.drawPath(p, fill=1, stroke=0)
+    c.setFillColor(gold_light)
+    c.circle(cx, cy, r*0.80, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.circle(cx, cy, r*0.63, fill=1, stroke=0)
+    if logo_path and os.path.exists(logo_path):
+        img = ImageReader(logo_path)
+        d = r*1.18
+        c.saveState()
+        clip = c.beginPath(); clip.circle(cx, cy, r*0.61)
+        c.clipPath(clip, stroke=0, fill=0)
+        c.drawImage(img, cx-d/2, cy-d/2, width=d, height=d,
+                    preserveAspectRatio=True, mask="auto")
+        c.restoreState()
+    c.setFillColor(gold)
+    tail_w = r*0.32
+    for dx in (-1, 1):
+        p2 = c.beginPath()
+        x0 = cx + dx*tail_w*0.55
+        p2.moveTo(x0-tail_w/2, cy-r*0.85)
+        p2.lineTo(x0+tail_w/2, cy-r*0.85)
+        p2.lineTo(x0+tail_w*0.35, cy-r*1.45)
+        p2.lineTo(x0-tail_w*0.35, cy-r*1.45)
+        p2.close()
+        c.drawPath(p2, fill=1, stroke=0)
+    c.restoreState()
+
+
+def _cert_laurel(c, cx, cy, r, lines, navy, gold):
+    import math
+    from reportlab.lib.units import mm
+    c.saveState()
+    n = 8
+    for side in (-1, 1):
+        for i in range(n):
+            t = i/(n-1)
+            ang = math.radians(95 + t*170)
+            x = cx - side*r*math.cos(ang)
+            y = cy - r*math.sin(ang) + r*0.62
+            taper = 0.55 + 0.55*math.sin(math.radians(t*180))
+            c.saveState()
+            c.translate(x, y)
+            tangent_deg = math.degrees(ang) + 90
+            c.rotate(tangent_deg * side)
+            c.setFillColor(gold)
+            lw_ = 2.3*mm*taper
+            c.ellipse(-lw_, -0.75*mm*taper, lw_, 0.75*mm*taper, fill=1, stroke=0)
+            c.restoreState()
+    c.setFillColor(navy)
+    c.setFont("Times-Bold", 9.3)
+    for i, line in enumerate(lines):
+        c.drawCentredString(cx, cy + (len(lines)-1)*3.6 - i*7.2, line)
+    c.restoreState()
+
+
+def _draw_elegant_certificate(buf, data):
+    """Gumagawa ng elegant, landscape, gold/navy certificate
+    (parang formal na donation certificate) at isinusulat papunta sa buf (BytesIO)."""
+    import math
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas as pdfcanvas
+
+    NAVY = colors.HexColor("#0b1d3a")
+    GOLD = colors.HexColor("#b8964f")
+    GOLD_LIGHT = colors.HexColor("#e3cd97")
+    CREAM = colors.HexColor("#fbf8f1")
+    TEXT = colors.HexColor("#1a2a44")
+    MUTED = colors.HexColor("#6b7a94")
+
+    W, H = landscape(A4)
+    logo_path = _pdf_logo_path()
+
+    c = pdfcanvas.Canvas(buf, pagesize=landscape(A4))
+    c.setFillColor(CREAM); c.rect(0, 0, W, H, fill=1, stroke=0)
+
+    if logo_path and os.path.exists(logo_path):
+        from reportlab.lib.utils import ImageReader
+        c.saveState()
+        c.setFillAlpha(0.07)
+        wm_size = 150*mm
+        c.drawImage(ImageReader(logo_path), W/2-wm_size/2, H/2-wm_size/2,
+                    width=wm_size, height=wm_size,
+                    preserveAspectRatio=True, mask="auto")
+        c.restoreState()
+
+
+    band = 8*mm
+    c.setFillColor(NAVY)
+    c.rect(0, 0, W, band, fill=1, stroke=0)
+    c.rect(0, H-band, W, band, fill=1, stroke=0)
+    c.setFillColor(GOLD)
+    c.rect(0, band-0.9*mm, W, 0.9*mm, fill=1, stroke=0)
+    c.rect(0, H-band, W, 0.9*mm, fill=1, stroke=0)
+
+    m1 = band + 3*mm
+    m2 = m1 + 3.2*mm
+    c.setStrokeColor(GOLD); c.setLineWidth(1.4)
+    c.rect(m1, m1, W-2*m1, H-2*m1, fill=0, stroke=1)
+    c.setLineWidth(0.6)
+    c.rect(m2, m2, W-2*m2, H-2*m2, fill=0, stroke=1)
+
+    for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+        cx0 = m2 + 3*mm if sx > 0 else W-m2-3*mm
+        cy0 = m2 + 3*mm if sy > 0 else H-m2-3*mm
+        _cert_diamond(c, cx0, cy0, 2.2*mm, GOLD)
+
+    cx = W/2
+    y = H - 26*mm
+    logo_r = 13.5*mm
+    c.setStrokeColor(GOLD); c.setLineWidth(1)
+    c.circle(cx, y, logo_r+1.1*mm, fill=0, stroke=1)
+    if logo_path and os.path.exists(logo_path):
+        from reportlab.lib.utils import ImageReader
+        img = ImageReader(logo_path)
+        d = logo_r*2
+        c.saveState()
+        clip = c.beginPath(); clip.circle(cx, y, logo_r)
+        c.clipPath(clip, stroke=0, fill=0)
+        c.drawImage(img, cx-d/2, y-d/2, width=d, height=d,
+                    preserveAspectRatio=True, mask="auto")
+        c.restoreState()
+
+    y -= (logo_r + 10*mm)
+    c.setFillColor(NAVY); c.setFont("Times-Bold", 28)
+    c.drawCentredString(cx, y, data.get("cert_title", "DONATION CERTIFICATE"))
+
+    y -= 6.2*mm
+    c.setStrokeColor(GOLD); c.setLineWidth(0.8)
+    lw = 44*mm
+    c.line(cx-lw, y, cx-6*mm, y); c.line(cx+6*mm, y, cx+lw, y)
+    _cert_star(c, cx, y, 2.1*mm, 0.9*mm, GOLD)
+
+    y -= 8.5*mm
+    c.setFillColor(NAVY); c.setFont("Times-Italic", 12)
+    c.drawCentredString(cx, y, "This certificate is proudly presented to")
+
+    y -= 10.5*mm
+    c.setFont("Times-Bold", 24)
+    c.drawCentredString(cx, y, str(data.get("donor_name") or "-"))
+
+    y -= 5*mm
+    c.setStrokeColor(GOLD); c.setLineWidth(0.6)
+    c.line(cx-52*mm, y, cx+52*mm, y)
+
+    y -= 8.5*mm
+    c.setFillColor(TEXT); c.setFont("Times-Italic", 11)
+    c.drawCentredString(cx, y, "In sincere appreciation and gratitude for your generous donation")
+    y -= 5.4*mm
+    c.drawCentredString(cx, y, "and valuable support to the programs and activities of the")
+    y -= 6.3*mm
+    c.setFont("Times-Bold", 11.5); c.setFillColor(NAVY)
+    c.drawCentredString(cx, y, "FILIPINO COMMUNITY CENTER INTERNATIONAL (FCCI)")
+
+    y -= 8*mm
+    c.setFont("Times-Italic", 11); c.setFillColor(TEXT)
+    amt_line = f"in the amount of \u20a9{data['amount']:,}" if data.get("amount") else ""
+    if data.get("purpose"):
+        amt_line += (" for " if amt_line else "for ") + str(data["purpose"])
+    if amt_line:
+        c.drawCentredString(cx, y, amt_line)
+        y -= 6.2*mm
+    c.setFont("Times-Italic", 10.3); c.setFillColor(MUTED)
+    c.drawCentredString(cx, y, "Your kindness and commitment help empower our community")
+    y -= 4.8*mm
+    c.drawCentredString(cx, y, "and make a lasting difference.")
+
+    base_y = 30*mm
+    _cert_seal(c, m2 + 23*mm, base_y+1*mm, 15.5*mm, GOLD, GOLD_LIGHT, logo_path)
+
+    sig_x = cx - 52*mm
+    c.setStrokeColor(NAVY); c.setLineWidth(0.7)
+    c.line(sig_x-26*mm, base_y+3*mm, sig_x+26*mm, base_y+3*mm)
+    c.setFont("Times-Bold", 10.3); c.setFillColor(NAVY)
+    c.drawCentredString(sig_x, base_y-2*mm, data.get("signee", "Authorized Signatory"))
+    c.setFont("Times-Roman", 8.3); c.setFillColor(MUTED)
+    c.drawCentredString(sig_x, base_y-6*mm, data.get("signee_title", "Treasurer"))
+
+    _cert_laurel(c, cx, base_y+7*mm, 12.5*mm, ["THANK", "YOU"], NAVY, GOLD)
+
+    date_x = cx + 52*mm
+    c.setStrokeColor(NAVY)
+    c.line(date_x-26*mm, base_y+3*mm, date_x+26*mm, base_y+3*mm)
+    c.setFont("Times-Bold", 10.3); c.setFillColor(NAVY)
+    c.drawCentredString(date_x, base_y-2*mm, data.get("date_str", "-"))
+    c.setFont("Times-Roman", 8.3); c.setFillColor(MUTED)
+    c.drawCentredString(date_x, base_y-6*mm, "Date")
+
+    if data.get("receipt_no"):
+        c.setFont("Helvetica", 7); c.setFillColor(MUTED)
+        footer = f"Receipt No. {data['receipt_no']}"
+        if data.get("contact"):
+            footer += f"   |   Contact: {data['contact']}"
+        c.drawCentredString(cx, m2+3.2*mm, footer)
+
+    c.showPage()
+    c.save()
+
+
 @app.route("/")
 def home():
     return redirect("/login")
@@ -2257,102 +2496,20 @@ def donation_certificate(donation_id):
         return "Donation Not Found"
 
     import io as _io
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import mm
-    from reportlab.lib import colors
-    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
-                                    Table, TableStyle)
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
-
-    kfont = _ensure_korean_font()
     donor_name, d_contact, d_amount, d_purpose, d_date = donation
 
     buf = _io.BytesIO()
-    pdf = SimpleDocTemplate(buf, pagesize=A4,
-                            topMargin=14*mm, bottomMargin=14*mm,
-                            leftMargin=16*mm, rightMargin=16*mm)
-    content = []
-    content.append(_modern_pdf_header("CERTIFICATE"))
-    content.append(Spacer(1, 22))
-
-    content.append(Paragraph("Certificate of Donation",
-        ParagraphStyle("t", fontSize=20, textColor=colors.HexColor("#0b1d2e"),
-                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=3)))
-    content.append(Paragraph("With sincere gratitude",
-        ParagraphStyle("s", fontSize=10, textColor=colors.HexColor("#5c8270"),
-                       alignment=TA_CENTER, spaceAfter=18)))
-
-    content.append(Paragraph("Kinikilala ng FCCI ang mapagbigay na kontribusyon ni",
-        ParagraphStyle("b", fontSize=11, textColor=colors.HexColor("#3a5045"),
-                       alignment=TA_CENTER, spaceAfter=6)))
-    content.append(Paragraph(str(donor_name or "-"),
-        ParagraphStyle("nm", fontSize=22, textColor=colors.HexColor("#0b1d2e"),
-                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=16)))
-
-    # Amount hero
-    amt_tbl = Table([[Paragraph("DONATION AMOUNT",
-                        ParagraphStyle("al", fontSize=9, textColor=colors.HexColor("#5c8270"),
-                                       alignment=TA_CENTER))],
-                     [Paragraph(f"\u20a9{d_amount:,}" if d_amount else "\u20a90",
-                        ParagraphStyle("aa", fontSize=30, textColor=colors.HexColor("#00a89e"),
-                                       fontName="Helvetica-Bold", alignment=TA_CENTER))]],
-                    colWidths=[120*mm])
-    amt_tbl.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#f4fbf7")),
-        ("BOX",(0,0),(-1,-1),1,colors.HexColor("#c5e8dc")),
-        ("TOPPADDING",(0,0),(0,0),16),("BOTTOMPADDING",(0,1),(0,1),16),
-        ("ALIGN",(0,0),(-1,-1),"CENTER"),
-    ]))
-    content.append(Table([[amt_tbl]], colWidths=[178*mm],
-                   style=TableStyle([("ALIGN",(0,0),(-1,-1),"CENTER")])))
-    content.append(Spacer(1, 18))
-
-    # Details — purpose gamit Korean font
-    kr_style = ParagraphStyle("kr", fontSize=10.5, fontName=kfont,
-                              textColor=colors.HexColor("#0c2418"))
-    lbl_style = ParagraphStyle("l", fontSize=10.5, textColor=colors.HexColor("#5c8270"))
-    def frow(lbl, val, mono=False, korean=False):
-        if korean:
-            vc = Paragraph(str(val), kr_style)
-        else:
-            fn = "Courier-Bold" if mono else "Helvetica-Bold"
-            vc = Paragraph(f'<font name="{fn}" color="#0c2418">{val}</font>',
-                           ParagraphStyle("v", fontSize=10.5))
-        return [Paragraph(lbl, lbl_style), vc]
-
-    det = Table([
-        frow("Receipt No.", f"DON-2026-{donation_id:06d}", mono=True),
-        frow("Contact", d_contact or "-", mono=True),
-        frow("Purpose", d_purpose or "-", korean=True),
-        frow("Date", str(d_date) if d_date else "-"),
-    ], colWidths=[50*mm, 128*mm])
-    det.setStyle(TableStyle([
-        ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8),
-        ("LINEBELOW",(0,0),(-1,-1),0.5,colors.HexColor("#eef3f2")),
-        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-    ]))
-    content.append(det)
-    content.append(Spacer(1, 28))
-
-    # Signature lines
-    sig = Table([
-        [Paragraph("_______________________", ParagraphStyle("sl",fontSize=10,alignment=TA_CENTER)),
-         Paragraph("_______________________", ParagraphStyle("sl2",fontSize=10,alignment=TA_CENTER))],
-        [Paragraph("Authorized Signature", ParagraphStyle("sn",fontSize=8,textColor=colors.HexColor("#5c8270"),alignment=TA_CENTER)),
-         Paragraph("Treasurer", ParagraphStyle("sn2",fontSize=8,textColor=colors.HexColor("#5c8270"),alignment=TA_CENTER))],
-    ], colWidths=[89*mm, 89*mm])
-    content.append(sig)
-    content.append(Spacer(1, 20))
-
-    content.append(Paragraph("United in Faith, Serving with Love",
-        ParagraphStyle("f", fontSize=8, textColor=colors.HexColor("#9ab5a8"),
-                       alignment=TA_CENTER)))
-    content.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        ParagraphStyle("g", fontSize=7, textColor=colors.HexColor("#b5c9be"),
-                       alignment=TA_CENTER)))
-
-    pdf.build(content, onFirstPage=_watermark_canvas, onLaterPages=_watermark_canvas)
+    _draw_elegant_certificate(buf, dict(
+        cert_title="DONATION CERTIFICATE",
+        donor_name=donor_name,
+        amount=d_amount,
+        purpose=d_purpose,
+        date_str=str(d_date) if d_date else datetime.now().strftime("%B %d, %Y"),
+        receipt_no=f"DON-2026-{donation_id:06d}",
+        contact=d_contact,
+        signee="Authorized Signatory",
+        signee_title="Treasurer",
+    ))
     buf.seek(0)
     return send_file(buf, mimetype="application/pdf", as_attachment=True,
                      download_name=f"Donation_Certificate_{donation_id}.pdf")
