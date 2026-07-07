@@ -13,11 +13,11 @@
     --bg-mist: #e9f7ef;
     --glass: rgba(255,255,255,0.65);
     --glass-border: rgba(0,150,90,0.18);
-    --emerald: #00a85c;
-    --emerald-bright: #00c46a;
-    --emerald-deep: #00562a;
+    --cyan: #00a89e;
+    --cyan-bright: #00d4c8;
+    --cyan-deep: #0b2236;
     --text-main: #0c2418;
-    --text-dim: #5c8270;
+    --text-dim: #6b7e8f;
   }
 
   * { box-sizing:border-box; margin:0; padding:0; }
@@ -82,7 +82,7 @@
     position:absolute;
     inset:0;
     border-radius:50%;
-    border:1px solid var(--emerald);
+    border:1px solid var(--cyan);
     opacity:0.55;
     animation:pulse-ring 2.8s ease-out infinite;
   }
@@ -107,7 +107,7 @@
     font-size:22px;
     font-weight:700;
     letter-spacing:3px;
-    background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright));
+    background:linear-gradient(90deg, var(--cyan-deep), var(--cyan-bright));
     -webkit-background-clip:text;
     background-clip:text;
     -webkit-text-fill-color:transparent;
@@ -143,13 +143,13 @@
   .sidebar-nav a:hover {
     background:rgba(0,196,106,0.08);
     border-color:var(--glass-border);
-    color:var(--emerald-deep);
+    color:var(--cyan-deep);
   }
 
   .sidebar-nav a.active {
     background:linear-gradient(90deg, rgba(0,196,106,0.16), rgba(0,196,106,0.02));
     border-color:rgba(0,196,106,0.4);
-    color:var(--emerald-deep);
+    color:var(--cyan-deep);
     box-shadow:0 0 18px rgba(0,196,106,0.12) inset;
     font-weight:600;
   }
@@ -186,7 +186,7 @@
   }
 
   .topbar .greeting-tag {
-    font-size:11px; color:var(--emerald);
+    font-size:11px; color:var(--cyan);
     letter-spacing:1.5px; text-transform:uppercase;
     margin-bottom:6px; display:block;
     font-weight:600;
@@ -233,7 +233,7 @@
     margin-bottom:14px;
     background:rgba(0,196,106,0.12);
     border:1px solid rgba(0,196,106,0.3);
-    color:var(--emerald-deep);
+    color:var(--cyan-deep);
   }
 
   .stat-label {
@@ -269,7 +269,7 @@
   }
 
   .balance-hero .label {
-    font-size:12px; font-weight:700; color:var(--emerald-deep);
+    font-size:12px; font-weight:700; color:var(--cyan-deep);
     letter-spacing:1.5px; text-transform:uppercase;
     position:relative; z-index:1;
   }
@@ -279,7 +279,7 @@
     font-size:48px; font-weight:700;
     margin:10px 0 4px;
     position:relative; z-index:1;
-    color:var(--emerald-deep);
+    color:var(--cyan-deep);
   }
 
   .balance-hero .sub {
@@ -296,7 +296,7 @@
 
   .birthday-avatar {
     width:38px; height:38px; border-radius:50%;
-    background:linear-gradient(135deg, var(--emerald), var(--emerald-bright));
+    background:linear-gradient(135deg, var(--cyan), var(--cyan-bright));
     display:flex; align-items:center; justify-content:center;
     font-weight:700; font-size:14px; color:#fff;
     flex-shrink:0; overflow:hidden;
@@ -312,7 +312,7 @@
     font-size:10.5px; font-weight:600;
     padding:3px 10px; border-radius:20px;
     background:rgba(0,196,106,0.14);
-    color:var(--emerald-deep);
+    color:var(--cyan-deep);
     border:1px solid rgba(0,196,106,0.3);
     white-space:nowrap;
   }
@@ -337,7 +337,7 @@
     content:'';
     width:6px; height:6px;
     border-radius:50%;
-    background:var(--emerald);
+    background:var(--cyan);
     box-shadow:0 0 8px rgba(0,196,106,0.6);
   }
 
@@ -358,7 +358,7 @@
 
   .amount-pill {
     background:rgba(0,196,106,0.12);
-    color:var(--emerald-deep);
+    color:var(--cyan-deep);
     font-weight:600; font-size:12.5px;
     padding:4px 12px; border-radius:20px;
     border:1px solid rgba(0,196,106,0.3);
@@ -367,7 +367,7 @@
 
   <!-- PWA -->
   <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#00562a">
+  <meta name="theme-color" content="#0b2236">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FCCI">

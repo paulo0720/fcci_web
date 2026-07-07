@@ -10,8 +10,8 @@
 :root {
   --bg-base: #f4fbf7; --bg-mist: #e9f7ef;
   --glass: rgba(255,255,255,0.65); --glass-border: rgba(0,150,90,0.18);
-  --emerald: #00a85c; --emerald-bright: #00c46a; --emerald-deep: #00562a;
-  --text-main: #0c2418; --text-dim: #5c8270;
+  --cyan: #00a89e; --cyan-bright: #00d4c8; --cyan-deep: #0b2236;
+  --text-main: #0c2418; --text-dim: #6b7e8f;
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 body {
@@ -37,7 +37,7 @@ body {
 }
 .brand-logo-ring::before {
   content:''; position:absolute; inset:0; border-radius:50%;
-  border:1px solid var(--emerald); opacity:0.55;
+  border:1px solid var(--cyan); opacity:0.55;
   animation:pulse-ring 2.8s ease-out infinite;
 }
 @keyframes pulse-ring {
@@ -48,7 +48,7 @@ body {
 .brand-logo-ring img { width:48px; height:48px; object-fit:contain; border-radius:50%; position:relative; z-index:1; }
 .brand-name {
   font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:700; letter-spacing:3px;
-  background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright));
+  background:linear-gradient(90deg, var(--cyan-deep), var(--cyan-bright));
   -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
 }
 .brand-sub { font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
@@ -59,10 +59,10 @@ body {
   border-radius:10px; color:var(--text-dim); text-decoration:none;
   font-size:13.5px; font-weight:500; border:1px solid transparent; transition:all 0.25s ease;
 }
-.sidebar-nav a:hover { background:rgba(0,196,106,0.08); border-color:var(--glass-border); color:var(--emerald-deep); }
+.sidebar-nav a:hover { background:rgba(0,196,106,0.08); border-color:var(--glass-border); color:var(--cyan-deep); }
 .sidebar-nav a.active {
   background:linear-gradient(90deg, rgba(0,196,106,0.16), rgba(0,196,106,0.02));
-  border-color:rgba(0,196,106,0.4); color:var(--emerald-deep);
+  border-color:rgba(0,196,106,0.4); color:var(--cyan-deep);
   box-shadow:0 0 18px rgba(0,196,106,0.12) inset; font-weight:600;
 }
 .nav-icon { font-size:15px; width:18px; text-align:center; }
@@ -76,7 +76,7 @@ body {
   border-radius:18px; padding:28px; box-shadow:0 4px 20px rgba(0,100,60,0.06);
 }
 .btn-cancel {
-  background:rgba(0,100,60,0.08); color:var(--emerald-deep); border:1px solid var(--glass-border);
+  background:rgba(0,100,60,0.08); color:var(--cyan-deep); border:1px solid var(--glass-border);
   border-radius:12px; padding:10px 22px; font-weight:600; font-size:13.5px; text-decoration:none;
 }
 .profile-photo {
@@ -91,7 +91,7 @@ table { width:100%; border-collapse:collapse; }
 th { text-align:left; padding:10px 6px; font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; width:160px; vertical-align:top; }
 td { padding:10px 6px; font-size:14.5px; border-bottom:1px solid rgba(0,100,60,0.06); }
 .badge-pill { font-size:11.5px; font-weight:700; padding:4px 12px; border-radius:20px; }
-.badge-active { background:rgba(0,196,106,0.14); color:var(--emerald-deep); }
+.badge-active { background:rgba(0,196,106,0.14); color:var(--cyan-deep); }
 .badge-other { background:rgba(220,53,69,0.1); color:#c0392b; }
 .btn-action { padding:8px 18px; border-radius:10px; font-size:13.5px; font-weight:600; border:none; text-decoration:none; display:inline-block; margin-right:8px; }
 .btn-edit { background:rgba(255,170,0,0.14); color:#c97300; }
@@ -101,7 +101,7 @@ td { padding:10px 6px; font-size:14.5px; border-bottom:1px solid rgba(0,100,60,0
 
   <!-- PWA -->
   <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#00562a">
+  <meta name="theme-color" content="#0b2236">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FCCI">

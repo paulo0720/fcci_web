@@ -10,8 +10,8 @@
   :root {
     --bg-base: #f4fbf7; --bg-mist: #e9f7ef;
     --glass: rgba(255,255,255,0.7); --glass-border: rgba(0,150,90,0.18);
-    --emerald: #00a85c; --emerald-bright: #00c46a; --emerald-deep: #00562a;
-    --text-main: #0c2418; --text-dim: #5c8270;
+    --cyan: #00a89e; --cyan-bright: #00d4c8; --cyan-deep: #0b2236;
+    --text-main: #0c2418; --text-dim: #6b7e8f;
   }
   * { box-sizing:border-box; margin:0; padding:0; }
   body {
@@ -33,7 +33,7 @@
   .topbar-brand img { width:36px; height:36px; border-radius:50%; object-fit:contain; }
   .topbar-brand span {
     font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:18px;
-    background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright));
+    background:linear-gradient(90deg, var(--cyan-deep), var(--cyan-bright));
     -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
   }
   .topbar-nav { display:flex; gap:8px; }
@@ -41,7 +41,7 @@
     text-decoration:none; color:var(--text-dim); font-size:13.5px; font-weight:600;
     padding:8px 14px; border-radius:10px; transition:all 0.2s;
   }
-  .topbar-nav a:hover, .topbar-nav a.active { background:rgba(0,196,106,0.1); color:var(--emerald-deep); }
+  .topbar-nav a:hover, .topbar-nav a.active { background:rgba(0,196,106,0.1); color:var(--cyan-deep); }
 
   .wrap { max-width:580px; margin:0 auto; padding:28px 16px 60px; }
 
@@ -49,7 +49,7 @@
     background:var(--glass); backdrop-filter:blur(18px); border:1px solid var(--glass-border);
     border-radius:20px; padding:28px; box-shadow:0 6px 26px rgba(0,100,60,0.08); margin-bottom:20px;
   }
-  .card-title { font-family:'Space Grotesk', sans-serif; font-size:18px; font-weight:700; color:var(--emerald-deep); margin-bottom:6px; }
+  .card-title { font-family:'Space Grotesk', sans-serif; font-size:18px; font-weight:700; color:var(--cyan-deep); margin-bottom:6px; }
   .card-sub { font-size:12.5px; color:var(--text-dim); margin-bottom:22px; }
 
   .current-photo {
@@ -65,7 +65,7 @@
 
   .form-group { margin-bottom:18px; }
   .form-group label {
-    display:block; font-size:11.5px; font-weight:600; color:var(--emerald-deep);
+    display:block; font-size:11.5px; font-weight:600; color:var(--cyan-deep);
     text-transform:uppercase; letter-spacing:0.5px; margin-bottom:7px;
   }
   .form-control {
@@ -73,7 +73,7 @@
     border-radius:12px; padding:11px 16px; font-size:14px; color:var(--text-main); width:100%;
     transition:border-color 0.2s, box-shadow 0.2s;
   }
-  .form-control:focus { outline:none; border-color:var(--emerald); box-shadow:0 0 0 3px rgba(0,196,106,0.15); }
+  .form-control:focus { outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,196,106,0.15); }
   textarea.form-control { resize:vertical; min-height:80px; }
 
   .readonly-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(0,100,60,0.07); font-size:13.5px; margin-bottom:4px; }
@@ -83,21 +83,21 @@
   .note-box { background:rgba(255,170,0,0.08); border:1px solid rgba(255,170,0,0.3); border-radius:12px; padding:12px 16px; font-size:12.5px; color:#8a6000; margin-bottom:20px; }
 
   .btn-save {
-    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald));
+    background:linear-gradient(135deg, var(--cyan-deep), var(--cyan));
     color:#fff; border:none; border-radius:12px; padding:13px 0; width:100%;
     font-weight:600; font-size:15px; box-shadow:0 6px 18px rgba(0,168,92,0.3);
     cursor:pointer; margin-bottom:10px;
   }
   .btn-cancel {
     display:block; text-align:center; background:rgba(0,100,60,0.07);
-    color:var(--emerald-deep); border:1px solid var(--glass-border);
+    color:var(--cyan-deep); border:1px solid var(--glass-border);
     border-radius:12px; padding:12px 0; font-weight:600; font-size:14px; text-decoration:none;
   }
 </style>
 
   <!-- PWA -->
   <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#00562a">
+  <meta name="theme-color" content="#0b2236">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FCCI">

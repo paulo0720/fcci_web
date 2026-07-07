@@ -10,8 +10,8 @@
 :root {
   --bg-base: #f4fbf7; --bg-mist: #e9f7ef;
   --glass: rgba(255,255,255,0.7); --glass-border: rgba(0,150,90,0.18);
-  --emerald: #00a85c; --emerald-bright: #00c46a; --emerald-deep: #00562a;
-  --text-main: #0c2418; --text-dim: #5c8270;
+  --cyan: #00a89e; --cyan-bright: #00d4c8; --cyan-deep: #0b2236;
+  --text-main: #0c2418; --text-dim: #6b7e8f;
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 body {
@@ -40,7 +40,7 @@ body {
 }
 .brand-logo-ring::before {
   content:''; position:absolute; inset:0; border-radius:50%;
-  border:1px solid var(--emerald); opacity:0.55;
+  border:1px solid var(--cyan); opacity:0.55;
   animation:pulse-ring 2.8s ease-out infinite;
 }
 @keyframes pulse-ring {
@@ -51,7 +51,7 @@ body {
 .brand-logo-ring img { width:48px; height:48px; object-fit:contain; border-radius:50%; position:relative; z-index:1; box-shadow:0 2px 12px rgba(0,100,60,0.15); }
 .brand-name {
   font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:700; letter-spacing:3px;
-  background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright));
+  background:linear-gradient(90deg, var(--cyan-deep), var(--cyan-bright));
   -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
 }
 .brand-sub { font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
@@ -61,7 +61,7 @@ body {
   border-radius:10px; color:var(--text-dim); text-decoration:none;
   font-size:13.5px; font-weight:500; border:1px solid transparent; transition:all 0.25s ease;
 }
-.sidebar-nav a:hover, .sidebar-nav a.active { background:rgba(0,196,106,0.1); color:var(--emerald-deep); }
+.sidebar-nav a:hover, .sidebar-nav a.active { background:rgba(0,196,106,0.1); color:var(--cyan-deep); }
 .sidebar-footer { padding:16px 12px; border-top:1px solid var(--glass-border); }
 .main-content { margin-left:250px; padding:32px 36px; position:relative; z-index:1; }
 .topbar h4 { font-family:'Space Grotesk', sans-serif; font-size:24px; font-weight:600; margin-bottom:22px; }
@@ -69,17 +69,17 @@ body {
   background:var(--glass); backdrop-filter:blur(18px); border:1px solid var(--glass-border);
   border-radius:18px; padding:22px; box-shadow:0 4px 20px rgba(0,100,60,0.06); margin-bottom:20px;
 }
-label { display:block; font-size:12px; font-weight:600; color:var(--emerald-deep); letter-spacing:0.4px; text-transform:uppercase; margin-bottom:6px; }
+label { display:block; font-size:12px; font-weight:600; color:var(--cyan-deep); letter-spacing:0.4px; text-transform:uppercase; margin-bottom:6px; }
 .form-control { background:rgba(255,255,255,0.8); border:1px solid var(--glass-border); border-radius:12px; padding:11px 16px; font-size:14px; color:var(--text-main); width:100%; }
-.form-control:focus { outline:none; border-color:var(--emerald); box-shadow:0 0 0 3px rgba(0,196,106,0.15); }
+.form-control:focus { outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,196,106,0.15); }
 .form-control::placeholder { color:#9bb8a8; }
-.btn-go { background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none; border-radius:12px; padding:11px 24px; font-weight:600; font-size:14px; box-shadow:0 6px 18px rgba(0,168,92,0.3); text-decoration:none; display:inline-block; cursor:pointer; }
+.btn-go { background:linear-gradient(135deg, var(--cyan-deep), var(--cyan)); color:#fff; border:none; border-radius:12px; padding:11px 24px; font-weight:600; font-size:14px; box-shadow:0 6px 18px rgba(0,168,92,0.3); text-decoration:none; display:inline-block; cursor:pointer; }
 .btn-go:hover { color:#fff; }
 table { width:100%; border-collapse:collapse; }
 th { font-size:10.5px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.6px; text-align:left; padding-bottom:10px; border-bottom:1px solid var(--glass-border); }
 td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1px solid rgba(0,100,60,0.06); }
 .badge-pill { font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; }
-.badge-active { background:rgba(0,196,106,0.14); color:var(--emerald-deep); }
+.badge-active { background:rgba(0,196,106,0.14); color:var(--cyan-deep); }
 .badge-danger { background:rgba(220,53,69,0.12); color:#c0392b; }
 .btn-action { padding:5px 12px; border-radius:8px; font-size:12px; font-weight:600; border:none; text-decoration:none; display:inline-block; margin:2px; }
 .btn-view { background:rgba(0,150,200,0.12); color:#0077b0; }
@@ -91,7 +91,7 @@ td { font-size:13.5px; color:var(--text-main); padding:11px 6px; border-bottom:1
 
   <!-- PWA -->
   <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#00562a">
+  <meta name="theme-color" content="#0b2236">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FCCI">

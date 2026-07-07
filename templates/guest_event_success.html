@@ -4,42 +4,44 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Naka-register ka na! — FCCI</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg-base:#f4fbf7; --bg-mist:#e9f7ef;
-    --glass:rgba(255,255,255,0.75); --glass-border:rgba(0,150,90,0.18);
-    --emerald:#00a85c; --emerald-bright:#00c46a; --emerald-deep:#00562a;
-    --text-main:#0c2418; --text-dim:#5c8270;
+    --cyan:#00d4c8; --cyan-deep:#00a89e; --violet:#7c6df0;
+    --ink:#0b1d2e; --muted:#6b7e8f;
   }
   * { box-sizing:border-box; margin:0; padding:0; }
   body {
-    font-family:'Inter', sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:'Outfit', sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center;
     background:
-      radial-gradient(circle at 12% 8%, rgba(0,196,106,0.16) 0%, transparent 40%),
-      radial-gradient(circle at 88% 18%, rgba(0,168,92,0.12) 0%, transparent 45%),
-      linear-gradient(160deg, #ffffff 0%, var(--bg-base) 45%, var(--bg-mist) 100%);
-    color:var(--text-main); padding:20px;
+      radial-gradient(ellipse 700px 500px at 12% 8%, rgba(0,212,200,0.16) 0%, transparent 45%),
+      radial-gradient(ellipse 600px 500px at 88% 90%, rgba(124,109,240,0.12) 0%, transparent 50%),
+      linear-gradient(160deg, #ffffff 0%, #f4f8fb 100%);
+    color:var(--ink); padding:20px;
   }
   .card {
-    background:var(--glass); backdrop-filter:blur(20px); border:1px solid var(--glass-border);
-    border-radius:22px; padding:36px 30px; max-width:400px; width:100%; text-align:center;
-    box-shadow:0 8px 30px rgba(0,150,90,0.1);
+    background:rgba(255,255,255,0.8); backdrop-filter:blur(20px); border:1px solid rgba(0,212,200,0.2);
+    border-radius:24px; padding:40px 32px; max-width:410px; width:100%; text-align:center;
+    box-shadow:0 20px 60px rgba(0,60,80,0.12);
   }
   .check {
-    width:64px; height:64px; border-radius:50%; margin:0 auto 18px;
-    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald-bright));
-    display:flex; align-items:center; justify-content:center; font-size:30px; color:#fff;
+    width:76px; height:76px; border-radius:50%; margin:0 auto 20px;
+    background:linear-gradient(135deg, var(--cyan), var(--violet));
+    display:flex; align-items:center; justify-content:center; font-size:34px; color:#fff;
+    box-shadow:0 8px 30px rgba(0,212,200,0.4); animation:pop 0.5s cubic-bezier(0.34,1.56,0.64,1);
   }
-  h2 { font-family:'Space Grotesk', sans-serif; color:var(--emerald-deep); margin-bottom:8px; }
-  p { font-size:13.5px; color:var(--text-dim); line-height:1.6; margin-bottom:6px; }
+  @keyframes pop { from { transform:scale(0); } to { transform:scale(1); } }
+  h2 { font-size:23px; font-weight:800; color:var(--ink); margin-bottom:8px; }
+  p { font-size:13.5px; color:var(--muted); line-height:1.6; margin-bottom:6px; }
   .info-box {
-    background:rgba(0,168,92,0.08); border:1px solid rgba(0,168,92,0.25); border-radius:12px;
-    padding:12px 14px; margin:16px 0; font-size:13px; color:var(--emerald-deep); text-align:left;
+    background:rgba(0,212,200,0.08); border:1px solid rgba(0,212,200,0.3); border-radius:14px;
+    padding:14px 16px; margin:18px 0; font-size:13px; color:var(--cyan-deep); text-align:left;
   }
+  .info-box b { color:var(--ink); }
   .btn-back {
-    display:inline-block; margin-top:14px; background:linear-gradient(135deg, var(--emerald-deep), var(--emerald));
-    color:#fff; text-decoration:none; padding:11px 26px; border-radius:12px; font-weight:600; font-size:13.5px;
+    display:inline-block; margin-top:16px; background:linear-gradient(135deg, var(--cyan-deep), var(--cyan));
+    color:#04222a; text-decoration:none; padding:13px 28px; border-radius:13px; font-weight:700; font-size:14px;
+    box-shadow:0 8px 24px rgba(0,212,200,0.3);
   }
 </style>
 </head>
