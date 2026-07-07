@@ -6664,6 +6664,292 @@ def admin_events_export(post_id):
 
 
 # ════════════════════════════════════════════════════════════
+#  EVENTS — CALENDAR VIEW
+# ════════════════════════════════════════════════════════════
+@app.route("/events_calendar")
+def events_calendar():
+    if "username" not in session:
+        return redirect("/login")
+
+    import calendar as _cal
+    from datetime import date as _date
+
+    # Kunin ang buwan/taon mula sa query (default: kasalukuyang buwan)
+    try:
+        year = int(request.args.get("year", datetime.now().year))
+        month = int(request.args.get("month", datetime.now().month))
+    except (ValueError, TypeError):
+        year, month = datetime.now().year, datetime.now().month
+
+    # Ilagay sa tamang range
+    if month < 1:
+        month, year = 12, year - 1
+    elif month > 12:
+        month, year = 1, year + 1
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, event_type, event_title, event_date, event_location, max_slots
+        FROM feed_posts
+        WHERE is_event = TRUE AND event_date IS NOT NULL AND event_date != ''
+        ORDER BY event_date ASC
+    """)
+    rows = cursor.fetchall()
+    return_db(conn)
+
+    # I-organisa ang events by date string (YYYY-MM-DD)
+    events_by_day = {}
+    all_events = []
+    for r in rows:
+        ev = {
+            "id": r[0], "type": r[1],
+            "icon": EVENT_TYPE_ICONS.get(r[1], "📌"),
+            "title": r[2] or r[1], "date": r[3],
+            "location": r[4], "max_slots": r[5],
+            "team_mode": _event_is_team_mode(r[1]),
+        }
+        all_events.append(ev)
+        # I-extract ang araw (kung YYYY-MM-DD format)
+        try:
+            ed = str(r[3])[:10]
+            events_by_day.setdefault(ed, []).append(ev)
+        except Exception:
+            pass
+
+    # Buuin ang calendar grid (list ng weeks, bawat week may 7 days)
+    _cal.setfirstweekday(_cal.SUNDAY)
+    month_weeks = _cal.monthcalendar(year, month)
+    today = _date.today()
+
+    weeks = []
+    for wk in month_weeks:
+        days = []
+        for d in wk:
+            if d == 0:
+                days.append({"day": "", "other": True, "events": [], "today": False})
+            else:
+                dstr = f"{year:04d}-{month:02d}-{d:02d}"
+                days.append({
+                    "day": d, "other": False,
+                    "events": events_by_day.get(dstr, []),
+                    "today": (today.year == year and today.month == month and today.day == d),
+                    "date_str": dstr,
+                })
+        weeks.append(days)
+
+    month_name = _cal.month_name[month]
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
+
+    # Upcoming events (para sa list view)
+    upcoming = sorted([e for e in all_events if str(e["date"])[:10] >= today.isoformat()],
+                      key=lambda x: str(x["date"]))[:10]
+
+    return render_template("events_calendar.html",
+        weeks=weeks, month_name=month_name, year=year, month=month,
+        prev_month=prev_month, prev_year=prev_year,
+        next_month=next_month, next_year=next_year,
+        upcoming=upcoming, event_types=EVENT_TYPES,
+        type_icons=EVENT_TYPE_ICONS, username=session["username"])
+
+
+# ════════════════════════════════════════════════════════════
+#  EVENTS — TEAM MANAGEMENT (bracket, scores, standings)
+# ════════════════════════════════════════════════════════════
+def _compute_standings(matches, teams):
+    """Kwentahin ang standings mula sa completed matches.
+    2 puntos bawat panalo, 0 sa talo."""
+    stats = {t: {"team": t, "w": 0, "l": 0, "pts": 0, "pf": 0, "pa": 0} for t in teams}
+    for m in matches:
+        if m["status"] != "Completed" or m["score_a"] is None or m["score_b"] is None:
+            continue
+        a, b = m["team_a"], m["team_b"]
+        if a not in stats or b not in stats:
+            continue
+        stats[a]["pf"] += m["score_a"]; stats[a]["pa"] += m["score_b"]
+        stats[b]["pf"] += m["score_b"]; stats[b]["pa"] += m["score_a"]
+        if m["score_a"] > m["score_b"]:
+            stats[a]["w"] += 1; stats[a]["pts"] += 2; stats[b]["l"] += 1
+        elif m["score_b"] > m["score_a"]:
+            stats[b]["w"] += 1; stats[b]["pts"] += 2; stats[a]["l"] += 1
+    # I-sort by pts, tapos point differential
+    ranked = sorted(stats.values(),
+                    key=lambda x: (x["pts"], x["pf"] - x["pa"], x["pf"]), reverse=True)
+    return ranked
+
+
+@app.route("/admin_events/<int:post_id>/teams")
+def admin_events_teams(post_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Kunin ang event
+    cursor.execute("""
+        SELECT id, event_type, event_title, event_date, event_location
+        FROM feed_posts WHERE id = %s AND is_event = TRUE
+    """, (post_id,))
+    ev = cursor.fetchone()
+    if not ev:
+        return_db(conn)
+        return "Event not found", 404
+
+    event = {
+        "id": ev[0], "type": ev[1],
+        "icon": EVENT_TYPE_ICONS.get(ev[1], "📌"),
+        "title": ev[2] or ev[1], "date": ev[3], "location": ev[4],
+        "team_mode": _event_is_team_mode(ev[1]),
+    }
+
+    # Kunin ang mga registered teams
+    regs = _get_feed_event_registrations(cursor, post_id)
+    teams = [r["team_name"] for r in regs if r.get("team_name")]
+
+    # Kunin ang matches
+    matches = []
+    try:
+        cursor.execute("""
+            SELECT id, round_name, round_order, team_a, team_b,
+                   score_a, score_b, winner, match_date, match_time,
+                   location, status
+            FROM event_matches WHERE post_id = %s
+            ORDER BY round_order ASC, id ASC
+        """, (post_id,))
+        for m in cursor.fetchall():
+            matches.append({
+                "id": m[0], "round_name": m[1], "round_order": m[2],
+                "team_a": m[3], "team_b": m[4],
+                "score_a": m[5], "score_b": m[6], "winner": m[7],
+                "match_date": m[8], "match_time": m[9],
+                "location": m[10], "status": m[11],
+            })
+    except Exception:
+        conn.rollback()  # baka wala pang event_matches table
+
+    return_db(conn)
+
+    # Group matches by round
+    rounds = {}
+    for m in matches:
+        rounds.setdefault(m["round_name"], []).append(m)
+    rounds_ordered = sorted(rounds.items(),
+                            key=lambda kv: kv[1][0]["round_order"] if kv[1] else 0)
+
+    standings = _compute_standings(matches, teams)
+
+    # Next scheduled match
+    next_match = None
+    for m in matches:
+        if m["status"] == "Scheduled":
+            next_match = m
+            break
+
+    # Champion (winner ng pinaka-huling round)
+    champion = None
+    if rounds_ordered:
+        last_round = rounds_ordered[-1][1]
+        if last_round and last_round[0]["winner"]:
+            champion = last_round[0]["winner"]
+
+    return render_template("admin_events_teams.html",
+        event=event, teams=teams, rounds=rounds_ordered,
+        standings=standings, next_match=next_match, champion=champion,
+        all_matches=matches, username=session["username"])
+
+
+@app.route("/admin_events/<int:post_id>/add_match", methods=["POST"])
+def admin_events_add_match(post_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    round_name = request.form.get("round_name", "").strip()
+    team_a = request.form.get("team_a", "").strip()
+    team_b = request.form.get("team_b", "").strip()
+    match_date = request.form.get("match_date", "").strip()
+    match_time = request.form.get("match_time", "").strip()
+    location = request.form.get("location", "").strip()
+
+    # round_order base sa pangalan
+    round_order_map = {"Quarterfinals": 1, "Semifinals": 2, "Finals": 3,
+                       "Round 1": 1, "Round 2": 2, "Round 3": 3, "Championship": 4}
+    round_order = round_order_map.get(round_name, 1)
+
+    if not round_name or not team_a or not team_b:
+        return redirect(f"/admin_events/{post_id}/teams")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO event_matches
+            (post_id, round_name, round_order, team_a, team_b,
+             match_date, match_time, location, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Scheduled')
+        """, (post_id, round_name, round_order, team_a, team_b,
+              match_date, match_time, location))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"[EVENT MATCH] Add error: {e}")
+    return_db(conn)
+    return redirect(f"/admin_events/{post_id}/teams")
+
+
+@app.route("/admin_events/<int:post_id>/update_score/<int:match_id>", methods=["POST"])
+def admin_events_update_score(post_id, match_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    try:
+        score_a = int(request.form.get("score_a", 0))
+        score_b = int(request.form.get("score_b", 0))
+    except (ValueError, TypeError):
+        return redirect(f"/admin_events/{post_id}/teams")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # Kunin muna ang team names para malaman ang winner
+        cursor.execute("SELECT team_a, team_b FROM event_matches WHERE id = %s", (match_id,))
+        row = cursor.fetchone()
+        if row:
+            team_a, team_b = row
+            winner = team_a if score_a > score_b else (team_b if score_b > score_a else None)
+            cursor.execute("""
+                UPDATE event_matches
+                SET score_a = %s, score_b = %s, winner = %s, status = 'Completed'
+                WHERE id = %s
+            """, (score_a, score_b, winner, match_id))
+            conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"[EVENT SCORE] Update error: {e}")
+    return_db(conn)
+    return redirect(f"/admin_events/{post_id}/teams")
+
+
+@app.route("/admin_events/<int:post_id>/delete_match/<int:match_id>")
+def admin_events_delete_match(post_id, match_id):
+    if "username" not in session:
+        return redirect("/login")
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM event_matches WHERE id = %s", (match_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"[EVENT MATCH] Delete error: {e}")
+    return_db(conn)
+    return redirect(f"/admin_events/{post_id}/teams")
+
+
+# ════════════════════════════════════════════════════════════
 #  DEVELOPER PANEL (hidden — /dev)
 #  Kailangan: naka-login bilang admin + tamang DEV_ACCESS_KEY
 #  I-set ang DEV_ACCESS_KEY sa Render environment variables
