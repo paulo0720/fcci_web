@@ -5724,13 +5724,13 @@ def _event_is_team_mode(event_type):
     return event_type in EVENT_TEAM_TYPES
 
 
-def _get_event_registrations(cursor, post_id):
+def _get_feed_event_registrations(cursor, post_id):
     """Ibinabalik ang lahat ng registrations ng isang event, kasama
     ang team members (kung team-based) bilang listahan ng pangalan."""
     cursor.execute("""
         SELECT id, member_id, is_guest, team_name, captain_name,
                contact, companions, notes, status, registered_date, registered_time
-        FROM event_registrations
+        FROM feed_event_registrations
         WHERE post_id = %s
         ORDER BY id ASC
     """, (post_id,))
@@ -5740,7 +5740,7 @@ def _get_event_registrations(cursor, post_id):
     for r in rows:
         reg_id = r[0]
         cursor.execute("""
-            SELECT member_name FROM event_registration_members
+            SELECT member_name FROM feed_event_registration_members
             WHERE registration_id = %s ORDER BY id ASC
         """, (reg_id,))
         members = [m[0] for m in cursor.fetchall()]
@@ -5780,7 +5780,7 @@ def _get_open_events():
     for r in rows:
         post_id = r[0]
         cursor.execute("""
-            SELECT COUNT(*) FROM event_registrations
+            SELECT COUNT(*) FROM feed_event_registrations
             WHERE post_id = %s AND status = 'Confirmed'
         """, (post_id,))
         join_count = cursor.fetchone()[0]
@@ -5882,21 +5882,21 @@ def feed():
             team_mode = _event_is_team_mode(event_type)
 
             cursor.execute("""
-                SELECT COUNT(*) FROM event_registrations
+                SELECT COUNT(*) FROM feed_event_registrations
                 WHERE post_id = %s AND status != 'Cancelled'
             """, (post_id,))
             join_count = cursor.fetchone()[0]
 
             cursor.execute("""
                 SELECT id, team_name, captain_name, contact, companions, status
-                FROM event_registrations
+                FROM feed_event_registrations
                 WHERE post_id = %s AND member_id = %s
             """, (post_id, session["member_id"]))
             my_reg_row = cursor.fetchone()
             my_registration = None
             if my_reg_row:
                 cursor.execute("""
-                    SELECT member_name FROM event_registration_members
+                    SELECT member_name FROM feed_event_registration_members
                     WHERE registration_id = %s ORDER BY id ASC
                 """, (my_reg_row[0],))
                 my_registration = {
@@ -6091,7 +6091,7 @@ def feed_event_join(post_id):
 
     # Isang registration lang bawat member kada event
     cursor.execute("""
-        SELECT id FROM event_registrations WHERE post_id = %s AND member_id = %s
+        SELECT id FROM feed_event_registrations WHERE post_id = %s AND member_id = %s
     """, (post_id, session["member_id"]))
     if cursor.fetchone():
         return_db(conn)
@@ -6121,7 +6121,7 @@ def feed_event_join(post_id):
     status = "Confirmed"
     if max_slots:
         cursor.execute("""
-            SELECT COUNT(*) FROM event_registrations
+            SELECT COUNT(*) FROM feed_event_registrations
             WHERE post_id = %s AND status = 'Confirmed'
         """, (post_id,))
         current_count = cursor.fetchone()[0]
@@ -6129,7 +6129,7 @@ def feed_event_join(post_id):
             status = "Waitlisted"
 
     cursor.execute("""
-        INSERT INTO event_registrations
+        INSERT INTO feed_event_registrations
         (post_id, member_id, is_guest, team_name, captain_name, contact,
          companions, notes, status, registered_date, registered_time)
         VALUES (%s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -6143,7 +6143,7 @@ def feed_event_join(post_id):
 
     for m_name in member_names:
         cursor.execute("""
-            INSERT INTO event_registration_members (registration_id, member_name)
+            INSERT INTO feed_event_registration_members (registration_id, member_name)
             VALUES (%s, %s)
         """, (reg_id, m_name))
 
@@ -6164,7 +6164,7 @@ def feed_event_cancel(post_id):
     cursor = conn.cursor()
 
     cursor.execute("""
-        DELETE FROM event_registrations WHERE post_id = %s AND member_id = %s
+        DELETE FROM feed_event_registrations WHERE post_id = %s AND member_id = %s
     """, (post_id, session["member_id"]))
 
     conn.commit()
@@ -6219,7 +6219,7 @@ def guest_event_join(post_id):
     status = "Confirmed"
     if max_slots:
         cursor.execute("""
-            SELECT COUNT(*) FROM event_registrations
+            SELECT COUNT(*) FROM feed_event_registrations
             WHERE post_id = %s AND status = 'Confirmed'
         """, (post_id,))
         current_count = cursor.fetchone()[0]
@@ -6227,7 +6227,7 @@ def guest_event_join(post_id):
             status = "Waitlisted"
 
     cursor.execute("""
-        INSERT INTO event_registrations
+        INSERT INTO feed_event_registrations
         (post_id, member_id, is_guest, team_name, captain_name, contact,
          companions, notes, status, registered_date, registered_time)
         VALUES (%s, NULL, TRUE, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -6241,7 +6241,7 @@ def guest_event_join(post_id):
 
     for m_name in member_names:
         cursor.execute("""
-            INSERT INTO event_registration_members (registration_id, member_name)
+            INSERT INTO feed_event_registration_members (registration_id, member_name)
             VALUES (%s, %s)
         """, (reg_id, m_name))
 
@@ -6487,7 +6487,7 @@ def admin_events():
         post_id = r[0]
         event_type = r[1]
         team_mode = _event_is_team_mode(event_type)
-        regs = _get_event_registrations(cursor, post_id)
+        regs = _get_feed_event_registrations(cursor, post_id)
 
         confirmed = [x for x in regs if x["status"] == "Confirmed"]
         waitlisted = [x for x in regs if x["status"] == "Waitlisted"]
@@ -6548,7 +6548,7 @@ def admin_events_remove_registration(post_id, reg_id):
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM event_registrations WHERE id = %s AND post_id = %s", (reg_id, post_id))
+    cursor.execute("DELETE FROM feed_event_registrations WHERE id = %s AND post_id = %s", (reg_id, post_id))
     conn.commit()
     return_db(conn)
 
@@ -6565,7 +6565,7 @@ def _get_single_event(cursor, post_id):
         return None
     event_type = r[1]
     team_mode = _event_is_team_mode(event_type)
-    regs = _get_event_registrations(cursor, post_id)
+    regs = _get_feed_event_registrations(cursor, post_id)
     confirmed = [x for x in regs if x["status"] == "Confirmed"]
     waitlisted = [x for x in regs if x["status"] == "Waitlisted"]
     if team_mode:
