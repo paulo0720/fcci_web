@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ event.title }} — Event Summary</title>
+<style>
+  * { box-sizing:border-box; }
+  body { font-family:'Georgia', serif; color:#0c2418; max-width:800px; margin:0 auto; padding:40px 30px; }
+  .letterhead { border-bottom:3px solid #00562a; padding-bottom:14px; margin-bottom:20px; }
+  .letterhead .org { font-family:'Helvetica', sans-serif; font-weight:700; font-size:15px; color:#00562a; }
+  .letterhead .org-sub { font-family:'Helvetica', sans-serif; font-size:10.5px; color:#5c8270; }
+  h1 { font-size:22px; margin-bottom:4px; }
+  .meta { font-family:'Helvetica', sans-serif; font-size:12px; color:#5c8270; margin-bottom:22px; }
+  .stats { display:flex; gap:26px; margin-bottom:26px; }
+  .stats div { text-align:center; font-family:'Helvetica', sans-serif; }
+  .stats .v { font-size:26px; font-weight:700; color:#00562a; }
+  .stats .l { font-size:10.5px; color:#5c8270; text-transform:uppercase; letter-spacing:.04em; }
+  table { width:100%; border-collapse:collapse; font-family:'Helvetica', sans-serif; font-size:12.5px; margin-bottom:20px; }
+  th { text-align:left; border-bottom:2px solid #0c2418; padding:8px 10px; }
+  td { border-bottom:1px solid #ddd; padding:8px 10px; }
+  .no-print { margin-top:20px; text-align:right; }
+  .no-print button {
+    background:#00562a; color:#fff; border:none; border-radius:8px; padding:10px 22px;
+    font-weight:600; font-family:'Helvetica', sans-serif; font-size:13px; cursor:pointer; margin-left:8px;
+  }
+  .no-print button.secondary { background:#eee; color:#333; }
+  @media print { .no-print { display:none; } body { padding:0; } }
+</style>
+</head>
+<body>
+
+  <div class="letterhead">
+    <div class="org">FILIPINO COMMUNITY CENTER INTERNATIONAL (FCCI)</div>
+    <div class="org-sub">United in Faith, Serving with Love</div>
+  </div>
+
+  <h1>📋 {{ event.icon }} {{ event.title }} — Event Summary</h1>
+  <div class="meta">{{ event.date or '-' }} · {{ event.location or '-' }} · Generated {{ generated }}</div>
+
+  <div class="stats">
+    <div><div class="v">{{ event.registrations | length }}</div><div class="l">{{ 'Teams' if event.team_mode else 'Registrations' }}</div></div>
+    <div><div class="v">{{ event.total_people }}</div><div class="l">Total People</div></div>
+    <div><div class="v">{{ event.confirmed_count }}</div><div class="l">Confirmed</div></div>
+    <div><div class="v">{{ event.waitlisted_count }}</div><div class="l">Waitlisted</div></div>
+    {% if event.max_slots %}
+    <div><div class="v">{{ event.max_slots }}</div><div class="l">Max Slots</div></div>
+    {% endif %}
+  </div>
+
+  {% if event.team_mode %}
+  <table>
+    <tr><th>Team</th><th>Captain</th><th>Members</th><th>Status</th></tr>
+    {% for r in event.registrations %}
+    <tr><td>{{ r.team_name }}</td><td>{{ r.captain_name }}</td><td>{{ r.members | length }}</td><td>{{ r.status }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <table>
+    <tr><th>Name</th><th>Companions</th><th>Status</th></tr>
+    {% for r in event.registrations %}
+    <tr><td>{{ r.captain_name }}</td><td>{{ r.companions }}</td><td>{{ r.status }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if event.description %}
+  <p style="font-family:'Helvetica',sans-serif;font-size:12px;color:#5c8270;">{{ event.description }}</p>
+  {% endif %}
+
+  <div class="no-print">
+    <button class="secondary" onclick="window.close()">Close</button>
+    <button onclick="window.print()">🖨 Print / Save as PDF</button>
+  </div>
+
+</body>
+</html>

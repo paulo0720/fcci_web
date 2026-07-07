@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Management - FCCI Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+:root {
+  --bg-base: #f4fbf7; --bg-mist: #e9f7ef;
+  --glass: rgba(255,255,255,0.65); --glass-border: rgba(0,150,90,0.18);
+  --emerald: #00a85c; --emerald-bright: #00c46a; --emerald-deep: #00562a;
+  --text-main: #0c2418; --text-dim: #5c8270;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family:'Inter', sans-serif;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(0,196,106,0.16) 0%, transparent 40%),
+    radial-gradient(circle at 88% 18%, rgba(0,168,92,0.12) 0%, transparent 45%),
+    linear-gradient(160deg, #ffffff 0%, var(--bg-base) 45%, var(--bg-mist) 100%);
+  background-attachment:fixed;
+  color:var(--text-main);
+  min-height:100vh;
+}
+.sidebar {
+  width:250px; height:100vh; position:fixed; top:0; left:0;
+  background:rgba(255,255,255,0.55); backdrop-filter:blur(22px);
+  border-right:1px solid var(--glass-border);
+  display:flex; flex-direction:column; z-index:10; overflow-y:auto;
+}
+.sidebar-brand { padding:28px 20px 22px; border-bottom:1px solid var(--glass-border); text-align:center; }
+.brand-logo-ring { width:68px; height:68px; border-radius:50%; margin:0 auto 12px; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle, rgba(0,196,106,0.18), transparent 70%); }
+.brand-logo-ring img { width:48px; height:48px; object-fit:contain; border-radius:50%; box-shadow:0 2px 12px rgba(0,100,60,0.15); }
+.brand-name { font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:700; letter-spacing:3px; background:linear-gradient(90deg, var(--emerald-deep), var(--emerald-bright)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.brand-sub { font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
+.sidebar-nav { padding:18px 12px; }
+.nav-label { font-size:10px; font-weight:600; color:rgba(92,130,112,0.6); letter-spacing:1.5px; text-transform:uppercase; padding:14px 12px 6px; }
+.sidebar-nav a, .sidebar-footer a { display:flex; align-items:center; gap:11px; padding:11px 14px; margin-bottom:3px; border-radius:10px; color:var(--text-dim); text-decoration:none; font-size:13.5px; font-weight:500; border:1px solid transparent; }
+.sidebar-nav a:hover { background:rgba(0,196,106,0.08); border-color:var(--glass-border); color:var(--emerald-deep); }
+.sidebar-nav a.active { background:linear-gradient(90deg, rgba(0,196,106,0.16), rgba(0,196,106,0.02)); border-color:rgba(0,196,106,0.4); color:var(--emerald-deep); font-weight:600; }
+.nav-icon { font-size:15px; width:18px; text-align:center; }
+.sidebar-footer { padding:16px 12px; border-top:1px solid var(--glass-border); }
+
+.main-content { margin-left:250px; padding:32px 36px; max-width:980px; position:relative; z-index:1; }
+.topbar h4 { font-family:'Space Grotesk', sans-serif; font-size:24px; font-weight:600; margin-bottom:4px; }
+.topbar p { font-size:13px; color:var(--text-dim); margin-bottom:22px; }
+
+.event-tabs { display:flex; gap:8px; overflow-x:auto; margin-bottom:0; }
+.event-tab {
+  padding:10px 18px; border-radius:12px 12px 0 0; font-size:13.5px; font-weight:600; cursor:pointer;
+  color:var(--text-dim); background:rgba(255,255,255,0.5); border:1px solid var(--glass-border); border-bottom:none;
+  white-space:nowrap; text-decoration:none;
+}
+.event-tab.active { background:#fff; color:var(--emerald-deep); }
+.event-tab .n { font-size:11px; color:var(--text-dim); }
+
+.event-card { display:none; background:rgba(255,255,255,0.5); border:1px solid var(--glass-border); border-radius:0 14px 14px 14px; padding:20px; }
+.event-card.active { display:block; }
+
+.event-header { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+.event-header h2 { font-family:'Space Grotesk',sans-serif; font-size:18px; margin-bottom:4px; }
+.event-header .sub { font-size:12.5px; color:var(--text-dim); }
+.btn-ghost { background:rgba(0,100,60,0.06); border:1px solid var(--glass-border); color:var(--emerald-deep); border-radius:9px; padding:8px 14px; font-size:12.5px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; }
+.btn-primary { background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none; border-radius:9px; padding:8px 16px; font-size:12.5px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block; }
+
+.stats-row { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+.stat-chip { background:var(--glass); border:1px solid var(--glass-border); border-radius:12px; padding:12px 16px; flex:1; min-width:110px; }
+.stat-chip .v { font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700; color:var(--emerald-deep); }
+.stat-chip .l { font-size:11px; color:var(--text-dim); text-transform:uppercase; }
+
+.toolbar-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px; flex-wrap:wrap; }
+.search-box input { border:1px solid var(--glass-border); border-radius:10px; padding:8px 14px; font-size:13px; width:220px; background:rgba(255,255,255,0.8); }
+.print-btns { display:flex; gap:8px; flex-wrap:wrap; }
+
+.reg-card { background:#fff; border:1px solid var(--glass-border); border-radius:14px; overflow-x:auto; }
+table.reg-table { width:100%; border-collapse:collapse; font-size:13px; min-width:600px; }
+table.reg-table th { text-align:left; background:rgba(0,100,60,0.05); color:var(--text-dim); font-weight:700; font-size:11px; text-transform:uppercase; padding:10px 14px; }
+table.reg-table td { padding:11px 14px; border-top:1px solid rgba(0,100,60,0.06); vertical-align:top; }
+.team-members-mini { font-size:11.5px; color:var(--text-dim); margin-top:3px; }
+.status-pill { font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px; }
+.status-pill.Confirmed { background:rgba(0,168,92,0.12); color:var(--emerald-deep); }
+.status-pill.Waitlisted { background:rgba(230,126,34,0.14); color:#b3591a; }
+.row-actions a { font-size:12px; font-weight:600; color:#c0392b; text-decoration:none; }
+.empty-state { padding:40px; text-align:center; color:var(--text-dim); font-size:13px; }
+.guest-tag { font-size:10px; color:#b3591a; font-weight:700; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-logo-ring"><img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI"></div>
+    <div class="brand-name">FCCI</div>
+    <div class="brand-sub">United in Faith</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Main</div>
+    <a href="/dashboard"><span class="nav-icon">⬡</span> Dashboard</a>
+    <a href="/admin_feed"><span class="nav-icon">📰</span> Community Feed</a>
+    <a href="/admin_events" class="active"><span class="nav-icon">📅</span> Event Management</a>
+
+    <div class="nav-label">Members</div>
+    <a href="/members"><span class="nav-icon">◈</span> Members</a>
+    <a href="/registration_approval"><span class="nav-icon">◉</span> Reg. Approval</a>
+
+    <div class="nav-label">Finance</div>
+    <a href="/payments"><span class="nav-icon">◎</span> Payments</a>
+    <a href="/donations"><span class="nav-icon">◭</span> Donations</a>
+    <a href="/withdrawals"><span class="nav-icon">▣</span> Withdrawals</a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="/logout"><span class="nav-icon">⏻</span> Logout</a>
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="topbar">
+    <h4>📅 Event Management</h4>
+    <p>Manage registrations per event — hiwalay na tab ang bawat isa. I-post ang bagong event sa <a href="/admin_feed">Community Feed</a>.</p>
+  </div>
+
+  {% if not events %}
+  <div class="reg-card empty-state">
+    Wala pang na-post na event. Pumunta sa <a href="/admin_feed">Community Feed</a> at i-check ang "This is an Event" kapag nagpo-post ka. 📭
+  </div>
+  {% else %}
+
+  <div class="event-tabs">
+    {% for ev in events %}
+    <div class="event-tab {{ 'active' if loop.first else '' }}" onclick="switchEvent({{ ev.id }}, this)">
+      {{ ev.icon }} {{ ev.title }}
+      <span class="n">· {{ ev.registrations | length }} {{ 'teams' if ev.team_mode else 'joined' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% for ev in events %}
+  <div class="event-card {{ 'active' if loop.first else '' }}" id="event-{{ ev.id }}">
+    <div class="event-header">
+      <div>
+        <h2>{{ ev.icon }} {{ ev.title }}</h2>
+        <div class="sub">
+          {{ ev.date or '-' }} · {{ ev.location or '-' }}
+          {% if ev.max_slots %} · Max {{ ev.max_slots }} {{ 'teams' if ev.team_mode else 'slots' }}{% endif %}
+          {% if ev.registration_closed %} · <b style="color:#c0392b;">Registration Closed</b>{% endif %}
+        </div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <a class="btn-ghost" href="/admin_events/{{ ev.id }}/toggle_close">
+          {{ '🔓 Reopen Registration' if ev.registration_closed else '🔒 Close Registration' }}
+        </a>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-chip"><div class="v">{{ ev.registrations | length }}</div><div class="l">{{ 'Teams' if ev.team_mode else 'Registrations' }}</div></div>
+      <div class="stat-chip"><div class="v">{{ ev.total_people }}</div><div class="l">Total People</div></div>
+      <div class="stat-chip"><div class="v">{{ ev.confirmed_count }}</div><div class="l">Confirmed</div></div>
+      <div class="stat-chip"><div class="v">{{ ev.waitlisted_count }}</div><div class="l">Waitlisted</div></div>
+      {% if ev.slots_remaining is not none %}
+      <div class="stat-chip"><div class="v">{{ ev.slots_remaining }}</div><div class="l">Slots Left</div></div>
+      {% endif %}
+    </div>
+
+    <div class="toolbar-row">
+      <div class="search-box"><input placeholder="🔍 Search (client-side)..." oninput="filterTable(this, {{ ev.id }})"></div>
+      <div class="print-btns">
+        <a class="btn-ghost" href="/admin_events/{{ ev.id }}/print/team" target="_blank">🖨 Print {{ 'Team List' if ev.team_mode else 'Attendee List' }}</a>
+        <a class="btn-ghost" href="/admin_events/{{ ev.id }}/print/summary" target="_blank">🖨 Print Event Summary</a>
+        <a class="btn-primary" href="/admin_events/{{ ev.id }}/export">⬇ Export Excel</a>
+      </div>
+    </div>
+
+    <div class="reg-card">
+      {% if ev.team_mode %}
+      <table class="reg-table" id="table-{{ ev.id }}">
+        <tr><th>Team</th><th>Captain</th><th>Contact</th><th>Status</th><th></th></tr>
+        {% for r in ev.registrations %}
+        <tr>
+          <td><b>{{ r.team_name }}</b>{% if r.is_guest %} <span class="guest-tag">GUEST</span>{% endif %}
+              <div class="team-members-mini">{{ r.members | length }} members: {{ r.members | join(', ') }}</div></td>
+          <td>{{ r.captain_name }}</td>
+          <td>{{ r.contact or '-' }}</td>
+          <td><span class="status-pill {{ r.status }}">{{ r.status }}</span></td>
+          <td class="row-actions">
+            <a href="/admin_events/{{ ev.id }}/remove/{{ r.id }}" onclick="return confirm('Remove this team?')">Remove</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <table class="reg-table" id="table-{{ ev.id }}">
+        <tr><th>Name</th><th>Companions</th><th>Contact</th><th>Notes</th><th>Status</th><th></th></tr>
+        {% for r in ev.registrations %}
+        <tr>
+          <td>{{ r.captain_name }}{% if r.is_guest %} <span class="guest-tag">GUEST</span>{% endif %}</td>
+          <td>{{ r.companions }}</td>
+          <td>{{ r.contact or '-' }}</td>
+          <td>{{ r.notes or '-' }}</td>
+          <td><span class="status-pill {{ r.status }}">{{ r.status }}</span></td>
+          <td class="row-actions">
+            <a href="/admin_events/{{ ev.id }}/remove/{{ r.id }}" onclick="return confirm('Remove this registration?')">Remove</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+
+      {% if not ev.registrations %}
+      <div class="empty-state">Wala pang sumasali sa event na ito. 📭</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% endif %}
+</div>
+
+<script>
+function switchEvent(id, el) {
+  document.querySelectorAll('.event-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.event-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('event-' + id).classList.add('active');
+}
+function filterTable(input, id) {
+  const q = input.value.toLowerCase();
+  const rows = document.querySelectorAll('#table-' + id + ' tr');
+  rows.forEach((row, i) => {
+    if (i === 0) return; // header row
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+</script>
+
+</body>
+</html>

@@ -125,6 +125,66 @@
   }
 
   .delete-link { font-size:11.5px !important; color:#c0392b !important; }
+
+  /* ===== Event card + Join modal ===== */
+  .event-tag {
+    display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700;
+    padding:4px 12px; border-radius:20px; margin-bottom:10px; background:rgba(0,168,92,0.12); color:var(--emerald-deep);
+  }
+  .event-meta-row {
+    display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--text-dim);
+    margin:6px 0 12px; padding:10px 12px; background:rgba(0,100,60,0.04); border-radius:10px;
+  }
+  .join-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:6px 0 10px; flex-wrap:wrap; }
+  .participant-count { font-size:12.5px; color:var(--text-dim); font-weight:600; }
+  .participant-count b { color:var(--emerald-deep); }
+  .btn-join {
+    background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none;
+    border-radius:10px; padding:9px 20px; font-weight:700; font-size:13.5px; cursor:pointer;
+  }
+  .btn-join.closed { background:rgba(92,130,112,0.25); color:var(--text-dim); cursor:not-allowed; }
+  .joined-summary {
+    margin:6px 0 4px; padding:10px 12px; background:rgba(0,168,92,0.08); border:1px solid rgba(0,168,92,0.25);
+    border-radius:10px; font-size:12.5px; color:var(--emerald-deep);
+  }
+  .joined-summary b { display:block; font-size:13.5px; margin-bottom:2px; }
+  .joined-summary a { color:#c0392b; font-weight:600; text-decoration:underline; margin-left:8px; }
+  .status-badge { font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:6px; }
+  .status-badge.Waitlisted { background:rgba(230,126,34,0.14); color:#b3591a; }
+
+  .modal-overlay {
+    display:none; position:fixed; inset:0; background:rgba(4,20,12,0.45); backdrop-filter:blur(3px);
+    z-index:200; align-items:flex-end; justify-content:center;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-sheet {
+    background:#fff; width:100%; max-width:480px; border-radius:20px 20px 0 0;
+    padding:22px 22px 26px; max-height:88vh; overflow-y:auto;
+  }
+  .modal-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; }
+  .modal-title { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; }
+  .modal-sub { font-size:12px; color:var(--text-dim); margin-bottom:16px; }
+  .modal-close { background:none; border:none; font-size:20px; color:var(--text-dim); cursor:pointer; }
+  .form-group { margin-bottom:13px; }
+  .form-group label { display:block; font-size:12.5px; font-weight:700; margin-bottom:5px; }
+  .form-group input, .form-group textarea {
+    width:100%; border:1.5px solid var(--glass-border); border-radius:10px; padding:9px 12px;
+    font-size:13.5px; font-family:inherit; background:rgba(0,100,60,0.02);
+  }
+  .member-row { display:flex; gap:8px; margin-bottom:8px; }
+  .member-row input { flex:1; }
+  .member-row .rm-btn {
+    width:32px; height:32px; border-radius:8px; border:1.5px solid rgba(192,57,43,0.3); background:rgba(192,57,43,0.06);
+    color:#c0392b; font-weight:700; cursor:pointer; flex-shrink:0;
+  }
+  .add-member-btn {
+    background:rgba(0,168,92,0.1); border:1.5px dashed rgba(0,168,92,0.4); color:var(--emerald-deep);
+    border-radius:10px; padding:9px; width:100%; font-weight:600; font-size:13px; cursor:pointer; margin-top:2px;
+  }
+  .btn-submit-join {
+    width:100%; background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none;
+    border-radius:12px; padding:13px; font-weight:700; font-size:14.5px; margin-top:8px; cursor:pointer;
+  }
 </style>
 
   <!-- PWA -->
@@ -200,6 +260,43 @@
     <img src="{{ post.photo_path }}" class="post-photo">
     {% endif %}
 
+    {% if post.is_event and post.event %}
+    <div class="event-tag">{{ post.event.icon }} Event · {{ post.event.type }}</div>
+    <div class="event-meta-row">
+      {% if post.event.date %}<span>📅 {{ post.event.date }}</span>{% endif %}
+      {% if post.event.location %}<span>📍 {{ post.event.location }}</span>{% endif %}
+      {% if post.event.max_slots %}<span>🧢 {{ post.event.slots_remaining }} slots left</span>{% endif %}
+    </div>
+
+    <div class="join-row">
+      <div class="participant-count"><b>{{ post.event.join_count }}</b> {{ post.event.join_label }}</div>
+      {% if post.event.my_registration %}
+        <button class="btn-join" disabled>✅ You're In!</button>
+      {% elif post.event.registration_closed %}
+        <button class="btn-join closed" disabled>🔒 Registration Closed</button>
+      {% else %}
+        <button class="btn-join" onclick="openJoinModal({{ post.id }}, '{{ post.event.type }}', {{ 'true' if post.event.team_mode else 'false' }})">
+          {{ post.event.icon }} Join Event
+        </button>
+      {% endif %}
+    </div>
+
+    {% if post.event.my_registration %}
+    <div class="joined-summary">
+      {% if post.event.team_mode %}
+        <b>Team "{{ post.event.my_registration.team_name }}" registered ✅
+        <span class="status-badge {{ post.event.my_registration.status }}">{{ post.event.my_registration.status }}</span></b>
+        {{ post.event.my_registration.members | length }} members
+      {% else %}
+        <b>You're confirmed ✅
+        <span class="status-badge {{ post.event.my_registration.status }}">{{ post.event.my_registration.status }}</span></b>
+        Attending with {{ post.event.my_registration.companions }} total {{ 'person' if post.event.my_registration.companions == 1 else 'people' }}
+      {% endif %}
+      <a href="/feed/event/{{ post.id }}/cancel" onclick="return confirm('Cancel your registration?')">Cancel registration</a>
+    </div>
+    {% endif %}
+    {% endif %}
+
     <div class="post-actions">
       <a href="/feed/like/{{ post.id }}" class="{{ 'liked' if post.liked_by_me else '' }}">
         {{ '💚' if post.liked_by_me else '🤍' }} Like ({{ post.like_count }})
@@ -242,6 +339,64 @@
 
 </div>
 
+<!-- JOIN EVENT MODAL -->
+<div class="modal-overlay" id="joinModal">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="modalTitle">Join Event</div>
+        <div class="modal-sub" id="modalSub">Complete the form below to join.</div>
+      </div>
+      <button class="modal-close" onclick="closeJoinModal()">✕</button>
+    </div>
+
+    <form method="POST" id="joinForm">
+      <!-- TEAM FORM (basketball / volleyball) -->
+      <div id="teamForm" style="display:none;">
+        <div class="form-group">
+          <label>Team Name</label>
+          <input type="text" name="team_name" id="teamName" placeholder="e.g. Tondo Kings" required>
+        </div>
+        <div class="form-group">
+          <label>Team Captain</label>
+          <input type="text" name="captain_name" id="teamCaptain" value="{{ member_name }}">
+        </div>
+        <div class="form-group">
+          <label>Team Members</label>
+          <div id="memberList"></div>
+          <button type="button" class="add-member-btn" onclick="addMemberRow()">+ Add Member</button>
+        </div>
+        <div class="form-group">
+          <label>Contact Number</label>
+          <input type="text" name="contact" placeholder="010-XXXX-XXXX">
+        </div>
+      </div>
+
+      <!-- RSVP FORM (individual / general) -->
+      <div id="rsvpForm" style="display:none;">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" name="rsvp_name" value="{{ member_name }}">
+        </div>
+        <div class="form-group">
+          <label>Number of Attendees (including you)</label>
+          <input type="number" name="companions" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label>Contact Number</label>
+          <input type="text" name="contact" placeholder="010-XXXX-XXXX">
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <textarea rows="2" name="notes" placeholder="Allergies, availability, etc."></textarea>
+        </div>
+      </div>
+
+      <button class="btn-submit-join" type="submit">Submit</button>
+    </form>
+  </div>
+</div>
+
 <script>
 function previewPhoto(event) {
   const file = event.target.files[0];
@@ -250,6 +405,37 @@ function previewPhoto(event) {
     img.src = URL.createObjectURL(file);
     img.style.display = 'block';
   }
+}
+
+function addMemberRow(prefill) {
+  const wrap = document.getElementById('memberList');
+  const row = document.createElement('div');
+  row.className = 'member-row';
+  row.innerHTML = `
+    <input type="text" name="members[]" placeholder="Member full name" value="${prefill || ''}">
+    <button type="button" class="rm-btn" onclick="this.closest('.member-row').remove()">✕</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function openJoinModal(postId, eventType, teamMode) {
+  document.getElementById('joinForm').action = '/feed/event/' + postId + '/join';
+  document.getElementById('teamForm').style.display = teamMode ? 'block' : 'none';
+  document.getElementById('rsvpForm').style.display = teamMode ? 'none' : 'block';
+  document.getElementById('memberList').innerHTML = '';
+
+  if (teamMode) {
+    document.getElementById('modalTitle').textContent = '{{ member_name }}\'s Team — ' + eventType;
+    document.getElementById('modalSub').textContent = 'Team event — magdagdag ng members sa iyong team.';
+    addMemberRow('{{ member_name }} (You)');
+  } else {
+    document.getElementById('modalTitle').textContent = 'Join: ' + eventType;
+    document.getElementById('modalSub').textContent = 'Simple sign-up — no team required.';
+  }
+  document.getElementById('joinModal').classList.add('open');
+}
+function closeJoinModal() {
+  document.getElementById('joinModal').classList.remove('open');
 }
 </script>
 

@@ -78,6 +78,45 @@
   .admin-link { text-align:center; margin-top:18px; font-size:12.5px; }
   .admin-link a { color:var(--text-dim); text-decoration:none; }
   .admin-link a:hover { color:var(--emerald-deep); }
+
+  /* ===== Public event widget ===== */
+  .event-widget {
+    background:var(--glass); backdrop-filter:blur(20px); border:1px solid var(--glass-border);
+    border-radius:20px; padding:20px; margin-bottom:18px; box-shadow:0 8px 30px rgba(0,150,90,0.1);
+  }
+  .event-widget .eyebrow {
+    font-size:11px; font-weight:700; color:var(--emerald-deep); text-transform:uppercase; letter-spacing:.05em;
+    display:flex; align-items:center; gap:6px; margin-bottom:8px;
+  }
+  .event-widget .pulse { width:7px; height:7px; border-radius:50%; background:var(--emerald-bright); animation:pulse-dot 1.6s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+  .ew-title { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; margin-bottom:4px; }
+  .ew-desc { font-size:12.5px; color:var(--text-dim); margin-bottom:10px; line-height:1.5; }
+  .ew-meta { font-size:12px; color:var(--text-dim); margin-bottom:12px; }
+  .ew-meta div { margin-bottom:3px; }
+  .btn-guest-join {
+    width:100%; background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none;
+    border-radius:12px; padding:11px; font-weight:700; font-size:13.5px; cursor:pointer;
+  }
+  .ew-note { font-size:10.5px; color:var(--text-dim); text-align:center; margin-top:8px; }
+  .ew-more { text-align:center; font-size:11px; color:var(--text-dim); margin-top:6px; }
+
+  /* Guest join modal */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(4,20,12,0.45); z-index:400; align-items:flex-end; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-sheet { background:#fff; width:100%; max-width:440px; border-radius:20px 20px 0 0; padding:22px; max-height:85vh; overflow-y:auto; }
+  .modal-title { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px; }
+  .modal-sub { font-size:12px; color:var(--text-dim); margin-bottom:14px; }
+  .modal-close { float:right; background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-dim); }
+  .fg { margin-bottom:12px; clear:both; }
+  .fg label { display:block; font-size:11.5px; font-weight:700; margin-bottom:5px; text-transform:none; color:var(--text-main); letter-spacing:0; }
+  .fg input, .fg textarea { width:100%; border:1.5px solid var(--glass-border); border-radius:10px; padding:9px 12px; font-size:13.5px; font-family:inherit; }
+  .member-row { display:flex; gap:8px; margin-bottom:8px; }
+  .member-row input { flex:1; }
+  .member-row .rm-btn { width:32px; border-radius:8px; border:1.5px solid rgba(192,57,43,0.3); background:rgba(192,57,43,0.06); color:#c0392b; font-weight:700; cursor:pointer; }
+  .add-member-btn { background:rgba(0,168,92,0.1); border:1.5px dashed rgba(0,168,92,0.4); color:var(--emerald-deep); border-radius:10px; padding:8px; width:100%; font-weight:600; font-size:12.5px; cursor:pointer; }
+  .btn-submit-join { width:100%; background:linear-gradient(135deg, var(--emerald-deep), var(--emerald)); color:#fff; border:none; border-radius:12px; padding:12px; font-weight:700; margin-top:8px; cursor:pointer; }
+  .guest-note { background:rgba(184,150,79,0.1); border:1px solid rgba(184,150,79,0.3); border-radius:10px; padding:10px 12px; font-size:11.5px; color:#7a5f22; margin-bottom:14px; }
 </style>
 
   <!-- PWA -->
@@ -102,6 +141,25 @@
     <p>Filipino Community Center International</p>
   </div>
 
+  {% if open_events %}
+  {% set ev = open_events[0] %}
+  <div class="event-widget">
+    <div class="eyebrow"><span class="pulse"></span> Open Event · No account needed</div>
+    <div class="ew-title">{{ ev.icon }} {{ ev.title }}</div>
+    {% if ev.description %}<div class="ew-desc">{{ ev.description }}</div>{% endif %}
+    <div class="ew-meta">
+      {% if ev.date %}<div>📅 {{ ev.date }}</div>{% endif %}
+      {% if ev.location %}<div>📍 {{ ev.location }}</div>{% endif %}
+      <div>{{ ev.join_count }} {{ 'teams' if ev.team_mode else '' }} joined{% if ev.slots_remaining is not none %} · {{ ev.slots_remaining }} slots left{% endif %}</div>
+    </div>
+    <button class="btn-guest-join" onclick="openGuestModal({{ ev.id }}, '{{ ev.type }}', {{ 'true' if ev.team_mode else 'false' }})">Join without an account</button>
+    <div class="ew-note">Miyembro ka na? Mag-login sa ibaba para awtomatikong ma-fill ang iyong info.</div>
+    {% if open_events | length > 1 %}
+    <div class="ew-more">+{{ open_events | length - 1 }} pang open event kapag naka-login ka na</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="login-card">
 
     {% if error %}
@@ -125,12 +183,67 @@
   </div>
 </div>
 
+<!-- GUEST JOIN MODAL -->
+<div class="modal-overlay" id="guestModal">
+  <div class="modal-sheet">
+    <button class="modal-close" onclick="closeGuestModal()">✕</button>
+    <div class="modal-title" id="guestModalTitle">Join as Guest</div>
+    <div class="modal-sub" id="guestModalSub"></div>
+    <div class="guest-note">Hindi ka miyembro? Ok lang — kumpletuhin lang ang form na ito, walang kailangang account.</div>
+
+    <form method="POST" id="guestForm">
+      <div id="guestTeamForm" style="display:none;">
+        <div class="fg"><label>Team Name</label><input type="text" name="team_name" placeholder="e.g. Barangay Ballers"></div>
+        <div class="fg"><label>Your Name (Team Captain)</label><input type="text" name="captain_name" placeholder="Full name"></div>
+        <div class="fg"><label>Contact Number</label><input type="text" name="contact" placeholder="010-XXXX-XXXX"></div>
+        <div class="fg">
+          <label>Team Members</label>
+          <div id="guestMemberList"></div>
+          <button type="button" class="add-member-btn" onclick="addGuestMemberRow()">+ Add Member</button>
+        </div>
+      </div>
+      <div id="guestRsvpForm" style="display:none;">
+        <div class="fg"><label>Your Name</label><input type="text" name="rsvp_name" placeholder="Full name"></div>
+        <div class="fg"><label>Number of Attendees (including you)</label><input type="number" name="companions" value="1" min="1"></div>
+        <div class="fg"><label>Contact Number</label><input type="text" name="contact" placeholder="010-XXXX-XXXX"></div>
+        <div class="fg"><label>Notes (optional)</label><textarea rows="2" name="notes"></textarea></div>
+      </div>
+      <button class="btn-submit-join" type="submit">Submit Registration</button>
+    </form>
+  </div>
+</div>
+
 
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/static/sw.js").catch(() => {});
   });
+}
+
+function addGuestMemberRow(prefill) {
+  const wrap = document.getElementById('guestMemberList');
+  const row = document.createElement('div');
+  row.className = 'member-row';
+  row.innerHTML = `
+    <input type="text" name="members[]" placeholder="Member full name" value="${prefill || ''}">
+    <button type="button" class="rm-btn" onclick="this.closest('.member-row').remove()">✕</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function openGuestModal(postId, eventType, teamMode) {
+  document.getElementById('guestForm').action = '/guest_event/' + postId + '/join';
+  document.getElementById('guestTeamForm').style.display = teamMode ? 'block' : 'none';
+  document.getElementById('guestRsvpForm').style.display = teamMode ? 'none' : 'block';
+  document.getElementById('guestMemberList').innerHTML = '';
+  document.getElementById('guestModalTitle').textContent = (teamMode ? '🏀 Join as Guest' : '✅ Join as Guest');
+  document.getElementById('guestModalSub').textContent = eventType;
+  if (teamMode) addGuestMemberRow();
+  document.getElementById('guestModal').classList.add('open');
+}
+function closeGuestModal() {
+  document.getElementById('guestModal').classList.remove('open');
 }
 </script>
 </body>

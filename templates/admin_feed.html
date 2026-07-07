@@ -112,6 +112,26 @@ body::before {
   font-size:10px; font-weight:700; color:#7a3fd0; background:rgba(150,90,255,0.12);
   padding:2px 9px; border-radius:20px; margin-left:6px; vertical-align:middle;
 }
+.event-toggle-row { margin-top:10px; }
+.event-toggle-label { font-size:13px; font-weight:600; color:var(--emerald-deep); display:flex; align-items:center; gap:8px; cursor:pointer; }
+.event-fields { margin-top:12px; padding:14px; background:rgba(0,100,60,0.04); border:1px dashed var(--glass-border); border-radius:12px; }
+.ef-row { display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+.ef-group { flex:1; min-width:160px; }
+.ef-group label { display:block; font-size:11px; font-weight:700; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase; }
+.ef-group input, .ef-group select {
+  width:100%; border:1px solid var(--glass-border); border-radius:8px; padding:8px 10px; font-size:13px;
+  background:rgba(255,255,255,0.85); font-family:inherit;
+}
+.ef-hint { font-size:11.5px; color:var(--text-dim); font-style:italic; }
+.event-badge {
+  display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700;
+  padding:3px 11px; border-radius:20px; margin-bottom:8px; background:rgba(0,168,92,0.12); color:var(--emerald-deep);
+}
+.event-meta-mini { font-size:11.5px; color:var(--text-dim); margin:6px 0 10px; }
+.manage-link {
+  font-size:12px; font-weight:600; color:var(--emerald-deep); text-decoration:none;
+  background:rgba(0,168,92,0.1); padding:6px 14px; border-radius:8px; display:inline-block;
+}
 
 .post-card {
   background:var(--glass); backdrop-filter:blur(18px); border:1px solid var(--glass-border);
@@ -191,6 +211,7 @@ body::before {
     <div class="nav-label">Main</div>
     <a href="/dashboard"><span class="nav-icon">⬡</span> Dashboard</a>
     <a href="/admin_feed" class="active"><span class="nav-icon">📰</span> Community Feed</a>
+    <a href="/admin_events"><span class="nav-icon">📅</span> Event Management</a>
 
     <div class="nav-label">Members</div>
     <a href="/members"><span class="nav-icon">◈</span> Members</a>
@@ -227,6 +248,47 @@ body::before {
       <textarea name="content" placeholder="Mag-post bilang FCCI Admin..."></textarea>
       <img id="previewImg" class="preview-photo">
 
+      <div class="event-toggle-row">
+        <label class="event-toggle-label">
+          <input type="checkbox" id="isEventCheck" name="is_event" onchange="toggleEventFields()">
+          🎟️ This is an Event (may Join button)
+        </label>
+      </div>
+
+      <div id="eventFields" class="event-fields" style="display:none;">
+        <div class="ef-row">
+          <div class="ef-group">
+            <label>Event Type</label>
+            <select name="event_type" id="eventTypeSelect">
+              {% for t in ["Basketball","Volleyball","Feeding Program","General Assembly","Fun Run","Fiesta / Celebration","Other"] %}
+              <option value="{{ t }}">{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="ef-group">
+            <label>Event Title</label>
+            <input type="text" name="event_title" placeholder="e.g. Summer 3x3 Basketball Tournament">
+          </div>
+        </div>
+        <div class="ef-row">
+          <div class="ef-group">
+            <label>Date &amp; Time (text)</label>
+            <input type="text" name="event_date" placeholder="e.g. July 26, 2026 · 1:00 PM">
+          </div>
+          <div class="ef-group">
+            <label>Location</label>
+            <input type="text" name="event_location" placeholder="e.g. Ansan Sports Complex">
+          </div>
+        </div>
+        <div class="ef-row">
+          <div class="ef-group">
+            <label>Max Slots / Teams (optional)</label>
+            <input type="number" name="max_slots" min="1" placeholder="Walang limitasyon kung iiwan blangko">
+          </div>
+        </div>
+        <div class="ef-hint" id="eventModeHint">🏀🏐 Team-based: mag-form ng team name + members ang mga sasali.</div>
+      </div>
+
       <div class="composer-footer">
         <label class="photo-label">
           📷 Add Photo
@@ -236,6 +298,23 @@ body::before {
       </div>
     </form>
   </div>
+
+  <script>
+    const TEAM_EVENT_TYPES = ["Basketball", "Volleyball"];
+    function toggleEventFields() {
+      const on = document.getElementById('isEventCheck').checked;
+      document.getElementById('eventFields').style.display = on ? 'block' : 'none';
+      updateEventModeHint();
+    }
+    function updateEventModeHint() {
+      const type = document.getElementById('eventTypeSelect').value;
+      const hint = document.getElementById('eventModeHint');
+      hint.textContent = TEAM_EVENT_TYPES.includes(type)
+        ? '🏀🏐 Team-based: mag-fo-form ng team name + members ang mga sasali.'
+        : '✅ Simple RSVP: pangalan + bilang ng kasama lang ang itatanong sa mga sasali.';
+    }
+    document.getElementById('eventTypeSelect') && document.getElementById('eventTypeSelect').addEventListener('change', updateEventModeHint);
+  </script>
 
   {% for post in posts %}
   <div class="post-card {{ 'pinned' if post[5] else '' }}">
@@ -251,6 +330,15 @@ body::before {
 
     {% if post[3] %}<div class="post-content">{{ post[3] }}</div>{% endif %}
     {% if post[4] %}<img src="{{ post[4] }}" class="post-photo">{% endif %}
+
+    {% if post[8] %}
+    <div class="event-badge">{{ event_type_icons.get(post[9], '📌') }} Event · {{ post[9] }}</div>
+    <div class="event-meta-mini">
+      {% if post[11] %}📅 {{ post[11] }}{% endif %}
+      {% if post[12] %} · 📍 {{ post[12] }}{% endif %}
+    </div>
+    <div style="margin-bottom:10px;"><a class="manage-link" href="/admin_events#event-{{ post[0] }}">👥 Manage Registrations</a></div>
+    {% endif %}
 
     <div class="post-actions">
       <a href="/feed/pin/{{ post[0] }}" class="pin-btn {{ 'unpin' if post[5] else 'pin' }}">
