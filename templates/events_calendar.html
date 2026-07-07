@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Events Calendar — FCCI</title>
+<meta name="theme-color" content="#0b2236">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-base:#f4f8fb; --cyan:#00a89e; --cyan-bright:#00d4c8; --cyan-deep:#0b2236;
+  --violet:#7c6df0; --ink:#0b1d2e; --muted:#6b7e8f; --line:#e3eef4;
+  --glass:rgba(255,255,255,0.9); --glass-border:#e3eef4;
+  --sidebar-w:220px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Inter',sans-serif; background:
+  radial-gradient(ellipse 700px 500px at 10% 0%, rgba(0,212,200,0.09), transparent 55%),
+  linear-gradient(180deg,#fff,#f4f8fb); color:var(--ink); min-height:100vh; }
+
+/* Sidebar */
+.sidebar { position:fixed; top:0; left:0; width:var(--sidebar-w); height:100vh; background:var(--glass); backdrop-filter:blur(14px); border-right:1px solid var(--glass-border); display:flex; flex-direction:column; z-index:100; }
+.sidebar-brand { padding:22px 20px 18px; text-align:center; border-bottom:1px solid var(--glass-border); }
+.brand-logo-ring { width:46px; height:46px; border-radius:50%; margin:0 auto 8px; background:linear-gradient(135deg,var(--cyan-bright),var(--violet)); padding:2px; }
+.brand-logo-ring img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
+.brand-name { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px; color:var(--ink); }
+.brand-sub { font-size:8px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
+.sidebar-nav { padding:16px 12px; flex:1; overflow-y:auto; }
+.nav-label { font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin:14px 8px 6px; }
+.sidebar-nav a, .sidebar-footer a { display:flex; align-items:center; gap:11px; padding:10px 13px; margin-bottom:2px; border-radius:10px; color:var(--muted); text-decoration:none; font-size:13px; font-weight:500; border:1px solid transparent; }
+.sidebar-nav a:hover { background:rgba(0,212,200,0.08); color:var(--cyan); }
+.sidebar-nav a.active { background:#e8faf8; border-color:var(--cyan-bright); color:var(--cyan); font-weight:600; }
+.nav-icon { font-size:14px; width:18px; text-align:center; }
+.sidebar-footer { padding:14px 12px; border-top:1px solid var(--glass-border); }
+.sidebar-footer a.logout:hover { background:rgba(220,53,69,0.08); color:#c0392b; }
+
+/* Main */
+.main { margin-left:var(--sidebar-w); padding:26px 30px; }
+.topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.topbar h1 { font-family:'Space Grotesk',sans-serif; font-size:24px; color:var(--ink); display:flex; align-items:center; gap:10px; }
+.view-toggle { display:flex; gap:4px; background:#eef3f8; padding:3px; border-radius:9px; }
+.view-toggle a { padding:7px 15px; border-radius:7px; font-size:12px; color:var(--muted); text-decoration:none; }
+.view-toggle a.on { background:#fff; color:var(--cyan); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.subtitle { font-size:12.5px; color:var(--muted); margin-bottom:18px; }
+
+.cal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.cal-nav { display:flex; align-items:center; gap:14px; }
+.cal-nav .mo { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; color:var(--ink); min-width:150px; text-align:center; }
+.cal-nav .arrow { width:32px; height:32px; border-radius:8px; background:#fff; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:16px; text-decoration:none; }
+.cal-nav .arrow:hover { border-color:var(--cyan-bright); color:var(--cyan); }
+.btn-new { background:linear-gradient(135deg,var(--cyan),var(--cyan-bright)); color:#fff; padding:10px 18px; border-radius:10px; font-size:12.5px; font-weight:700; text-decoration:none; }
+
+.legend { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:12px; font-size:10.5px; color:var(--muted); }
+.legend span { display:flex; align-items:center; gap:5px; }
+.dot { width:9px; height:9px; border-radius:50%; }
+
+.grid { background:#fff; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.dow { display:grid; grid-template-columns:repeat(7,1fr); background:var(--cyan-deep); }
+.dow div { padding:10px; text-align:center; font-size:10px; color:var(--cyan-bright); font-family:'JetBrains Mono',monospace; letter-spacing:0.5px; }
+.week { display:grid; grid-template-columns:repeat(7,1fr); }
+.day { min-height:92px; border-right:1px solid #eef3f2; border-bottom:1px solid #eef3f2; padding:7px 8px; }
+.day:nth-child(7n) { border-right:none; }
+.day .num { font-size:12px; color:var(--ink); font-weight:600; margin-bottom:5px; }
+.day.other { background:#fafcfd; } .day.other .num { color:#c5d0d8; }
+.day.today .num { background:var(--cyan); color:#fff; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.ev { display:block; font-size:9px; padding:3px 6px; border-radius:5px; margin-bottom:3px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-decoration:none; }
+.ev-Basketball { background:#fff0e0; color:#c8860a; }
+.ev-Volleyball { background:#e8f4ff; color:#2b7cc4; }
+.ev-Feeding { background:#e8faf0; color:#00a06a; }
+.ev-Assembly { background:#f3ecff; color:#7c6df0; }
+.ev-Fiesta { background:#ffe8f0; color:#d4468a; }
+.ev-Other { background:#eef3f8; color:#6b7e8f; }
+.ev-FunRun { background:#fff8e0; color:#c8a20a; }
+
+/* Mobile */
+.hamburger { display:none; }
+.sidebar-overlay { display:none; }
+@media (max-width:900px) {
+  .sidebar { transform:translateX(-100%); transition:transform 0.3s; }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar-overlay.show { display:block; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:99; }
+  .main { margin-left:0; padding:16px; }
+  .hamburger { display:flex; width:40px; height:40px; border-radius:10px; background:#fff; border:1px solid var(--line); align-items:center; justify-content:center; font-size:18px; cursor:pointer; }
+  .topbar h1 { font-size:19px; }
+  .day { min-height:64px; padding:4px 5px; }
+  .day .num { font-size:10px; }
+  .ev { font-size:7.5px; padding:2px 4px; }
+  .dow div { font-size:8px; padding:6px 2px; }
+  .cal-nav .mo { font-size:15px; min-width:110px; }
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-logo-ring"><img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI"></div>
+    <div class="brand-name">FCCI</div>
+    <div class="brand-sub">United in Faith</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Main</div>
+    <a href="/dashboard"><span class="nav-icon">⬡</span> Dashboard</a>
+    <a href="/admin_feed"><span class="nav-icon">📰</span> Community Feed</a>
+    <a href="/admin_events" class="active"><span class="nav-icon">📅</span> Events</a>
+    <div class="nav-label">Members</div>
+    <a href="/members"><span class="nav-icon">◈</span> Members</a>
+    <a href="/registration_approval"><span class="nav-icon">◉</span> Reg. Approval</a>
+    <div class="nav-label">Finance</div>
+    <a href="/payments"><span class="nav-icon">◎</span> Payments</a>
+    <a href="/expenses"><span class="nav-icon">◐</span> Expenses</a>
+    <a href="/donations"><span class="nav-icon">◭</span> Donations</a>
+    <a href="/withdrawals"><span class="nav-icon">▣</span> Withdrawals</a>
+    <div class="nav-label">Tools</div>
+    <a href="/attendance"><span class="nav-icon">▤</span> Attendance</a>
+    <a href="/exports"><span class="nav-icon">▥</span> Export Center</a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="/settings"><span class="nav-icon">⚙</span> Settings</a>
+    <a href="/logout" class="logout"><span class="nav-icon">⏻</span> Logout</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" onclick="openSidebar()">☰</button>
+      <h1>📅 Events Calendar</h1>
+    </div>
+    <div class="view-toggle">
+      <a href="/events_calendar" class="on">Calendar</a>
+      <a href="/admin_events">List</a>
+    </div>
+  </div>
+  <div class="subtitle">Lahat ng aktibidad ng samahan sa isang tingin</div>
+
+  <div class="cal-head">
+    <div class="cal-nav">
+      <a href="/events_calendar?year={{ prev_year }}&month={{ prev_month }}" class="arrow">‹</a>
+      <span class="mo">{{ month_name }} {{ year }}</span>
+      <a href="/events_calendar?year={{ next_year }}&month={{ next_month }}" class="arrow">›</a>
+    </div>
+    <a href="/admin_feed" class="btn-new">＋ New Event</a>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#f0a93f"></span>Basketball</span>
+    <span><span class="dot" style="background:#2b7cc4"></span>Volleyball</span>
+    <span><span class="dot" style="background:#00a06a"></span>Feeding</span>
+    <span><span class="dot" style="background:#7c6df0"></span>Assembly</span>
+    <span><span class="dot" style="background:#d4468a"></span>Fiesta</span>
+  </div>
+
+  <div class="grid">
+    <div class="dow"><div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div></div>
+    {% for week in weeks %}
+    <div class="week">
+      {% for d in week %}
+      <div class="day {% if d.other %}other{% endif %} {% if d.today %}today{% endif %}">
+        {% if d.day %}
+        <div class="num">{{ d.day }}</div>
+        {% for ev in d.events %}
+        {% set typeclass = ev.type|replace(' ','')|replace('/','')|replace('Program','')|replace('General','')|replace('Celebration','') %}
+        <a href="{% if ev.team_mode %}/admin_events/{{ ev.id }}/teams{% else %}/admin_events{% endif %}"
+           class="ev ev-{{ typeclass }}" title="{{ ev.title }}">{{ ev.icon }} {{ ev.title }}</a>
+        {% endfor %}
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if upcoming %}
+  <div style="margin-top:22px;">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--ink);margin-bottom:12px;">Mga Paparating na Event</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+      {% for ev in upcoming %}
+      <a href="{% if ev.team_mode %}/admin_events/{{ ev.id }}/teams{% else %}/admin_events{% endif %}"
+         style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;text-decoration:none;display:flex;gap:12px;align-items:center;">
+        <div style="font-size:26px;">{{ ev.icon }}</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--ink);">{{ ev.title }}</div>
+          <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;">{{ ev.date }}{% if ev.location %} · {{ ev.location }}{% endif %}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('show');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('show');}
+</script>
+</body>
+</html>

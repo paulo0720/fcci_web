@@ -217,7 +217,7 @@ table.reg-table td { padding:11px 14px; border-top:1px solid rgba(0,100,60,0.06)
 <div class="main-content">
   <div class="topbar">
     <h4>📅 Event Management</h4>
-    <p>Manage registrations per event — hiwalay na tab ang bawat isa. I-post ang bagong event sa <a href="/admin_feed">Community Feed</a>.</p>
+    <p>Manage registrations per event — hiwalay na tab ang bawat isa. I-post ang bagong event sa <a href="/admin_feed">Community Feed</a>. Tingnan sa <a href="/events_calendar">📅 Calendar View</a>.</p>
   </div>
 
   {% if not events %}
@@ -266,6 +266,9 @@ table.reg-table td { padding:11px 14px; border-top:1px solid rgba(0,100,60,0.06)
     <div class="toolbar-row">
       <div class="search-box"><input placeholder="🔍 Search (client-side)..." oninput="filterTable(this, {{ ev.id }})"></div>
       <div class="print-btns">
+        {% if ev.team_mode %}
+        <a class="btn-primary" href="/admin_events/{{ ev.id }}/teams">🏆 Manage Teams & Scores</a>
+        {% endif %}
         <a class="btn-ghost" href="/admin_events/{{ ev.id }}/print/team" target="_blank">🖨 Print {{ 'Team List' if ev.team_mode else 'Attendee List' }}</a>
         <a class="btn-ghost" href="/admin_events/{{ ev.id }}/print/summary" target="_blank">🖨 Print Event Summary</a>
         <a class="btn-primary" href="/admin_events/{{ ev.id }}/export">⬇ Export Excel</a>

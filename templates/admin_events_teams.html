@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ event.title }} — Teams — FCCI</title>
+<meta name="theme-color" content="#0b2236">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-base:#f4f8fb; --cyan:#00a89e; --cyan-bright:#00d4c8; --cyan-deep:#0b2236;
+  --violet:#7c6df0; --ink:#0b1d2e; --muted:#6b7e8f; --line:#e3eef4; --gold:#c8860a;
+  --glass:rgba(255,255,255,0.9); --glass-border:#e3eef4; --sidebar-w:220px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Inter',sans-serif; background:
+  radial-gradient(ellipse 700px 500px at 10% 0%, rgba(0,212,200,0.09), transparent 55%),
+  linear-gradient(180deg,#fff,#f4f8fb); color:var(--ink); min-height:100vh; }
+.sidebar { position:fixed; top:0; left:0; width:var(--sidebar-w); height:100vh; background:var(--glass); backdrop-filter:blur(14px); border-right:1px solid var(--glass-border); display:flex; flex-direction:column; z-index:100; }
+.sidebar-brand { padding:22px 20px 18px; text-align:center; border-bottom:1px solid var(--glass-border); }
+.brand-logo-ring { width:46px; height:46px; border-radius:50%; margin:0 auto 8px; background:linear-gradient(135deg,var(--cyan-bright),var(--violet)); padding:2px; }
+.brand-logo-ring img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
+.brand-name { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px; color:var(--ink); }
+.brand-sub { font-size:8px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
+.sidebar-nav { padding:16px 12px; flex:1; overflow-y:auto; }
+.nav-label { font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin:14px 8px 6px; }
+.sidebar-nav a, .sidebar-footer a { display:flex; align-items:center; gap:11px; padding:10px 13px; margin-bottom:2px; border-radius:10px; color:var(--muted); text-decoration:none; font-size:13px; font-weight:500; border:1px solid transparent; }
+.sidebar-nav a:hover { background:rgba(0,212,200,0.08); color:var(--cyan); }
+.sidebar-nav a.active { background:#e8faf8; border-color:var(--cyan-bright); color:var(--cyan); font-weight:600; }
+.nav-icon { font-size:14px; width:18px; text-align:center; }
+.sidebar-footer { padding:14px 12px; border-top:1px solid var(--glass-border); }
+.sidebar-footer a.logout:hover { background:rgba(220,53,69,0.08); color:#c0392b; }
+
+.main { margin-left:var(--sidebar-w); padding:26px 30px; }
+.topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.topbar h1 { font-family:'Space Grotesk',sans-serif; font-size:22px; color:var(--ink); display:flex; align-items:center; gap:10px; }
+.evtag { font-size:11px; color:var(--gold); background:#fff0e0; padding:4px 12px; border-radius:12px; font-weight:600; }
+.back-link { font-size:12px; color:var(--muted); text-decoration:none; }
+.subtitle { font-size:12.5px; color:var(--muted); margin-bottom:18px; }
+
+.cols { display:grid; grid-template-columns:1.5fr 1fr; gap:20px; align-items:start; }
+.panel { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin-bottom:16px; }
+.panel h3 { font-size:14px; color:var(--ink); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+
+/* Bracket */
+.bracket { display:flex; gap:22px; align-items:flex-start; overflow-x:auto; padding-bottom:8px; }
+.round { display:flex; flex-direction:column; gap:14px; min-width:150px; }
+.round-label { font-size:9px; color:var(--muted); font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:1px; text-align:center; }
+.match { background:#f6fbf9; border:1px solid var(--line); border-radius:10px; overflow:hidden; position:relative; }
+.team { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; font-size:11.5px; }
+.team + .team { border-top:1px solid #eef3f2; }
+.team .nm { color:var(--ink); font-weight:600; }
+.team .sc { font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--muted); }
+.team.win { background:#e8faf8; } .team.win .nm, .team.win .sc { color:var(--cyan); }
+.match-actions { display:flex; gap:4px; padding:6px 8px; border-top:1px solid #eef3f2; background:#fbfdfe; }
+.match-actions a, .match-actions button { flex:1; font-size:9.5px; padding:5px; border-radius:6px; border:none; cursor:pointer; text-decoration:none; text-align:center; font-weight:600; }
+.btn-score { background:#e8faf8; color:var(--cyan); } .btn-del { background:#fdeceb; color:#d0442f; }
+.champ-box { display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:16px; padding:16px; background:#fffbf0; border:1px solid #f0e0b0; border-radius:12px; }
+.champ-box .trophy { font-size:32px; } .champ-box .clabel { font-size:9px; color:var(--gold); font-family:'JetBrains Mono',monospace; letter-spacing:1px; }
+.champ-box .cname { font-size:15px; font-weight:800; color:var(--ink); }
+
+/* Standings */
+.stand-tbl { width:100%; border-collapse:collapse; }
+.stand-tbl th { font-size:9px; color:var(--muted); font-family:'JetBrains Mono',monospace; text-align:left; padding:8px 6px; border-bottom:2px solid #eef3f2; letter-spacing:0.5px; }
+.stand-tbl td { font-size:12px; padding:10px 6px; border-bottom:1px solid #f2f6f4; }
+.rank { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
+.rank-1 { background:#fff4d6; color:#c8860a; } .rank-2 { background:#eef1f4; color:#7a8a99; } .rank-3 { background:#f7e8dd; color:#b3591a; } .rank-o { background:#f4f8fb; color:var(--muted); }
+.team-name { font-weight:600; color:var(--ink); }
+.wl { font-family:'JetBrains Mono',monospace; } .pts { font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--cyan); }
+
+.next-match { background:linear-gradient(135deg,#0b2236,#0a2d40); border-radius:12px; padding:16px; }
+.next-match .lbl { font-size:9px; color:var(--cyan-bright); font-family:'JetBrains Mono',monospace; letter-spacing:1px; margin-bottom:10px; }
+.vs-row { display:flex; align-items:center; justify-content:space-between; }
+.vs-team { text-align:center; flex:1; } .vs-team .t { font-size:13px; font-weight:700; color:#fff; }
+.vs-mid { font-size:11px; color:var(--cyan-bright); padding:0 12px; font-family:'JetBrains Mono',monospace; }
+.vs-time { text-align:center; font-size:10px; color:#9fb8c4; margin-top:8px; }
+
+.empty { text-align:center; padding:30px; color:var(--muted); font-size:13px; }
+
+/* Add match form */
+.add-form { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+.add-form .fg { display:flex; flex-direction:column; }
+.add-form label { font-size:9px; color:var(--muted); text-transform:uppercase; margin-bottom:4px; }
+.add-form input, .add-form select { padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:12px; font-family:'Inter',sans-serif; }
+.add-form .full { grid-column:1/3; }
+.btn-add { background:linear-gradient(135deg,var(--cyan),var(--cyan-bright)); color:#fff; padding:10px; border-radius:9px; border:none; font-size:12.5px; font-weight:700; cursor:pointer; }
+
+/* Modal */
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(11,29,46,0.6); z-index:200; align-items:center; justify-content:center; }
+.modal-bg.show { display:flex; }
+.modal { background:#fff; border-radius:16px; padding:26px; width:340px; max-width:90vw; }
+.modal h3 { font-size:16px; margin-bottom:16px; color:var(--ink); }
+.modal .score-row { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.modal .score-row .tname { flex:1; font-size:13px; font-weight:600; }
+.modal .score-row input { width:70px; padding:10px; border:1px solid var(--line); border-radius:8px; font-size:16px; text-align:center; font-family:'JetBrains Mono',monospace; font-weight:700; }
+.modal-actions { display:flex; gap:8px; margin-top:8px; }
+.modal-actions button { flex:1; padding:11px; border-radius:9px; border:none; font-size:13px; font-weight:700; cursor:pointer; }
+.modal-save { background:linear-gradient(135deg,var(--cyan),var(--cyan-bright)); color:#fff; }
+.modal-cancel { background:#eef3f8; color:var(--muted); }
+
+.hamburger { display:none; }
+.sidebar-overlay { display:none; }
+@media (max-width:900px) {
+  .sidebar { transform:translateX(-100%); transition:transform 0.3s; }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar-overlay.show { display:block; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:99; }
+  .main { margin-left:0; padding:16px; }
+  .hamburger { display:flex; width:40px; height:40px; border-radius:10px; background:#fff; border:1px solid var(--line); align-items:center; justify-content:center; font-size:18px; cursor:pointer; }
+  .cols { grid-template-columns:1fr; }
+  .topbar h1 { font-size:17px; }
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-logo-ring"><img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI"></div>
+    <div class="brand-name">FCCI</div>
+    <div class="brand-sub">United in Faith</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Main</div>
+    <a href="/dashboard"><span class="nav-icon">⬡</span> Dashboard</a>
+    <a href="/admin_feed"><span class="nav-icon">📰</span> Community Feed</a>
+    <a href="/admin_events" class="active"><span class="nav-icon">📅</span> Events</a>
+    <div class="nav-label">Members</div>
+    <a href="/members"><span class="nav-icon">◈</span> Members</a>
+    <a href="/registration_approval"><span class="nav-icon">◉</span> Reg. Approval</a>
+    <div class="nav-label">Finance</div>
+    <a href="/payments"><span class="nav-icon">◎</span> Payments</a>
+    <a href="/expenses"><span class="nav-icon">◐</span> Expenses</a>
+    <a href="/donations"><span class="nav-icon">◭</span> Donations</a>
+    <a href="/withdrawals"><span class="nav-icon">▣</span> Withdrawals</a>
+    <div class="nav-label">Tools</div>
+    <a href="/attendance"><span class="nav-icon">▤</span> Attendance</a>
+    <a href="/exports"><span class="nav-icon">▥</span> Export Center</a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="/settings"><span class="nav-icon">⚙</span> Settings</a>
+    <a href="/logout" class="logout"><span class="nav-icon">⏻</span> Logout</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" onclick="openSidebar()">☰</button>
+      <h1>{{ event.icon }} {{ event.title }}</h1>
+      <span class="evtag">{{ teams|length }} Teams · Team Mode</span>
+    </div>
+    <a href="/events_calendar" class="back-link">← Calendar</a>
+  </div>
+  <div class="subtitle">Bracket, scores, at standings — real-time na makikita</div>
+
+  <div class="cols">
+    <!-- LEFT: Bracket -->
+    <div>
+      <div class="panel">
+        <h3>🏆 Tournament Bracket</h3>
+        {% if rounds %}
+        <div class="bracket">
+          {% for round_name, matches in rounds %}
+          <div class="round">
+            <div class="round-label">{{ round_name }}</div>
+            {% for m in matches %}
+            <div class="match">
+              <div class="team {% if m.winner == m.team_a %}win{% endif %}">
+                <span class="nm">{{ m.team_a }}</span>
+                <span class="sc">{{ m.score_a if m.score_a is not none else '–' }}</span>
+              </div>
+              <div class="team {% if m.winner == m.team_b %}win{% endif %}">
+                <span class="nm">{{ m.team_b }}</span>
+                <span class="sc">{{ m.score_b if m.score_b is not none else '–' }}</span>
+              </div>
+              <div class="match-actions">
+                <button class="btn-score" onclick="openScore({{ m.id }}, '{{ m.team_a }}', '{{ m.team_b }}', {{ m.score_a if m.score_a is not none else 0 }}, {{ m.score_b if m.score_b is not none else 0 }})">✎ Score</button>
+                <a href="/admin_events/{{ event.id }}/delete_match/{{ m.id }}" class="btn-del" onclick="return confirm('Burahin ang match na ito?')">✕</a>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        {% if champion %}
+        <div class="champ-box">
+          <div class="trophy">🏆</div>
+          <div class="clabel">CHAMPION</div>
+          <div class="cname">{{ champion }}</div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty">Wala pang match. Magdagdag sa ibaba para simulan ang bracket.</div>
+        {% endif %}
+      </div>
+
+      <!-- Add Match -->
+      <div class="panel">
+        <h3>＋ Magdagdag ng Match</h3>
+        <form method="POST" action="/admin_events/{{ event.id }}/add_match" class="add-form">
+          <div class="fg">
+            <label>Round</label>
+            <select name="round_name" required>
+              <option value="Quarterfinals">Quarterfinals</option>
+              <option value="Semifinals">Semifinals</option>
+              <option value="Finals">Finals</option>
+              <option value="Championship">Championship</option>
+            </select>
+          </div>
+          <div class="fg"><label>Venue</label><input type="text" name="location" placeholder="Court / lugar"></div>
+          <div class="fg">
+            <label>Team A</label>
+            <select name="team_a" required>
+              <option value="">— Pumili —</option>
+              {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="fg">
+            <label>Team B</label>
+            <select name="team_b" required>
+              <option value="">— Pumili —</option>
+              {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="fg"><label>Petsa</label><input type="date" name="match_date"></div>
+          <div class="fg"><label>Oras</label><input type="time" name="match_time"></div>
+          <button type="submit" class="btn-add full">＋ Idagdag ang Match</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- RIGHT: Standings + Next -->
+    <div>
+      <div class="panel">
+        <h3>📊 Standings</h3>
+        {% if standings %}
+        <table class="stand-tbl">
+          <thead><tr><th>#</th><th>TEAM</th><th>W</th><th>L</th><th>PTS</th></tr></thead>
+          <tbody>
+            {% for s in standings %}
+            <tr>
+              <td><div class="rank rank-{{ loop.index if loop.index <= 3 else 'o' }}">{{ loop.index }}</div></td>
+              <td class="team-name">{{ s.team }}</td>
+              <td class="wl">{{ s.w }}</td>
+              <td class="wl">{{ s.l }}</td>
+              <td class="pts">{{ s.pts }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty">Wala pang standings. Mag-input ng scores.</div>
+        {% endif %}
+      </div>
+
+      {% if next_match %}
+      <div class="next-match">
+        <div class="lbl">● SUSUNOD NA LARO</div>
+        <div class="vs-row">
+          <div class="vs-team"><div class="t">{{ next_match.team_a }}</div></div>
+          <div class="vs-mid">VS</div>
+          <div class="vs-team"><div class="t">{{ next_match.team_b }}</div></div>
+        </div>
+        <div class="vs-time">{{ event.icon }} {{ next_match.round_name }}{% if next_match.match_date %} · {{ next_match.match_date }}{% endif %}{% if next_match.match_time %} · {{ next_match.match_time }}{% endif %}{% if next_match.location %} · {{ next_match.location }}{% endif %}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Score Modal -->
+<div class="modal-bg" id="scoreModal">
+  <div class="modal">
+    <h3>I-input ang Score</h3>
+    <form method="POST" id="scoreForm">
+      <div class="score-row"><span class="tname" id="mTeamA"></span><input type="number" name="score_a" id="mScoreA" min="0" value="0"></div>
+      <div class="score-row"><span class="tname" id="mTeamB"></span><input type="number" name="score_b" id="mScoreB" min="0" value="0"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-cancel" onclick="closeScore()">Cancel</button>
+        <button type="submit" class="modal-save">I-save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('show');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('show');}
+function openScore(id, ta, tb, sa, sb){
+  document.getElementById('mTeamA').textContent = ta;
+  document.getElementById('mTeamB').textContent = tb;
+  document.getElementById('mScoreA').value = sa;
+  document.getElementById('mScoreB').value = sb;
+  document.getElementById('scoreForm').action = '/admin_events/{{ event.id }}/update_score/' + id;
+  document.getElementById('scoreModal').classList.add('show');
+}
+function closeScore(){document.getElementById('scoreModal').classList.remove('show');}
+</script>
+</body>
+</html>
