@@ -529,8 +529,8 @@ def _draw_elegant_certificate(buf, data):
         _cert_diamond(c, cx0, cy0, 2.2*mm, GOLD)
 
     cx = W/2
-    y = H - 26*mm
-    logo_r = 13.5*mm
+    y = H - 31*mm
+    logo_r = 14*mm
     c.setStrokeColor(GOLD); c.setLineWidth(1)
     c.circle(cx, y, logo_r+1.1*mm, fill=0, stroke=1)
     if logo_path and os.path.exists(logo_path):
@@ -544,70 +544,70 @@ def _draw_elegant_certificate(buf, data):
                     preserveAspectRatio=True, mask="auto")
         c.restoreState()
 
-    y -= (logo_r + 10*mm)
-    c.setFillColor(NAVY); c.setFont("Times-Bold", 28)
+    y -= (logo_r + 12*mm)
+    c.setFillColor(NAVY); c.setFont("Times-Bold", 32)
     c.drawCentredString(cx, y, data.get("cert_title", "DONATION CERTIFICATE"))
 
-    y -= 6.2*mm
+    y -= 8*mm
     c.setStrokeColor(GOLD); c.setLineWidth(0.8)
-    lw = 44*mm
+    lw = 48*mm
     c.line(cx-lw, y, cx-6*mm, y); c.line(cx+6*mm, y, cx+lw, y)
-    _cert_star(c, cx, y, 2.1*mm, 0.9*mm, GOLD)
+    _cert_star(c, cx, y, 2.3*mm, 1.0*mm, GOLD)
 
-    y -= 8.5*mm
-    c.setFillColor(NAVY); c.setFont("Times-Italic", 12)
+    y -= 10*mm
+    c.setFillColor(NAVY); c.setFont("Times-Italic", 13.5)
     c.drawCentredString(cx, y, "This certificate is proudly presented to")
 
-    y -= 10.5*mm
-    c.setFont("Times-Bold", 24)
+    y -= 13*mm
+    c.setFont("Times-Bold", 30)
     c.drawCentredString(cx, y, str(data.get("donor_name") or "-"))
 
-    y -= 5*mm
+    y -= 6*mm
     c.setStrokeColor(GOLD); c.setLineWidth(0.6)
-    c.line(cx-52*mm, y, cx+52*mm, y)
+    c.line(cx-56*mm, y, cx+56*mm, y)
 
-    y -= 8.5*mm
-    c.setFillColor(TEXT); c.setFont("Times-Italic", 11)
+    y -= 10*mm
+    c.setFillColor(TEXT); c.setFont("Times-Italic", 12.5)
     c.drawCentredString(cx, y, "In sincere appreciation and gratitude for your generous donation")
-    y -= 5.4*mm
+    y -= 6.5*mm
     c.drawCentredString(cx, y, "and valuable support to the programs and activities of the")
-    y -= 6.3*mm
-    c.setFont("Times-Bold", 11.5); c.setFillColor(NAVY)
+    y -= 7.5*mm
+    c.setFont("Times-Bold", 13); c.setFillColor(NAVY)
     c.drawCentredString(cx, y, "FILIPINO COMMUNITY CENTER INTERNATIONAL (FCCI)")
 
-    y -= 8*mm
-    c.setFont("Times-Italic", 11); c.setFillColor(TEXT)
+    y -= 9.5*mm
+    c.setFont("Times-Italic", 12.5); c.setFillColor(TEXT)
     amt_line = f"in the amount of \u20a9{data['amount']:,}" if data.get("amount") else ""
     if data.get("purpose"):
         amt_line += (" for " if amt_line else "for ") + str(data["purpose"])
     if amt_line:
         c.drawCentredString(cx, y, amt_line)
-        y -= 6.2*mm
-    c.setFont("Times-Italic", 10.3); c.setFillColor(MUTED)
+        y -= 7*mm
+    c.setFont("Times-Italic", 11.5); c.setFillColor(MUTED)
     c.drawCentredString(cx, y, "Your kindness and commitment help empower our community")
-    y -= 4.8*mm
+    y -= 5.5*mm
     c.drawCentredString(cx, y, "and make a lasting difference.")
 
-    base_y = 30*mm
+    base_y = 35*mm
     _cert_seal(c, m2 + 23*mm, base_y+1*mm, 15.5*mm, GOLD, GOLD_LIGHT, logo_path)
 
     sig_x = cx - 52*mm
     c.setStrokeColor(NAVY); c.setLineWidth(0.7)
     c.line(sig_x-26*mm, base_y+3*mm, sig_x+26*mm, base_y+3*mm)
-    c.setFont("Times-Bold", 10.3); c.setFillColor(NAVY)
-    c.drawCentredString(sig_x, base_y-2*mm, data.get("signee", "Authorized Signatory"))
-    c.setFont("Times-Roman", 8.3); c.setFillColor(MUTED)
-    c.drawCentredString(sig_x, base_y-6*mm, data.get("signee_title", "Treasurer"))
+    c.setFont("Times-Bold", 11); c.setFillColor(NAVY)
+    c.drawCentredString(sig_x, base_y-2.2*mm, data.get("signee", "Authorized Signatory"))
+    c.setFont("Times-Roman", 9); c.setFillColor(MUTED)
+    c.drawCentredString(sig_x, base_y-6.5*mm, data.get("signee_title", "Treasurer"))
 
     _cert_laurel(c, cx, base_y+7*mm, 12.5*mm, ["THANK", "YOU"], NAVY, GOLD)
 
     date_x = cx + 52*mm
     c.setStrokeColor(NAVY)
     c.line(date_x-26*mm, base_y+3*mm, date_x+26*mm, base_y+3*mm)
-    c.setFont("Times-Bold", 10.3); c.setFillColor(NAVY)
-    c.drawCentredString(date_x, base_y-2*mm, data.get("date_str", "-"))
-    c.setFont("Times-Roman", 8.3); c.setFillColor(MUTED)
-    c.drawCentredString(date_x, base_y-6*mm, "Date")
+    c.setFont("Times-Bold", 11); c.setFillColor(NAVY)
+    c.drawCentredString(date_x, base_y-2.2*mm, data.get("date_str", "-"))
+    c.setFont("Times-Roman", 9); c.setFillColor(MUTED)
+    c.drawCentredString(date_x, base_y-6.5*mm, "Date")
 
     if data.get("receipt_no"):
         c.setFont("Helvetica", 7); c.setFillColor(MUTED)
