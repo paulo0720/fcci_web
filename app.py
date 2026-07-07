@@ -620,6 +620,222 @@ def _draw_elegant_certificate(buf, data):
     c.save()
 
 
+def _cert_arc_text(c, cx, cy, radius, text, font, size, color, start_deg, end_deg):
+    """Ipinapatong ang text sa isang arc, letra-por-letra, pantay ang spacing sa anggulo."""
+    import math
+    c.saveState()
+    c.setFillColor(color)
+    c.setFont(font, size)
+    n = len(text)
+    if n == 0:
+        c.restoreState(); return
+    span = end_deg - start_deg
+    step = span / max(n - 1, 1)
+    for i, ch in enumerate(text):
+        ang = math.radians(start_deg + i*step)
+        x = cx + radius*math.cos(ang)
+        y = cy + radius*math.sin(ang)
+        c.saveState()
+        c.translate(x, y)
+        c.rotate(math.degrees(ang) - 90)
+        c.drawCentredString(0, 0, ch)
+        c.restoreState()
+    c.restoreState()
+
+
+def _cert_official_seal(c, cx, cy, r, blue):
+    """Asul na 'Official Seal' stamp, parang notary ink stamp."""
+    from reportlab.lib.units import mm
+    c.saveState()
+    c.setStrokeColor(blue); c.setLineWidth(1.3)
+    c.circle(cx, cy, r, fill=0, stroke=1)
+    c.setLineWidth(0.6)
+    c.circle(cx, cy, r*0.82, fill=0, stroke=1)
+
+    _cert_arc_text(c, cx, cy, r*0.91, "FILIPINO COMMUNITY CENTER",
+                   "Helvetica-Bold", 4.6, blue, 200, 340)
+    _cert_arc_text(c, cx, cy, r*0.91, "INTERNATIONAL",
+                   "Helvetica-Bold", 4.6, blue, 20, 160)
+
+    _cert_star(c, cx-r*0.68, cy+r*0.12, 1.4*mm, 0.6*mm, blue)
+    _cert_star(c, cx+r*0.68, cy+r*0.12, 1.4*mm, 0.6*mm, blue)
+
+    c.setFillColor(blue)
+    c.setFont("Helvetica-Bold", 9.5)
+    c.drawCentredString(cx, cy+2.3*mm, "OFFICIAL")
+    c.drawCentredString(cx, cy-4.5*mm, "SEAL")
+    c.setFont("Helvetica-Bold", 6.5)
+    c.drawCentredString(cx, cy-1.6*mm, "FCCI")
+    c.restoreState()
+
+
+def _draw_withdrawal_certificate(buf, data):
+    """Gumagawa ng elegant, landscape, gold/navy withdrawal certificate
+    na may computation ng refund/community share, isinusulat papunta sa buf (BytesIO)."""
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas as pdfcanvas
+
+    NAVY = colors.HexColor("#0b1d3a")
+    GOLD = colors.HexColor("#b8964f")
+    GOLD_LIGHT = colors.HexColor("#e3cd97")
+    CREAM = colors.HexColor("#fbf8f1")
+    TEXT = colors.HexColor("#1a2a44")
+    MUTED = colors.HexColor("#6b7a94")
+    BLUE = colors.HexColor("#1f3f8f")
+    BOX_BG = colors.HexColor("#f4efe2")
+    REFUND_GREEN = colors.HexColor("#0d7a5f")
+
+    W, H = landscape(A4)
+    logo_path = _pdf_logo_path()
+
+    c = pdfcanvas.Canvas(buf, pagesize=landscape(A4))
+    c.setFillColor(CREAM); c.rect(0, 0, W, H, fill=1, stroke=0)
+
+    if logo_path and os.path.exists(logo_path):
+        from reportlab.lib.utils import ImageReader
+        c.saveState()
+        c.setFillAlpha(0.07)
+        wm_size = 150*mm
+        c.drawImage(ImageReader(logo_path), W/2-wm_size/2, H/2-wm_size/2,
+                    width=wm_size, height=wm_size,
+                    preserveAspectRatio=True, mask="auto")
+        c.restoreState()
+
+    band = 8*mm
+    c.setFillColor(NAVY)
+    c.rect(0, 0, W, band, fill=1, stroke=0)
+    c.rect(0, H-band, W, band, fill=1, stroke=0)
+    c.setFillColor(GOLD)
+    c.rect(0, band-0.9*mm, W, 0.9*mm, fill=1, stroke=0)
+    c.rect(0, H-band, W, 0.9*mm, fill=1, stroke=0)
+
+    m1 = band + 3*mm
+    m2 = m1 + 3.2*mm
+    c.setStrokeColor(GOLD); c.setLineWidth(1.4)
+    c.rect(m1, m1, W-2*m1, H-2*m1, fill=0, stroke=1)
+    c.setLineWidth(0.6)
+    c.rect(m2, m2, W-2*m2, H-2*m2, fill=0, stroke=1)
+
+    for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+        cx0 = m2 + 3*mm if sx > 0 else W-m2-3*mm
+        cy0 = m2 + 3*mm if sy > 0 else H-m2-3*mm
+        _cert_diamond(c, cx0, cy0, 2.2*mm, GOLD)
+
+    cx = W/2
+    y = H - 31*mm
+    logo_r = 14*mm
+    c.setStrokeColor(GOLD); c.setLineWidth(1)
+    c.circle(cx, y, logo_r+1.1*mm, fill=0, stroke=1)
+    if logo_path and os.path.exists(logo_path):
+        from reportlab.lib.utils import ImageReader
+        img = ImageReader(logo_path)
+        d = logo_r*2
+        c.saveState()
+        clip = c.beginPath(); clip.circle(cx, y, logo_r)
+        c.clipPath(clip, stroke=0, fill=0)
+        c.drawImage(img, cx-d/2, y-d/2, width=d, height=d,
+                    preserveAspectRatio=True, mask="auto")
+        c.restoreState()
+
+    y -= (logo_r + 12*mm)
+    c.setFillColor(NAVY); c.setFont("Times-Bold", 30)
+    c.drawCentredString(cx, y, "WITHDRAWAL CERTIFICATE")
+
+    y -= 7.5*mm
+    c.setStrokeColor(GOLD); c.setLineWidth(0.8)
+    lw = 48*mm
+    c.line(cx-lw, y, cx-6*mm, y); c.line(cx+6*mm, y, cx+lw, y)
+    _cert_star(c, cx, y, 2.2*mm, 1.0*mm, GOLD)
+
+    y -= 9.5*mm
+    c.setFillColor(NAVY); c.setFont("Times-Italic", 13)
+    c.drawCentredString(cx, y, "This is to certify that")
+
+    y -= 12*mm
+    c.setFont("Times-Bold", 27)
+    c.drawCentredString(cx, y, str(data.get("member_name") or "-"))
+
+    y -= 5.5*mm
+    c.setStrokeColor(GOLD); c.setLineWidth(0.6)
+    c.line(cx-56*mm, y, cx+56*mm, y)
+
+    y -= 9*mm
+    c.setFont("Times-Roman", 11.5); c.setFillColor(TEXT)
+    c.drawCentredString(cx, y, "is a registered member of the FILIPINO COMMUNITY CENTER INTERNATIONAL (FCCI)")
+    y -= 6*mm
+    c.drawCentredString(cx, y, f"with Membership ID No. {data.get('member_id', '-')}.")
+    y -= 7.5*mm
+    c.setFont("Times-Italic", 11.5)
+    c.drawCentredString(cx, y, "has formally submitted a request for withdrawal from membership")
+    y -= 6*mm
+    c.drawCentredString(cx, y, f"effective this {data.get('withdrawal_date', '-')}.")
+
+    y -= 12*mm
+    box_w = 172*mm
+    box_h = 24*mm
+    box_x = cx - box_w/2
+    box_y = y - box_h
+    c.setFillColor(BOX_BG)
+    c.setStrokeColor(GOLD); c.setLineWidth(0.9)
+    c.roundRect(box_x, box_y, box_w, box_h, 2.5*mm, fill=1, stroke=1)
+
+    col_w = box_w/3
+    for i in (1, 2):
+        xline = box_x + col_w*i
+        c.setStrokeColor(GOLD); c.setLineWidth(0.4)
+        c.line(xline, box_y+3*mm, xline, box_y+box_h-3*mm)
+
+    cols = [
+        ("TOTAL CONTRIBUTIONS", f"\u20a9{data.get('total_contributions', 0):,}", NAVY),
+        ("REFUND (75%)", f"\u20a9{data.get('refund_amount', 0):,}", REFUND_GREEN),
+        ("COMMUNITY SHARE (25%)", f"\u20a9{data.get('community_share', 0):,}", NAVY),
+    ]
+    for i, (label, val, vcolor) in enumerate(cols):
+        colcx = box_x + col_w*i + col_w/2
+        c.setFillColor(MUTED)
+        c.setFont("Helvetica-Bold", 7)
+        c.drawCentredString(colcx, box_y+box_h-8*mm, label)
+        c.setFillColor(vcolor)
+        c.setFont("Times-Bold", 15)
+        c.drawCentredString(colcx, box_y+6.5*mm, val)
+
+    y = box_y - 7*mm
+    c.setFont("Times-Italic", 9.6); c.setFillColor(MUTED)
+    c.drawCentredString(cx, y, "This certification is issued upon the request of the above-named individual")
+    y -= 4.6*mm
+    c.drawCentredString(cx, y, "for whatever legal purpose it may serve.")
+
+    base_y = 33*mm
+    _cert_seal(c, m2 + 22*mm, base_y+1*mm, 15*mm, GOLD, GOLD_LIGHT, logo_path)
+    _cert_official_seal(c, W - m2 - 22*mm, base_y+2*mm, 15*mm, BLUE)
+
+    sig_x = cx - 33*mm
+    c.setStrokeColor(NAVY); c.setLineWidth(0.7)
+    c.line(sig_x-26*mm, base_y+3*mm, sig_x+26*mm, base_y+3*mm)
+    c.setFont("Times-Bold", 10.6); c.setFillColor(NAVY)
+    c.drawCentredString(sig_x, base_y-2.2*mm, data.get("signee", "Maria Santos"))
+    c.setFont("Times-Roman", 8.6); c.setFillColor(MUTED)
+    c.drawCentredString(sig_x, base_y-6.3*mm, data.get("signee_title", "President"))
+    c.drawCentredString(sig_x, base_y-10*mm, "Filipino Community Center International (FCCI)")
+
+    date_x = cx + 33*mm
+    c.setStrokeColor(NAVY)
+    c.line(date_x-22*mm, base_y+3*mm, date_x+22*mm, base_y+3*mm)
+    c.setFont("Times-Bold", 10.6); c.setFillColor(NAVY)
+    c.drawCentredString(date_x, base_y-2.2*mm, data.get("withdrawal_date", "-"))
+    c.setFont("Times-Roman", 8.6); c.setFillColor(MUTED)
+    c.drawCentredString(date_x, base_y-6.3*mm, "Date")
+
+    c.setFont("Helvetica", 7); c.setFillColor(MUTED)
+    c.drawCentredString(cx, m2+3.2*mm,
+        f"Member ID: {data.get('member_id','-')}   |   Generated: {data.get('generated','-')}")
+
+    c.showPage()
+    c.save()
+
+
 @app.route("/")
 def home():
     return redirect("/login")
@@ -3379,20 +3595,6 @@ def withdrawal_certificate(member_id):
     if "username" not in session:
         return redirect("/login")
 
-    from reportlab.platypus import (
-        SimpleDocTemplate,
-        Paragraph,
-        Spacer,
-        Image,
-        Table,
-        TableStyle
-    )
-
-    from reportlab.lib import colors
-    from reportlab.lib.styles import (
-        getSampleStyleSheet
-    )
-
     conn = get_db()
     cursor = conn.cursor()
 
@@ -3408,7 +3610,7 @@ def withdrawal_certificate(member_id):
     if not member:
         return_db(conn)
         return "Member Not Found"
-    
+
     cursor.execute("""
     SELECT
         COALESCE(SUM(amount),0)
@@ -3434,80 +3636,18 @@ def withdrawal_certificate(member_id):
     return_db(conn)
 
     import io as _io
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import mm
-    from reportlab.lib import colors
-    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
-                                    Table, TableStyle)
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
-
-    kfont = _ensure_korean_font()
     buf = _io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4,
-                            topMargin=14*mm, bottomMargin=14*mm,
-                            leftMargin=16*mm, rightMargin=16*mm)
-    story = []
-    story.append(_modern_pdf_header("CERTIFICATE"))
-    story.append(Spacer(1, 22))
-
-    story.append(Paragraph("Certificate of Withdrawal",
-        ParagraphStyle("t", fontSize=20, textColor=colors.HexColor("#0b1d2e"),
-                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=3)))
-    story.append(Paragraph("Membership Status Change",
-        ParagraphStyle("s", fontSize=10, textColor=colors.HexColor("#5c8270"),
-                       alignment=TA_CENTER, spaceAfter=18)))
-
-    story.append(Paragraph("Pinatutunayan na ang miyembrong si",
-        ParagraphStyle("b", fontSize=11, textColor=colors.HexColor("#3a5045"),
-                       alignment=TA_CENTER, spaceAfter=6)))
-    story.append(Paragraph(str(member[2] or "-"),
-        ParagraphStyle("nm", fontSize=22, textColor=colors.HexColor("#0b1d2e"),
-                       fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=6)))
-    story.append(Paragraph("ay opisyal nang umalis sa pagiging miyembro ng FCCI.",
-        ParagraphStyle("b2", fontSize=11, textColor=colors.HexColor("#3a5045"),
-                       alignment=TA_CENTER, spaceAfter=18)))
-
-    lbl_style = ParagraphStyle("l", fontSize=10.5, textColor=colors.HexColor("#5c8270"))
-    def frow(lbl, val, mono=False, color="#0c2418"):
-        fn = "Courier-Bold" if mono else "Helvetica-Bold"
-        return [Paragraph(lbl, lbl_style),
-                Paragraph(f'<font name="{fn}" color="{color}">{val}</font>',
-                          ParagraphStyle("v", fontSize=10.5))]
-
-    det = Table([
-        frow("Member ID", member[1], mono=True, color="#00a89e"),
-        frow("Member Since", member[6] or "-"),
-        frow("Withdrawal Date", datetime.now().strftime("%Y-%m-%d")),
-        frow("Total Contributions", f"\u20a9{total_contributions:,}"),
-        frow("Refund (75%)", f"\u20a9{refund_amount:,}", color="#00a89e"),
-        frow("Community Share (25%)", f"\u20a9{community_share:,}"),
-    ], colWidths=[55*mm, 123*mm])
-    det.setStyle(TableStyle([
-        ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8),
-        ("LINEBELOW",(0,0),(-1,-1),0.5,colors.HexColor("#eef3f2")),
-        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-    ]))
-    story.append(det)
-    story.append(Spacer(1, 30))
-
-    sig = Table([
-        [Paragraph("_______________________", ParagraphStyle("sl",fontSize=10,alignment=TA_CENTER)),
-         Paragraph("_______________________", ParagraphStyle("sl2",fontSize=10,alignment=TA_CENTER))],
-        [Paragraph("Member Signature", ParagraphStyle("sn",fontSize=8,textColor=colors.HexColor("#5c8270"),alignment=TA_CENTER)),
-         Paragraph("FCCI Officer", ParagraphStyle("sn2",fontSize=8,textColor=colors.HexColor("#5c8270"),alignment=TA_CENTER))],
-    ], colWidths=[89*mm, 89*mm])
-    story.append(sig)
-    story.append(Spacer(1, 20))
-
-    story.append(Paragraph("United in Faith, Serving with Love",
-        ParagraphStyle("f", fontSize=8, textColor=colors.HexColor("#9ab5a8"),
-                       alignment=TA_CENTER)))
-    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        ParagraphStyle("g", fontSize=7, textColor=colors.HexColor("#b5c9be"),
-                       alignment=TA_CENTER)))
-
-    doc.build(story, onFirstPage=_watermark_canvas, onLaterPages=_watermark_canvas)
+    _draw_withdrawal_certificate(buf, dict(
+        member_name=member[2],
+        member_id=member[1],
+        withdrawal_date=datetime.now().strftime("%B %d, %Y"),
+        total_contributions=total_contributions,
+        refund_amount=refund_amount,
+        community_share=community_share,
+        signee="Maria Santos",
+        signee_title="President",
+        generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
+    ))
     buf.seek(0)
     return send_file(buf, mimetype="application/pdf", as_attachment=True,
                      download_name=f"Withdrawal_{member_id}.pdf")
