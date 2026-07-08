@@ -6251,6 +6251,133 @@ def guest_event_join(post_id):
     return render_template("guest_event_success.html", team_name=team_name, captain_name=captain_name)
 
 
+# ── MEMBER-FACING EVENTS VIEW (calendar + standings, read-only) ──
+@app.route("/member_events")
+def member_events():
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    from datetime import date as _date
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Kunin lahat ng events
+    cursor.execute("""
+        SELECT id, event_type, event_title, content, event_date,
+               event_location, max_slots, registration_closed
+        FROM feed_posts
+        WHERE is_event = TRUE
+        ORDER BY event_date ASC
+    """)
+    rows = cursor.fetchall()
+
+    today_str = _date.today().isoformat()
+    upcoming = []
+    for r in rows:
+        post_id = r[0]
+        event_type = r[1]
+        team_mode = _event_is_team_mode(event_type)
+        regs = _get_feed_event_registrations(cursor, post_id)
+        confirmed = [x for x in regs if x["status"] == "Confirmed"]
+        max_slots = r[6]
+        slots_remaining = (max_slots - len(confirmed)) if max_slots else None
+
+        ev = {
+            "id": post_id, "type": event_type,
+            "icon": EVENT_TYPE_ICONS.get(event_type, "📌"),
+            "title": r[2] or event_type, "description": r[3],
+            "date": r[4], "location": r[5],
+            "max_slots": max_slots, "slots_remaining": slots_remaining,
+            "registration_closed": r[7], "team_mode": team_mode,
+        }
+        # I-parse ang petsa para sa date badge (month abbr + day)
+        ev["mo_abbr"] = ""
+        ev["day_num"] = ""
+        try:
+            if r[4]:
+                _months = ["", "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                           "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+                _mm = int(str(r[4])[5:7])
+                _dd = int(str(r[4])[8:10])
+                ev["mo_abbr"] = _months[_mm] if 1 <= _mm <= 12 else ""
+                ev["day_num"] = _dd
+        except Exception:
+            pass
+        # Paparating lang (petsa >= ngayon, o walang petsa)
+        try:
+            if not r[4] or str(r[4])[:10] >= today_str:
+                upcoming.append(ev)
+        except Exception:
+            upcoming.append(ev)
+
+    # ── Results & Standings: hanapin ang team events na may matches ──
+    tournaments = []
+    try:
+        cursor.execute("""
+            SELECT DISTINCT post_id FROM event_matches
+            ORDER BY post_id DESC
+        """)
+        match_events = [row[0] for row in cursor.fetchall()]
+
+        for pid in match_events:
+            # Kunin ang event details
+            cursor.execute("""
+                SELECT event_type, event_title FROM feed_posts WHERE id = %s
+            """, (pid,))
+            ev_row = cursor.fetchone()
+            if not ev_row:
+                continue
+
+            # Kunin ang matches
+            cursor.execute("""
+                SELECT round_name, round_order, team_a, team_b,
+                       score_a, score_b, winner, status
+                FROM event_matches WHERE post_id = %s
+                ORDER BY round_order DESC, id DESC
+            """, (pid,))
+            m_rows = cursor.fetchall()
+
+            matches = [{
+                "round_name": m[0], "round_order": m[1],
+                "team_a": m[2], "team_b": m[3],
+                "score_a": m[4], "score_b": m[5],
+                "winner": m[6], "status": m[7],
+            } for m in m_rows]
+
+            # Standings
+            teams = set()
+            for m in matches:
+                if m["team_a"]: teams.add(m["team_a"])
+                if m["team_b"]: teams.add(m["team_b"])
+            standings = _compute_standings(matches, list(teams))
+
+            # Champion (winner ng highest round na completed)
+            champion = None
+            for m in matches:
+                if m["status"] == "Completed" and m["winner"]:
+                    champion = m["winner"]
+                    break
+
+            # Completed results lang
+            results = [m for m in matches if m["status"] == "Completed"]
+
+            tournaments.append({
+                "id": pid, "type": ev_row[0],
+                "icon": EVENT_TYPE_ICONS.get(ev_row[0], "🏆"),
+                "title": ev_row[1] or ev_row[0],
+                "standings": standings, "results": results,
+                "champion": champion,
+            })
+    except Exception:
+        conn.rollback()  # baka wala pang event_matches table
+
+    return_db(conn)
+
+    return render_template("member_events.html",
+        upcoming=upcoming, tournaments=tournaments,
+        member_name=session.get("member_name", ""))
+
+
 # ── MEMBER'S OWN PROFILE VIEW (sa loob ng portal) ──────────
 @app.route("/member_portal_profile")
 def member_portal_profile():
