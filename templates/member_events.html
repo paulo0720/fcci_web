@@ -131,7 +131,7 @@ body { font-family:'Inter',sans-serif; color:var(--ink); background:
         <div class="ev-icon ic-{{ iconclass }}">{{ ev.icon }}</div>
         <div class="ev-info">
           <div class="t">{{ ev.title }}</div>
-          <div class="meta">📅 {{ ev.date or 'TBA' }}{% if ev.location %} · 📍 {{ ev.location }}{% endif %}</div>
+          <div class="meta">📅 {{ ev.date or 'TBA' }}{% if ev.time %} · 🕐 {{ ev.time }}{% endif %}{% if ev.location %} · 📍 {{ ev.location }}{% endif %}</div>
           {% if ev.description %}<div class="desc">{{ ev.description }}</div>{% endif %}
         </div>
         <div class="ev-right">

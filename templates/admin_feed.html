@@ -272,9 +272,15 @@ body::before {
         </div>
         <div class="ef-row">
           <div class="ef-group">
-            <label>Date &amp; Time (text)</label>
-            <input type="text" name="event_date" placeholder="e.g. July 26, 2026 · 1:00 PM">
+            <label>Petsa ng Event</label>
+            <input type="date" name="event_date">
           </div>
+          <div class="ef-group">
+            <label>Oras (optional)</label>
+            <input type="time" name="event_time">
+          </div>
+        </div>
+        <div class="ef-row">
           <div class="ef-group">
             <label>Location</label>
             <input type="text" name="event_location" placeholder="e.g. Ansan Sports Complex">
@@ -335,6 +341,7 @@ body::before {
     <div class="event-badge">{{ event_type_icons.get(post[9], '📌') }} Event · {{ post[9] }}</div>
     <div class="event-meta-mini">
       {% if post[11] %}📅 {{ post[11] }}{% endif %}
+      {% if post[13] %} · 🕐 {{ post[13] }}{% endif %}
       {% if post[12] %} · 📍 {{ post[12] }}{% endif %}
     </div>
     <div style="margin-bottom:10px;"><a class="manage-link" href="/admin_events#event-{{ post[0] }}">👥 Manage Registrations</a></div>
