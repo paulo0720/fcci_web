@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Events — FCCI</title>
+<meta name="theme-color" content="#0b2236">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/fcci_logo.jpeg">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cyan-deep:#0b2236; --cyan:#00a89e; --cyan-bright:#00d4c8; --violet:#7c6df0;
+  --ink:#0b1d2e; --text-dim:#6b7e8f; --line:#e3eef4; --gold:#c8860a;
+  --glass-border:#e3eef4;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Inter',sans-serif; color:var(--ink); background:
+  radial-gradient(ellipse 800px 500px at 50% 0%, rgba(0,212,200,0.10), transparent 55%),
+  linear-gradient(180deg,#fff,#f4f8fb); min-height:100vh; padding-bottom:50px; }
+
+.topbar { position:sticky; top:0; z-index:50; background:rgba(255,255,255,0.8); backdrop-filter:blur(20px); border-bottom:1px solid var(--glass-border); padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+.topbar-brand { display:flex; align-items:center; gap:10px; }
+.topbar-brand img { width:36px; height:36px; border-radius:50%; object-fit:contain; }
+.topbar-brand span { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; background:linear-gradient(90deg,var(--cyan),var(--violet)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.topbar-nav { display:flex; gap:8px; }
+.topbar-nav a { text-decoration:none; color:var(--text-dim); font-size:13.5px; font-weight:600; padding:8px 14px; border-radius:10px; transition:all 0.2s; }
+.topbar-nav a:hover, .topbar-nav a.active { background:#e8faf8; color:var(--cyan); }
+
+.wrap { max-width:940px; margin:0 auto; padding:24px 20px; }
+.page-title { font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:var(--ink); margin-bottom:3px; display:flex; align-items:center; gap:10px; }
+.page-sub { font-size:13px; color:var(--text-dim); margin-bottom:20px; }
+
+.subtabs { display:flex; gap:4px; background:#eef3f8; padding:4px; border-radius:11px; margin-bottom:20px; width:fit-content; }
+.subtabs button { padding:9px 20px; border-radius:8px; font-size:13px; color:var(--text-dim); border:none; background:transparent; cursor:pointer; font-family:'Inter',sans-serif; font-weight:500; }
+.subtabs button.on { background:#fff; color:var(--cyan); font-weight:600; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+
+.tab-content { display:none; }
+.tab-content.on { display:block; }
+
+/* Upcoming cards */
+.ev-list { display:flex; flex-direction:column; gap:12px; }
+.ev-card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; display:flex; gap:16px; align-items:center; }
+.ev-icon { width:56px; height:56px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
+.ic-Basketball { background:#fff0e0; } .ic-Volleyball { background:#e8f4ff; }
+.ic-Feeding { background:#e8faf0; } .ic-General { background:#f3ecff; }
+.ic-Fiesta { background:#ffe8f0; } .ic-Fun { background:#fff8e0; } .ic-Other { background:#eef3f8; }
+.ev-info { flex:1; min-width:0; }
+.ev-info .t { font-size:16px; font-weight:700; color:var(--ink); }
+.ev-info .meta { font-size:12px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; margin-top:3px; }
+.ev-info .desc { font-size:12.5px; color:#5c7080; margin-top:5px; line-height:1.5; }
+.ev-right { text-align:right; flex-shrink:0; }
+.ev-date-badge { background:var(--cyan-deep); color:#fff; border-radius:12px; padding:8px 12px; text-align:center; min-width:60px; }
+.ev-date-badge .mo { font-size:9px; color:var(--cyan-bright); text-transform:uppercase; letter-spacing:1px; }
+.ev-date-badge .dy { font-size:22px; font-weight:800; line-height:1.1; }
+.join-btn { display:inline-block; margin-top:8px; background:linear-gradient(135deg,var(--cyan),var(--cyan-bright)); color:#fff; font-size:11px; font-weight:700; padding:7px 16px; border-radius:8px; text-decoration:none; }
+.join-btn.closed { background:#eef3f8; color:var(--text-dim); }
+.slots { font-size:10px; color:var(--cyan); margin-top:5px; font-family:'JetBrains Mono',monospace; }
+.slots.full { color:#d0442f; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--text-dim); font-size:14px; background:#fff; border:1px solid var(--line); border-radius:14px; }
+
+/* Standings */
+.champ-banner { background:linear-gradient(135deg,#0b2236,#0a2d40); border-radius:16px; padding:22px; text-align:center; margin-bottom:18px; position:relative; overflow:hidden; }
+.champ-banner::before { content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(0,212,200,0.08) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,200,0.08) 1px,transparent 1px); background-size:26px 26px; -webkit-mask-image:radial-gradient(ellipse at 70% 30%,#000,transparent 70%); }
+.champ-banner .inner { position:relative; }
+.champ-banner .evt { font-size:11px; color:var(--cyan-bright); font-family:'JetBrains Mono',monospace; letter-spacing:1px; margin-bottom:10px; }
+.champ-banner .trophy { font-size:40px; }
+.champ-banner .clabel { font-size:10px; color:#f0a93f; letter-spacing:2px; font-family:'JetBrains Mono',monospace; margin-top:4px; }
+.champ-banner .cname { font-size:24px; font-weight:800; color:#fff; margin-top:2px; }
+
+.two-col { display:grid; grid-template-columns:1.2fr 1fr; gap:18px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
+.card h3 { font-size:14px; color:var(--ink); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.stand-tbl { width:100%; border-collapse:collapse; }
+.stand-tbl th { font-size:9px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; text-align:left; padding:8px 6px; border-bottom:2px solid #eef3f2; }
+.stand-tbl td { font-size:12.5px; padding:11px 6px; border-bottom:1px solid #f2f6f4; }
+.rank { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
+.rank-1 { background:#fff4d6; color:#c8860a; } .rank-2 { background:#eef1f4; color:#7a8a99; } .rank-3 { background:#f7e8dd; color:#b3591a; } .rank-o { background:#f4f8fb; color:var(--text-dim); }
+.tn { font-weight:600; color:var(--ink); }
+.pts { font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--cyan); }
+.wl { font-family:'JetBrains Mono',monospace; color:var(--text-dim); }
+.result-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f2f6f4; font-size:12px; }
+.result-row .rteams { color:var(--ink); } .result-row .rteams b { color:var(--cyan); }
+.result-row .rscore { font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--ink); }
+.result-row .rround { font-size:9px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; margin-top:2px; }
+
+.tourney-block { margin-bottom:30px; }
+
+@media (max-width:760px) {
+  .topbar { padding:12px 16px; }
+  .topbar-brand span { font-size:15px; }
+  .topbar-nav a { padding:7px 10px; font-size:12px; }
+  .two-col { grid-template-columns:1fr; }
+  .ev-card { flex-wrap:wrap; }
+  .page-title { font-size:20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <img src="{{ url_for('static', filename='fcci_logo.jpeg') }}" alt="FCCI">
+    <span>FCCI Feed</span>
+  </div>
+  <div class="topbar-nav">
+    <a href="/feed">📰 Feed</a>
+    <a href="/member_events" class="active">📅 Events</a>
+    <a href="/member_portal_profile">👤 Profile</a>
+    <a href="/member_logout">⏻ Logout</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="page-title">📅 Events</div>
+  <div class="page-sub">Mga aktibidad ng samahan — makikita mo ang schedule at resulta ng mga laro</div>
+
+  <div class="subtabs">
+    <button class="on" onclick="showTab('upcoming', this)">Paparating</button>
+    <button onclick="showTab('standings', this)">Results & Standings</button>
+  </div>
+
+  <!-- UPCOMING -->
+  <div class="tab-content on" id="tab-upcoming">
+    {% if upcoming %}
+    <div class="ev-list">
+      {% for ev in upcoming %}
+      {% set iconclass = ev.type.split(' ')[0].split('/')[0] %}
+      <div class="ev-card">
+        <div class="ev-icon ic-{{ iconclass }}">{{ ev.icon }}</div>
+        <div class="ev-info">
+          <div class="t">{{ ev.title }}</div>
+          <div class="meta">📅 {{ ev.date or 'TBA' }}{% if ev.location %} · 📍 {{ ev.location }}{% endif %}</div>
+          {% if ev.description %}<div class="desc">{{ ev.description }}</div>{% endif %}
+        </div>
+        <div class="ev-right">
+          {% if ev.date %}
+          <div class="ev-date-badge">
+            <div class="mo">{{ ev.mo_abbr }}</div>
+            <div class="dy">{{ ev.day_num }}</div>
+          </div>
+          {% endif %}
+          {% if ev.registration_closed %}
+          <span class="join-btn closed">Closed</span>
+          {% else %}
+          <a href="/feed" class="join-btn">Join / Register</a>
+          {% endif %}
+          {% if ev.slots_remaining is not none %}
+            {% if ev.slots_remaining > 0 %}
+            <div class="slots">{{ ev.slots_remaining }} slots left</div>
+            {% else %}
+            <div class="slots full">Full</div>
+            {% endif %}
+          {% else %}
+          <div class="slots">Open</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">Wala pang paparating na event. Mag-check ka ulit mamaya! 📭</div>
+    {% endif %}
+  </div>
+
+  <!-- STANDINGS -->
+  <div class="tab-content" id="tab-standings">
+    {% if tournaments %}
+    {% for t in tournaments %}
+    <div class="tourney-block">
+      {% if t.champion %}
+      <div class="champ-banner">
+        <div class="inner">
+          <div class="evt">{{ t.icon }} {{ t.title | upper }}</div>
+          <div class="trophy">🏆</div>
+          <div class="clabel">CHAMPION</div>
+          <div class="cname">{{ t.champion }}</div>
+        </div>
+      </div>
+      {% else %}
+      <div class="page-title" style="font-size:17px;margin-bottom:12px;">{{ t.icon }} {{ t.title }}</div>
+      {% endif %}
+
+      <div class="two-col">
+        <div class="card">
+          <h3>📊 Standings</h3>
+          {% if t.standings %}
+          <table class="stand-tbl">
+            <thead><tr><th>#</th><th>TEAM</th><th>W</th><th>L</th><th>PTS</th></tr></thead>
+            <tbody>
+              {% for s in t.standings %}
+              <tr>
+                <td><div class="rank rank-{{ loop.index if loop.index <= 3 else 'o' }}">{{ loop.index }}</div></td>
+                <td class="tn">{{ s.team }}</td>
+                <td class="wl">{{ s.w }}</td>
+                <td class="wl">{{ s.l }}</td>
+                <td class="pts">{{ s.pts }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div style="color:var(--text-dim);font-size:12px;padding:10px 0;">Wala pang laro.</div>
+          {% endif %}
+        </div>
+
+        <div class="card">
+          <h3>{{ t.icon }} Mga Resulta</h3>
+          {% if t.results %}
+          {% for m in t.results %}
+          <div class="result-row">
+            <div>
+              <div class="rteams">
+                <span class="{% if m.winner == m.team_a %}"><b>{{ m.team_a }}</b>{% else %}{{ m.team_a }}{% endif %}</span>
+                vs
+                {% if m.winner == m.team_b %}<b>{{ m.team_b }}</b>{% else %}{{ m.team_b }}{% endif %}
+              </div>
+              <div class="rround">{{ m.round_name | upper }}</div>
+            </div>
+            <div class="rscore">{{ m.score_a }}–{{ m.score_b }}</div>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div style="color:var(--text-dim);font-size:12px;padding:10px 0;">Wala pang resulta.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty">Wala pang tournament o laro na may resulta. 🏀</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.subtabs button').forEach(b => b.classList.remove('on'));
+  document.getElementById('tab-' + name).classList.add('on');
+  btn.classList.add('on');
+}
+</script>
+</body>
+</html>
