@@ -346,7 +346,16 @@ body::before {
     </div>
     <div style="margin-bottom:10px;">
       <a class="manage-link" href="/admin_events#event-{{ post[0] }}">👥 Manage Registrations</a>
-      <a class="manage-link" href="javascript:void(0)" onclick="openEditEvent({{ post[0] }}, {{ post[10]|tojson }}, {{ post[9]|tojson }}, {{ post[11]|tojson }}, {{ post[13]|tojson }}, {{ post[12]|tojson }}, {{ post[3]|tojson }}, {{ post[14]|tojson }})" style="background:rgba(124,109,240,0.1);color:#7c6df0;">✏️ Edit Event</a>
+      <a class="manage-link edit-event-btn" href="javascript:void(0)"
+         data-id="{{ post[0] }}"
+         data-title="{{ post[10]|e }}"
+         data-type="{{ post[9]|e }}"
+         data-date="{{ post[11]|e }}"
+         data-time="{{ post[13]|e }}"
+         data-location="{{ post[12]|e }}"
+         data-content="{{ post[3]|e }}"
+         data-slots="{{ post[14] if post[14] is not none else '' }}"
+         style="background:rgba(124,109,240,0.1);color:#7c6df0;">✏️ Edit Event</a>
     </div>
     {% endif %}
 
@@ -628,6 +637,23 @@ function openEditEvent(id, title, type, date, time, location, content, slots) {
 function closeEditEvent() {
   document.getElementById('editEventModal').style.display = 'none';
 }
+// I-attach ang click handlers gamit ang data attributes (mas ligtas sa quotes)
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.edit-event-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      openEditEvent(
+        this.getAttribute('data-id'),
+        this.getAttribute('data-title'),
+        this.getAttribute('data-type'),
+        this.getAttribute('data-date'),
+        this.getAttribute('data-time'),
+        this.getAttribute('data-location'),
+        this.getAttribute('data-content'),
+        this.getAttribute('data-slots')
+      );
+    });
+  });
+});
 </script>
 
 </body>
