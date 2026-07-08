@@ -6554,7 +6554,7 @@ def admin_feed():
 
     cursor.execute("""
     SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time,
-           is_event, event_type, event_title, event_date, event_location, event_time
+           is_event, event_type, event_title, event_date, event_location, event_time, max_slots
     FROM feed_posts
     ORDER BY is_pinned DESC, id DESC
     """)
@@ -6634,6 +6634,44 @@ def admin_feed_delete(post_id):
     cursor = conn.cursor()
     cursor.execute("DELETE FROM feed_posts WHERE id = %s", (post_id,))
     conn.commit()
+    return_db(conn)
+    return redirect("/admin_feed")
+
+
+# ── EDIT EVENT (admin) — baguhin ang event details ─────────
+@app.route("/admin_feed/edit_event/<int:post_id>", methods=["POST"])
+def admin_feed_edit_event(post_id):
+    if "username" not in session:
+        return redirect("/login")
+
+    event_title = request.form.get("event_title", "").strip()
+    event_type = request.form.get("event_type", "").strip()
+    event_date = request.form.get("event_date", "").strip()
+    event_time = request.form.get("event_time", "").strip()
+    event_location = request.form.get("event_location", "").strip()
+    content = request.form.get("content", "").strip()
+    max_slots_raw = request.form.get("max_slots", "").strip()
+    max_slots = int(max_slots_raw) if max_slots_raw.isdigit() else None
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE feed_posts
+            SET event_title = %s,
+                event_type = %s,
+                event_date = %s,
+                event_time = %s,
+                event_location = %s,
+                content = %s,
+                max_slots = %s
+            WHERE id = %s AND is_event = TRUE
+        """, (event_title, event_type, event_date, event_time,
+              event_location, content, max_slots, post_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"[EDIT EVENT] Error: {e}")
     return_db(conn)
     return redirect("/admin_feed")
 
