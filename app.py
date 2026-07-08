@@ -5848,7 +5848,7 @@ def feed():
     cursor.execute("""
     SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time,
            is_event, event_type, event_title, event_date, event_location,
-           max_slots, registration_closed
+           max_slots, registration_closed, event_time
     FROM feed_posts
     ORDER BY is_pinned DESC, id DESC
     """)
@@ -5919,6 +5919,7 @@ def feed():
                 "title": post[10],
                 "date": post[11],
                 "location": post[12],
+                "time": post[15] if len(post) > 15 else None,
                 "max_slots": max_slots,
                 "slots_remaining": slots_remaining,
                 "registration_closed": post[14],
@@ -5968,6 +5969,52 @@ def feed_delete_post(post_id):
         "DELETE FROM feed_posts WHERE id = %s AND member_id = %s",
         (post_id, session["member_id"])
     )
+
+    conn.commit()
+    return_db(conn)
+
+    return redirect("/feed")
+
+
+# ── EDIT POST (sariling post lang ang puwedeng baguhin) ─────
+@app.route("/feed/edit/<int:post_id>", methods=["POST"])
+def feed_edit_post(post_id):
+
+    if not session.get("member_logged_in"):
+        return redirect("/member_login")
+
+    new_content = request.form.get("content", "").strip()
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # I-verify muna na ang post ay pag-aari ng member na ito
+    cursor.execute(
+        "SELECT member_id FROM feed_posts WHERE id = %s",
+        (post_id,)
+    )
+    row = cursor.fetchone()
+
+    if not row or row[0] != session["member_id"]:
+        # Hindi sariling post — huwag payagang mag-edit
+        return_db(conn)
+        return redirect("/feed")
+
+    # I-update lang ang content (sariling post)
+    now = datetime.now()
+    cursor.execute("""
+        UPDATE feed_posts
+        SET content = %s,
+            post_date = %s,
+            post_time = %s
+        WHERE id = %s AND member_id = %s
+    """, (
+        new_content,
+        now.strftime("%B %d, %Y"),
+        now.strftime("%I:%M %p"),
+        post_id,
+        session["member_id"],
+    ))
 
     conn.commit()
     return_db(conn)
@@ -6264,7 +6311,7 @@ def member_events():
     # Kunin lahat ng events
     cursor.execute("""
         SELECT id, event_type, event_title, content, event_date,
-               event_location, max_slots, registration_closed
+               event_location, max_slots, registration_closed, event_time
         FROM feed_posts
         WHERE is_event = TRUE
         ORDER BY event_date ASC
@@ -6289,6 +6336,7 @@ def member_events():
             "date": r[4], "location": r[5],
             "max_slots": max_slots, "slots_remaining": slots_remaining,
             "registration_closed": r[7], "team_mode": team_mode,
+            "time": r[8] if len(r) > 8 else None,
         }
         # I-parse ang petsa para sa date badge (month abbr + day)
         ev["mo_abbr"] = ""
@@ -6506,7 +6554,7 @@ def admin_feed():
 
     cursor.execute("""
     SELECT id, member_id, full_name, content, photo_path, is_pinned, post_date, post_time,
-           is_event, event_type, event_title, event_date, event_location
+           is_event, event_type, event_title, event_date, event_location, event_time
     FROM feed_posts
     ORDER BY is_pinned DESC, id DESC
     """)
@@ -6544,6 +6592,7 @@ def admin_feed_post():
     event_type = request.form.get("event_type", "").strip() if is_event else None
     event_title = request.form.get("event_title", "").strip() if is_event else None
     event_date = request.form.get("event_date", "").strip() if is_event else None
+    event_time = request.form.get("event_time", "").strip() if is_event else None
     event_location = request.form.get("event_location", "").strip() if is_event else None
     max_slots_raw = request.form.get("max_slots", "").strip() if is_event else ""
     max_slots = int(max_slots_raw) if max_slots_raw.isdigit() else None
@@ -6555,8 +6604,8 @@ def admin_feed_post():
         cursor.execute("""
         INSERT INTO feed_posts
         (member_id, full_name, content, photo_path, is_pinned, post_date, post_time,
-         is_event, event_type, event_title, event_date, event_location, max_slots, registration_closed)
-        VALUES (%s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
+         is_event, event_type, event_title, event_date, event_time, event_location, max_slots, registration_closed)
+        VALUES (%s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
         """, (
             "ADMIN",
             session["username"],
@@ -6568,6 +6617,7 @@ def admin_feed_post():
             event_type,
             event_title,
             event_date,
+            event_time,
             event_location,
             max_slots,
         ))
