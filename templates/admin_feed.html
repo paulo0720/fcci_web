@@ -344,7 +344,10 @@ body::before {
       {% if post[13] %} · 🕐 {{ post[13] }}{% endif %}
       {% if post[12] %} · 📍 {{ post[12] }}{% endif %}
     </div>
-    <div style="margin-bottom:10px;"><a class="manage-link" href="/admin_events#event-{{ post[0] }}">👥 Manage Registrations</a></div>
+    <div style="margin-bottom:10px;">
+      <a class="manage-link" href="/admin_events#event-{{ post[0] }}">👥 Manage Registrations</a>
+      <a class="manage-link" href="javascript:void(0)" onclick="openEditEvent({{ post[0] }}, {{ post[10]|tojson }}, {{ post[9]|tojson }}, {{ post[11]|tojson }}, {{ post[13]|tojson }}, {{ post[12]|tojson }}, {{ post[3]|tojson }}, {{ post[14]|tojson }})" style="background:rgba(124,109,240,0.1);color:#7c6df0;">✏️ Edit Event</a>
+    </div>
     {% endif %}
 
     <div class="post-actions">
@@ -554,6 +557,77 @@ window.addEventListener("resize", () => {
       appendAIMessage('bot', reply);
     }, 600 + Math.random() * 400);
   }
+</script>
+
+
+<!-- EDIT EVENT MODAL -->
+<div id="editEventModal" style="display:none;position:fixed;inset:0;background:rgba(11,29,46,0.6);z-index:300;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:18px;padding:26px;width:480px;max-width:100%;max-height:90vh;overflow-y:auto;">
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:19px;color:#0b1d2e;margin-bottom:18px;">✏️ Edit Event</h3>
+    <form method="POST" id="editEventForm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="font-size:11px;color:#6b7e8f;display:block;margin-bottom:5px;">Event Type</label>
+          <select name="event_type" id="editEventType" style="width:100%;padding:10px;border:1px solid #d5e3ec;border-radius:9px;font-size:13px;">
+            <option value="Basketball">Basketball</option>
+            <option value="Volleyball">Volleyball</option>
+            <option value="Feeding Program">Feeding Program</option>
+            <option value="General Assembly">General Assembly</option>
+            <option value="Fun Run">Fun Run</option>
+            <option value="Fiesta / Celebration">Fiesta / Celebration</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6b7e8f;display:block;margin-bottom:5px;">Max Slots (optional)</label>
+          <input type="number" name="max_slots" id="editEventSlots" min="1" style="width:100%;padding:10px;border:1px solid #d5e3ec;border-radius:9px;font-size:13px;">
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:#6b7e8f;display:block;margin-bottom:5px;">Event Title</label>
+        <input type="text" name="event_title" id="editEventTitle" style="width:100%;padding:10px;border:1px solid #d5e3ec;border-radius:9px;font-size:13px;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="font-size:11px;color:#6b7e8f;display:block;margin-bottom:5px;">Petsa</label>
+          <input type="date" name="event_date" id="editEventDate" style="width:100%;padding:10px;border:1px solid #d5e3ec;border-radius:9px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6b7e8f;display:block;margin-bottom:5px;">Oras</label>
+          <input type="time" name="event_time" id="editEventTime" style="width:100%;padding:10px;border:1px solid #d5e3ec;border-radius:9px;font-size:13px;">
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:#6b7e8f;display:block;margin-bottom:5px;">Location</label>
+        <input type="text" name="event_location" id="editEventLocation" style="width:100%;padding:10px;border:1px solid #d5e3ec;border-radius:9px;font-size:13px;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;color:#6b7e8f;display:block;margin-bottom:5px;">Description</label>
+        <textarea name="content" id="editEventContent" style="width:100%;min-height:70px;padding:10px;border:1px solid #d5e3ec;border-radius:9px;font-size:13px;resize:vertical;font-family:'Inter',sans-serif;"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" onclick="closeEditEvent()" style="padding:11px 22px;border-radius:10px;border:none;background:#eef3f8;color:#6b7e8f;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+        <button type="submit" style="padding:11px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#00a89e,#00d4c8);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">💾 I-save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditEvent(id, title, type, date, time, location, content, slots) {
+  document.getElementById('editEventForm').action = '/admin_feed/edit_event/' + id;
+  document.getElementById('editEventTitle').value = title || '';
+  document.getElementById('editEventType').value = type || 'Other';
+  document.getElementById('editEventDate').value = date || '';
+  document.getElementById('editEventTime').value = time || '';
+  document.getElementById('editEventLocation').value = location || '';
+  document.getElementById('editEventContent').value = content || '';
+  document.getElementById('editEventSlots').value = (slots !== null && slots !== undefined) ? slots : '';
+  document.getElementById('editEventModal').style.display = 'flex';
+}
+function closeEditEvent() {
+  document.getElementById('editEventModal').style.display = 'none';
+}
 </script>
 
 </body>
